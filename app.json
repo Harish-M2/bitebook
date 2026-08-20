@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bitebook",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080A09",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -28,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#080A09",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
