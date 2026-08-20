@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
+  // Bitebook is a dark-only app (app.json sets userInterfaceStyle: "dark"). NativeWind's
+  // default "media" dark mode can't be forced on web and throws there; "class" mode allows
+  // the forced-dark theme to work identically across native and web.
+  darkMode: 'class',
   presets: [require('nativewind/preset')],
   theme: {
     extend: {

@@ -10,7 +10,7 @@ export const mockTrendingDishes: Dish[] = [
     restaurant: { id: 'r1', name: 'Copper Tandoor' },
     rating: 4.8,
     ratingCount: 12400,
-    imageUrl: 'https://picsum.photos/seed/bitebook-lamb/700/700',
+    imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=700&q=80&auto=format&fit=crop',
   },
   {
     id: 'd2',
@@ -18,7 +18,7 @@ export const mockTrendingDishes: Dish[] = [
     restaurant: { id: 'r3', name: 'Bao & Ember' },
     rating: 4.7,
     ratingCount: 8700,
-    imageUrl: 'https://picsum.photos/seed/bitebook-skewers/700/700',
+    imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=700&q=80&auto=format&fit=crop',
   },
   {
     id: 'd3',
@@ -26,7 +26,7 @@ export const mockTrendingDishes: Dish[] = [
     restaurant: { id: 'r4', name: 'Black Bear Burger' },
     rating: 4.6,
     ratingCount: 6300,
-    imageUrl: 'https://picsum.photos/seed/bitebook-burger/700/700',
+    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=700&q=80&auto=format&fit=crop',
   },
 ];
 

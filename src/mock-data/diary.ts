@@ -21,7 +21,7 @@ export const mockDiaryEntries: DiaryEntry[] = [
       restaurant: { id: 'r1', name: 'Copper Tandoor' },
       rating: 4.8,
       ratingCount: 12400,
-      imageUrl: 'https://picsum.photos/seed/bitebook-lamb/300/300',
+      imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300&q=80&auto=format&fit=crop',
     },
   },
   {
@@ -34,7 +34,7 @@ export const mockDiaryEntries: DiaryEntry[] = [
       restaurant: { id: 'r4', name: 'Black Bear Burger' },
       rating: 4.6,
       ratingCount: 6300,
-      imageUrl: 'https://picsum.photos/seed/bitebook-burger/300/300',
+      imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&q=80&auto=format&fit=crop',
     },
   },
   {
@@ -47,7 +47,7 @@ export const mockDiaryEntries: DiaryEntry[] = [
       restaurant: { id: 'r5', name: 'Nonna\u2019s Table' },
       rating: 4.4,
       ratingCount: 3215,
-      imageUrl: 'https://picsum.photos/seed/bitebook-pasta/300/300',
+      imageUrl: 'https://images.unsplash.com/photo-1608219992759-8d74ed8d76eb?w=300&q=80&auto=format&fit=crop',
     },
   },
   {
@@ -60,7 +60,7 @@ export const mockDiaryEntries: DiaryEntry[] = [
       restaurant: { id: 'r3', name: 'Bao & Ember' },
       rating: 4.7,
       ratingCount: 8700,
-      imageUrl: 'https://picsum.photos/seed/bitebook-skewers/300/300',
+      imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300&q=80&auto=format&fit=crop',
     },
   },
 ];

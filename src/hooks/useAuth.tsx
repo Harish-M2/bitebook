@@ -9,14 +9,19 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { getProfile, type Profile } from '@/lib/db/profiles';
 
 type AuthResult = { error: string | null };
 
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
+  profile: Profile | null;
   /** True until the initial session lookup resolves. */
   isLoading: boolean;
+  /** True once `profile` has loaded and `profile.username` is still null. */
+  needsOnboarding: boolean;
+  refreshProfile: () => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
   signUpWithPassword: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -32,6 +37,20 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  const userId = session?.user.id ?? null;
+
+  const loadProfile = async (id: string) => {
+    try {
+      const nextProfile = await getProfile(id);
+      setProfile(nextProfile);
+    } catch (error) {
+      // Do not crash the app on a transient profile-fetch failure — surface via
+      // `profile` remaining null; screens should treat that as a loading/error state.
+      console.warn('[Bitebook] Failed to load profile:', error);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -56,11 +75,46 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    if (!userId) {
+      // Defer to a microtask so this isn't a synchronous setState call inside the
+      // effect body (avoids the cascading-render lint rule) while still resetting
+      // profile state as soon as the user signs out.
+      Promise.resolve().then(() => {
+        if (!isCancelled) setProfile(null);
+      });
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    getProfile(userId)
+      .then((nextProfile) => {
+        if (!isCancelled) setProfile(nextProfile);
+      })
+      .catch((error) => {
+        console.warn('[Bitebook] Failed to load profile:', error);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       user: session?.user ?? null,
+      profile,
       isLoading,
+      needsOnboarding: profile !== null && profile.username === null,
+      refreshProfile: async () => {
+        if (userId) {
+          await loadProfile(userId);
+        }
+      },
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return { error: error?.message ?? null };
@@ -73,7 +127,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await supabase.auth.signOut();
       },
     }),
-    [session, isLoading]
+    [session, isLoading, profile, userId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
