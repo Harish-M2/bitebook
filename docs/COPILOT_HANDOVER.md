@@ -107,7 +107,7 @@ bitebook/
 │   └── global.css                 Tailwind/NativeWind entry stylesheet
 ├── supabase/
 │   ├── config.toml                Supabase CLI project config (project_id "bitebook")
-│   ├── migrations/                23 SQL migration files, 0001–0023 (see §10)
+│   ├── migrations/                24 SQL migration files, 0001–0024 (see §10)
 │   ├── seed.sql                    Dev/demo seed data (namespaced @demo.bitebook.local)
 │   ├── tests/database/
 │   │   └── security_and_integrity.test.sql   18 pgTAP tests (written, NOT yet executed)
@@ -214,8 +214,8 @@ This section summarizes `docs/database-architecture.md`, which is the authoritat
 more detailed description — read that file directly for full detail. It documents what
 the migrations **actually create**, not aspirational design.
 
-**22 application tables**, created across 23 migration files (`supabase/migrations/0001`
-through `0023`):
+**22 application tables**, created across 24 migration files (`supabase/migrations/0001`
+through `0024`):
 
 `profiles`, `restaurants`, `restaurant_sources`, `restaurant_photos`, `cuisines`,
 `restaurant_cuisines`, `dishes`, `dish_photos`, `dish_cuisines`, `reviews`,
@@ -322,7 +322,7 @@ runtime.
   ```
   npx supabase migration list --linked
   ```
-  which shows all 23 local migrations (`0001`–`0023`) present in both the Local and
+  which shows all 24 local migrations (`0001`–`0024`) present in both the Local and
   Remote columns — i.e., the remote database schema matches the repository's migrations.
   This is a change from earlier in the project's history (see §14) when no live database
   existed at all.
@@ -389,7 +389,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<REDACTED>
 
 ## 10. Current Database State
 
-All 23 migrations currently in `supabase/migrations/`, in filename order:
+All 24 migrations currently in `supabase/migrations/`, in filename order:
 
 | File | Purpose |
 |---|---|
@@ -416,6 +416,7 @@ All 23 migrations currently in `supabase/migrations/`, in filename order:
 | `0021_indexes.sql` | Supplementary indexes (PostGIS GiST, `pg_trgm`, etc.) |
 | `0022_rpc.sql` | `nearby_restaurants()` RPC function |
 | `0023_seed_cuisines.sql` | Cuisine taxonomy seed data (real migration, not `seed.sql`) |
+| `0024_grants.sql` | Explicit table privileges: DML to `authenticated`, nothing to `anon` |
 
 Confirmed via `npx supabase migration list --linked` that **all 23 of these migrations
 are present on the linked remote "Bitebook" project**, i.e. the schema described above
@@ -528,11 +529,37 @@ to production via `db push`.
   through the generated `Enums<...>` helper so they can no longer drift from the schema.
   `tsc --noEmit` and `expo lint` both pass against it.
 
-### No sign-in/sign-up/onboarding UI
-- `useAuth.tsx` exposes the auth actions and onboarding-gate flag, but as of the last
-  known state, no actual sign-in/sign-up screens or an onboarding (username-setting)
-  screen exist in `src/app/`. **NEEDS VERIFICATION** — confirm by listing `src/app/`
-  contents directly on the Mac before assuming this is still true.
+### No sign-in/sign-up/onboarding UI — RESOLVED
+- The `(auth)` route group now exists: `welcome`, `sign-in`, `sign-up`, and a four-step
+  `onboarding` flow (identity, cuisines, location, suggested follows) per spec §22. Routing
+  uses `<Stack.Protected>` guards in `src/app/_layout.tsx` and `src/app/(auth)/_layout.tsx`.
+- Verified running in Expo Go on an iOS simulator: sign-up, email confirmation, sign-in and
+  the onboarding entry redirect all work against the live project.
+
+### Local and remote databases had different table privileges — RESOLVED
+- No migration before `0024` contained a single `GRANT`. They relied on Supabase's
+  *implicit* default privileges, which the **local stack has and the hosted project does
+  not**. Identical schema, different behaviour: every signed-in read succeeded locally and
+  failed in production with `42501 permission denied for table profiles`, which made the
+  app unusable the moment a real user signed in.
+- The pgTAP suite could not catch this, because it only ever runs against the local
+  database — where the implicit grants exist. **A green test run does not prove the hosted
+  project behaves the same way.** When changing anything privilege-related, verify against
+  the remote database too (Management API `/v1/projects/{ref}/database/query`, or a REST
+  call with a real user JWT).
+- `0024_grants.sql` now states the model explicitly and revokes the inherited grants so both
+  environments match: `authenticated` may attempt any DML and RLS decides the rows; `anon`
+  gets nothing.
+
+### `.env` may exist but be empty
+- A `.env` file being present does **not** mean it is configured — the committed
+  `.env.example` has the two keys with blank values, and copying it produces a file that
+  passes every "does `.env` exist?" check while leaving the app unconfigured.
+- `src/lib/supabase.ts` deliberately falls back to `https://placeholder.supabase.co` so the
+  client can construct, so the only symptom is a `console.warn` in the Metro output plus
+  every network call failing. Check for actual values, not the file.
+- `EXPO_PUBLIC_*` variables are inlined at **bundle** time; after editing `.env`, restart
+  Metro with `--clear` or the old values stay baked into the bundle.
 
 ### Mock data still backs the UI
 - Most/all of the 5 tab screens still render from `src/mock-data/*.ts`, not live Supabase
