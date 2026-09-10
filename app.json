@@ -9,9 +9,11 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080A09",
     "ios": {
+      "bundleIdentifier": "com.bitebook.app",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.bitebook.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
