@@ -28,4 +28,9 @@ export const queryKeys = {
   cuisineBreakdown: (userId: string) => ['cuisine-breakdown', userId] as const,
   feed: (userId: string) => ['feed', userId] as const,
   restaurants: () => ['restaurants'] as const,
+  /**
+   * External provider search. Keyed on the query so each term is cached separately —
+   * results are a paid-for lookup, so re-typing a term should not buy it twice.
+   */
+  placeSearch: (query: string) => ['place-search', query] as const,
 };

@@ -481,11 +481,13 @@ to production via `db push`.
   `expo-image`, `eslint-config-expo` and others). Not a blocker; run
   `npx expo install --check` to review and upgrade.
 - **Database/security tests (pgTAP)**: `supabase/tests/database/security_and_integrity.
-  test.sql` — 21 tests covering signup→profile creation, username case-insensitive
+  test.sql` — 33 tests covering signup→profile creation, username case-insensitive
   uniqueness, private-diary protection, review visibility (public/followers/private),
   like/comment visibility inheritance, self-follow prevention, list ownership, saved/
   want-to-eat mutual exclusivity, restaurant_sources uniqueness, dish-name deduplication,
-  diary↔review composite FK integrity, and counter consistency. **These now pass, 21/21**,
+  diary↔review composite FK integrity, counter consistency, the external place import
+  (dedupe, slug collision, derived coordinates) and function-level privileges. **These
+  now pass, 33/33**,
   reproducibly from a clean `supabase db reset`. Run them with `npx supabase test db`
   against the local stack (requires Docker, now installed).
   - Their first-ever execution surfaced three defects **in the test file**, since fixed:
@@ -540,7 +542,40 @@ to production via `db push`.
 - Verified running in Expo Go on an iOS simulator: sign-up, email confirmation, sign-in and
   the onboarding entry redirect all work against the live project.
 
-### Local and remote databases had different table privileges — RESOLVED
+### Local and remote privileges diverge — RESOLVED (three times)
+
+This is the single most productive bug class in the project so far. It has now bitten in
+three different forms, and every one of them passed the full local test suite.
+
+| Migration | What was missing on the hosted project | How it showed up |
+|---|---|---|
+| `0024` | `authenticated` had no privilege on any table | `42501 permission denied for table profiles` on first sign-in |
+| `0027` | `service_role` had no `EXECUTE` on `upsert_restaurant_from_place` | `places-import` returned a 500 |
+| `0028` | `service_role` had no privilege on any table | Silent: the import succeeded, only the read-back was denied |
+
+**Root cause, in all three cases:** the migrations relied on Supabase's *implicit* default
+privileges. Those defaults are attached to objects created by the dashboard's `postgres`
+role; CLI migrations run under a different login role, so they never applied. The local
+stack grants them anyway, so local and remote diverged silently.
+
+**The rule now:** state every privilege explicitly in the migration that creates the object.
+Never assume a role has access because it worked locally.
+
+**The safeguard:** `scripts/verify-remote-privileges.mjs` asks the *hosted* project directly
+and exits non-zero on any violation. Run it after any migration that touches grants, RLS or
+a `SECURITY DEFINER` function:
+
+```bash
+SUPABASE_ACCESS_TOKEN=$(security find-generic-password -s "Supabase CLI" -w) \
+  node scripts/verify-remote-privileges.mjs
+```
+
+The pgTAP suite now also asserts the rule structurally (test 28): no `SECURITY DEFINER`
+function we own may be executable by `anon` or `authenticated`. `EXECUTE` is granted to
+`PUBLIC` by default, so a new definer function is exposed until someone remembers to revoke
+it, and that test covers future ones without anyone adding a test for them.
+
+### The original instance (0024), for reference — RESOLVED
 - No migration before `0024` contained a single `GRANT`. They relied on Supabase's
   *implicit* default privileges, which the **local stack has and the hosted project does
   not**. Identical schema, different behaviour: every signed-in read succeeded locally and
@@ -690,7 +725,7 @@ Only items supported by repository evidence or the historical report files.
   done; the file is now generated output, with the five convenience enum aliases
   re-derived via `Enums<...>` so they cannot drift. `tsc` and lint pass.
 - _(Resolved)_ ~~Install Docker Desktop and actually run the pgTAP test suite~~ — done;
-  Docker Desktop is installed, and the suite passes 21/21 from a clean
+  Docker Desktop is installed, and the suite passes 33/33 from a clean
   `supabase db reset`. See §12 for the three test-file defects this uncovered and for
   confirmation that the schema/RLS themselves were correct and unchanged.
 
@@ -699,18 +734,26 @@ Only items supported by repository evidence or the historical report files.
   screens) — **verify current absence on the Mac first**.
 - Build the username/onboarding screen that calls `setUsername()` from
   `src/lib/db/profiles.ts`, gated by `needsOnboarding`.
-- Restaurant and dish data: nothing can be logged until restaurants exist, and spec §20
-  forbids hand-building them. Needs an external places provider behind a server-side
-  layer (Supabase Edge Function), with the provider key never in the mobile client.
+- _(Resolved)_ ~~Restaurant data needs an external places provider behind a server-side
+  layer~~ — done. See §23. The provider abstraction, both Edge Functions, the import RPC
+  and the Discover search UI are built, deployed and verified against the hosted project.
+
+### High — blocked on a decision
+- **Choose the real place provider and supply a key.** The system currently runs on the
+  fixture provider: eight hard-coded London/Manchester restaurants. Everything downstream
+  works, but the data is fake. See §23 for how to switch it on.
+- **Map provider categories onto the `cuisines` taxonomy.** Imported restaurants have no
+  `restaurant_cuisines` rows, so they do not appear under any cuisine chip and their list
+  row shows no cuisine. Google returns a `types` array that could seed this.
+- **Re-host provider photos into Supabase Storage.** `image_url` is left null on import on
+  purpose: the Google photo endpoint requires the API key in the URL, so it must never be
+  handed to the client. `restaurant_sources.normalized_source_fields.bitebookPhotoName`
+  holds the opaque photo resource name so this can be done later without a second search.
 
 ### Medium
-- Decide on and integrate a restaurant data provider for Phase 3 (explicitly deferred
-  — evaluate pricing/free tiers/licensing before choosing one; do not default to a paid
-  API without that evaluation).
-- Build restaurant/dish submission UI now that `dishes` (but not `restaurants`) is
-  client-writable — clarify product flow for how a restaurant record gets created if
-  clients can't create one directly (likely needs a server-side function or an
-  admin/seed-data-only flow until a provider is integrated).
+- Build the dish submission UI. `dishes` *is* client-writable (`auth.uid() =
+  created_by_profile_id`), and restaurants can now be created via import, so the log-a-dish
+  flow is finally unblocked.
 - Wire up Storage upload flows (avatar, dish photo, review photo) using the existing
   bucket/RLS design.
 
@@ -971,3 +1014,91 @@ Use this on the Mac before resuming feature work:
 - [ ] Read `.github/copilot-instructions.md` before making any code changes
 - [ ] Confirmed whether sign-in/sign-up/onboarding UI exists yet (§13/§17) before
       assuming it needs to be built from scratch
+
+---
+
+## 23. External Place Provider
+
+Spec §20 forbids hand-building a restaurant database and requires the provider to be
+replaceable. This is how that is implemented.
+
+### Shape
+
+```
+Discover search bar
+   ↓  supabase.functions.invoke        src/lib/db/places.ts
+places-search  (Edge Function)         ← holds the provider API key
+   ↓  PlacesProvider interface         supabase/functions/_shared/places/
+GooglePlacesProvider | FixturePlacesProvider
+   ↓
+places-import  (Edge Function)         ← service role
+   ↓  RPC
+public.upsert_restaurant_from_place    ← SECURITY DEFINER, service_role only
+   ↓
+public.restaurants + public.restaurant_sources
+```
+
+Search and import are separate functions on purpose. Search runs on every pause in typing
+and is billed per call, so it must stay cheap and must not write; a row is only persisted
+once the user picks one. That also stops a stray search from filling `restaurants` with
+places nobody logged.
+
+### Why the write goes through a database function
+
+`public.restaurants` has **no client INSERT policy** and is not going to get one — the
+catalogue is provider-owned, not user-owned. `upsert_restaurant_from_place` is the single
+sanctioned way in. It is `SECURITY DEFINER` and granted **only** to `service_role`, so
+reaching it requires the secret key, which exists only in the Edge Function environment.
+
+It owns three things that would otherwise be reimplemented per provider:
+
+- **Deduplication** on `(source, external_place_id)`, so re-importing or two users picking
+  the same restaurant at once converge on one row instead of racing to duplicate it.
+- **Slug generation.** `slug` is `NOT NULL UNIQUE` but restaurant names are not unique —
+  chains repeat verbatim. The city qualifies it first (`dishoom-london`), then a counter
+  (`dishoom-london-1`). A name in a non-Latin script slugifies to an empty string, so it
+  falls back to the place ID.
+- **PostGIS point construction.** `latitude`/`longitude` are *derived* from `location` by
+  the `sync_restaurant_lat_lng` trigger and silently overwritten — you must write
+  `location`, never the lat/lng columns.
+
+`places-import` re-fetches the place detail server-side rather than trusting the client's
+copy. Accepting a client-supplied name and location would let anyone write arbitrary rows
+into a table that deliberately has no INSERT policy.
+
+### Switching to the real provider
+
+The default is the **fixture provider**: eight hard-coded restaurants, no network, no cost.
+It exists so the log-a-dish flow can be built and tested before anyone enables billing, and
+so tests never depend on a paid API. Its rows are written with source `seed`, not
+`google_places` — that keeps fixture data out of the unique key real imports deduplicate on,
+so a place imported for real later is never mistaken for the fake one.
+
+To use Google Places API (New):
+
+```bash
+supabase secrets set GOOGLE_PLACES_API_KEY=...
+supabase secrets set PLACES_PROVIDER=google   # optional but recommended
+```
+
+`PLACES_PROVIDER=google` makes the real provider **mandatory** — without it, a production
+deploy that loses its secret degrades silently to the eight fake restaurants instead of
+erroring. Set `PLACES_PROVIDER=fixture` to force fixtures even when a key is present.
+
+To swap Google for something else, implement `PlacesProvider`
+(`supabase/functions/_shared/places/types.ts`) and select it in `index.ts`. Nothing outside
+that directory references a provider-specific shape. Selection is by configuration, never by
+request parameter — letting a client choose its provider would let it choose the free fake
+one and poison the catalogue.
+
+### Cost controls
+
+- The search bar debounces (`useDebouncedValue`, 400ms), so a request follows a pause, not a
+  keystroke.
+- Queries under 2 characters are rejected client- and server-side.
+- Search results are cached for 5 minutes per query string, so backspacing a character does
+  not buy them again.
+- The Google field mask requests only what a picker row needs; the expensive fields are
+  deferred to `details()`, which runs once for the one place the user actually chooses.
+- Both functions require a real user JWT. JWT verification alone is not enough — it does not
+  distinguish a user token from the anon key, and the anon key ships inside the app.

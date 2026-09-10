@@ -72,8 +72,17 @@ npx supabase test db                # pgTAP database/security tests (local stack
 ```
 
 See `docs/COPILOT_HANDOVER.md` §12/§13 for current pass/fail status. The pgTAP suite
-passes 21/21 against the local stack; run it with `npx supabase test db` (not `--linked`,
+passes 33/33 against the local stack; run it with `npx supabase test db` (not `--linked`,
 which targets the live database).
+
+The local suite cannot see privilege differences on the hosted project — that gap caused
+three separate production bugs. After any migration touching grants, RLS or a
+`SECURITY DEFINER` function, also run:
+
+```bash
+SUPABASE_ACCESS_TOKEN=$(security find-generic-password -s "Supabase CLI" -w) \
+  node scripts/verify-remote-privileges.mjs
+```
 
 ## Troubleshooting
 

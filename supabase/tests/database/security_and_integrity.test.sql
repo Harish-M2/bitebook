@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(21);
+select plan(33);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -329,6 +329,163 @@ select ok(
       and policyname = 'review photos are readable if the parent review is visible'
   ),
   'Storage RLS policy gating review-photos reads by parent review visibility exists'
+);
+
+-- 19-26. External place import (0025_places_import.sql).
+--
+-- upsert_restaurant_from_place is the sole sanctioned write path into the restaurant
+-- catalogue, because restaurants has no client INSERT policy. These tests cover the three
+-- pieces of logic that would otherwise be reimplemented per provider: deduplication on the
+-- provider's place ID, unique slug generation, and PostGIS point construction.
+
+-- 19. The function is not callable by clients. It is SECURITY DEFINER and restaurants has
+-- no INSERT policy, so a stray EXECUTE grant would hand every signed-in user the ability to
+-- write the catalogue. EXECUTE is granted to PUBLIC by default, so this must be revoked
+-- explicitly and stay revoked.
+select ok(
+  not has_function_privilege(
+    'authenticated', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+  ),
+  'authenticated cannot EXECUTE upsert_restaurant_from_place (no SECURITY DEFINER bypass)'
+);
+
+select ok(
+  not has_function_privilege(
+    'anon', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+  ),
+  'anon cannot EXECUTE upsert_restaurant_from_place'
+);
+
+-- 20. A first import creates the restaurant and records its provenance.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_a', 'Test Tandoor', '1 Test Street', 'London',
+  51.5, -0.1, 2::smallint
+) as restaurant_a \gset
+
+select is(
+  (select count(*)::int from public.restaurant_sources
+     where source = 'google_places' and external_place_id = 'test_place_a'),
+  1,
+  'importing a place records exactly one restaurant_sources row'
+);
+
+-- 21. location is written, and latitude/longitude are derived from it by the trigger rather
+-- than taken from the parameters directly.
+select is(
+  (select round(latitude::numeric, 4) from public.restaurants where id = :'restaurant_a'),
+  51.5000::numeric,
+  'latitude is derived from the PostGIS location written by the import'
+);
+
+-- 22. Re-importing the same place ID updates in place instead of creating a duplicate. This
+-- is what makes a re-sync safe to run repeatedly.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_a', 'Test Tandoor Renamed', null, 'London', 51.5, -0.1
+) as restaurant_a_again \gset
+
+select is(
+  :'restaurant_a_again'::uuid,
+  :'restaurant_a'::uuid,
+  're-importing the same external place ID returns the existing restaurant, not a duplicate'
+);
+
+select is(
+  (select name from public.restaurants where id = :'restaurant_a'),
+  'Test Tandoor Renamed',
+  're-importing refreshes the restaurant details'
+);
+
+-- 23. Omitted fields on a re-import must not blank out data already held. A provider
+-- response with a missing field means "unknown", not "empty".
+select is(
+  (select price_level from public.restaurants where id = :'restaurant_a'),
+  2::smallint,
+  'a null argument on re-import preserves the existing value rather than clearing it'
+);
+
+-- 24. Chains repeat their name verbatim across cities, but slug is globally unique. The
+-- city qualifies the slug first, because that is what a human would write.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_b', 'Test Tandoor', null, 'Manchester', 53.48, -2.24
+) as restaurant_b \gset
+
+select is(
+  (select slug from public.restaurants where id = :'restaurant_b'),
+  'test-tandoor-manchester',
+  'a same-named restaurant in another city is disambiguated by city'
+);
+
+-- 25. Two branches in the same city exhaust the city qualifier, so a counter is appended.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_c', 'Test Tandoor', null, 'London', 51.6, -0.2
+) as restaurant_c \gset
+
+select is(
+  (select slug from public.restaurants where id = :'restaurant_c'),
+  'test-tandoor-london-1',
+  'a second branch in the same city falls back to a numeric slug suffix'
+);
+
+-- 26. slugify strips rather than transliterates, so a name in a non-Latin script reduces to
+-- an empty string. The slug is NOT NULL, so this must not be allowed to produce one.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_d', '寿司', null, null, 35.6, 139.7
+) as restaurant_d \gset
+
+select isnt(
+  (select slug from public.restaurants where id = :'restaurant_d'),
+  '',
+  'a name that slugifies to nothing still produces a usable slug'
+);
+
+-- 27. service_role CAN execute it. Asserting only the negative is what let 0025 ship with
+-- the function revoked from everyone including the one role that needed it: the Edge
+-- Function failed with `permission denied for function` on the hosted project while every
+-- local test passed. See 0027_places_import_grants.sql.
+select ok(
+  has_function_privilege(
+    'service_role', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+  ),
+  'service_role CAN execute upsert_restaurant_from_place (the Edge Function depends on it)'
+);
+
+-- 28. No SECURITY DEFINER function we wrote is callable by a client role, except the one
+-- that has to be. EXECUTE is granted to PUBLIC by default, so every new definer function is
+-- exposed until someone remembers to revoke it. This asserts the rule rather than each
+-- individual function, so a function added later is covered without anyone adding a test.
+--
+-- Two categories are excluded:
+--
+--   * Extension-owned functions. PostGIS is installed into `public` in this project rather
+--     than `extensions`, so its several hundred functions — including SECURITY DEFINER ones
+--     like st_estimatedextent — would otherwise dominate the result. They are not ours to
+--     grant or revoke.
+--
+--   * can_view_review. It is the predicate behind the reviews RLS policy, and policies are
+--     evaluated as the querying role, so `authenticated` MUST be able to execute it or
+--     every review read fails. It is SECURITY DEFINER for exactly that reason and returns
+--     only a boolean.
+select is(
+  (select coalesce(string_agg(p.proname, ', ' order by p.proname), '')
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prosecdef
+      and p.prokind = 'f'
+      -- Trigger functions run as part of a write the caller is already permitted to make;
+      -- they are not independently invocable and PostgREST will not expose them.
+      and p.prorettype <> 'pg_catalog.trigger'::regtype
+      and p.proname <> 'can_view_review'
+      and not exists (
+        select 1 from pg_depend d
+        where d.objid = p.oid
+          and d.classid = 'pg_proc'::regclass
+          and d.deptype = 'e'
+      )
+      and (has_function_privilege('anon', p.oid, 'EXECUTE')
+        or has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
+  '',
+  'no SECURITY DEFINER function we own is executable by anon or authenticated'
 );
 
 select * from finish();

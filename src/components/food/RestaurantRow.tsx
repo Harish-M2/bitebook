@@ -31,8 +31,12 @@ export function RestaurantRow({ restaurant, onPress, onSave, className }: Restau
           {restaurant.name}
         </BodyText>
         <Caption numberOfLines={1}>
-          {restaurant.cuisine} · {restaurant.priceLevel}
-          {restaurant.distanceLabel ? ` · ${restaurant.distanceLabel}` : ''}
+          {/* Imported restaurants have no cuisine until one is assigned, and not every
+              screen supplies a distance — join only the parts that exist so the row never
+              renders a stray separator. */}
+          {[restaurant.cuisine, restaurant.priceLevel, restaurant.distanceLabel]
+            .filter(Boolean)
+            .join(' · ')}
         </Caption>
         <Rating value={restaurant.rating} size="sm" count={formatCount(restaurant.reviewCount)} />
       </View>
