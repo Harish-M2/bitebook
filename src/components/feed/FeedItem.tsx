@@ -37,7 +37,7 @@ export function FeedItem({ activity, className }: FeedItemProps) {
       </View>
 
       <Image
-        source={{ uri: activity.photoUrl }}
+        source={activity.photoUrl ?? undefined}
         transition={150}
         accessibilityLabel={title ?? 'Food photo'}
         style={{ width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: colors.surfaceElevated }}

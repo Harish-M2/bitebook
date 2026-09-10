@@ -26,7 +26,7 @@ export function FoodDiaryItem({ entry, onPress, className }: FoodDiaryItemProps)
         <Caption numberOfLines={1}>{entry.dish.restaurant.name}</Caption>
       </View>
       <Image
-        source={{ uri: entry.dish.imageUrl }}
+        source={entry.dish.imageUrl ?? undefined}
         transition={150}
         accessibilityLabel={entry.dish.name}
         style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.surfaceElevated }}

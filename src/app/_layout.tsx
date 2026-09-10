@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClientProvider } from '@tanstack/react-query';
 import {
   useFonts,
   Inter_400Regular,
@@ -13,6 +14,7 @@ import {
 } from '@expo-google-fonts/inter';
 
 import { colors } from '@/constants/colors';
+import { queryClient } from '@/lib/queryClient';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import '../global.css';
 
@@ -35,14 +37,16 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        {/* Mounted before the fonts gate so the session lookup starts immediately. */}
-        <AuthProvider>
-          <StatusBar style="light" />
-          <SplashScreenController fontsReady={fontsReady} />
-          {fontsReady ? <RootNavigator /> : null}
-        </AuthProvider>
-      </SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          {/* Mounted before the fonts gate so the session lookup starts immediately. */}
+          <AuthProvider>
+            <StatusBar style="light" />
+            <SplashScreenController fontsReady={fontsReady} />
+            {fontsReady ? <RootNavigator /> : null}
+          </AuthProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }

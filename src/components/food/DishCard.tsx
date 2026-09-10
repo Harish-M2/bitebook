@@ -19,7 +19,7 @@ export function DishCard({ dish, onPress, showRestaurant = true, className }: Di
   return (
     <Pressable onPress={onPress} className={cn('w-[140px]', className)}>
       <Image
-        source={{ uri: dish.imageUrl }}
+        source={dish.imageUrl ?? undefined}
         transition={150}
         accessibilityLabel={dish.name}
         style={{ width: 140, height: 140, borderRadius: 16, backgroundColor: colors.surfaceElevated }}

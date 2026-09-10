@@ -1,9 +1,10 @@
 /**
- * Presentation-layer types used by Phase 1 UI and mock data.
+ * Presentation-layer types: the shapes the UI renders, deliberately decoupled from the
+ * database schema. Supabase rows are mapped into these in `src/lib/db/*`, so a schema
+ * change touches one mapper rather than every component.
  *
- * These describe shapes the UI needs, not the database schema — the real schema
- * is introduced in Phase 2 (see Bitebook_Build_Instructions.md, section 18) and
- * these types will be superseded/derived from the generated Supabase types then.
+ * Image fields are nullable because real records frequently have no photo yet — only mock
+ * data could guarantee one.
  */
 
 export type UserSummary = {
@@ -24,7 +25,7 @@ export type Restaurant = {
   distanceLabel?: string;
   rating: number;
   reviewCount: number;
-  imageUrl: string;
+  imageUrl: string | null;
 };
 
 export type Dish = {
@@ -33,7 +34,7 @@ export type Dish = {
   restaurant: Pick<Restaurant, 'id' | 'name'>;
   rating: number;
   ratingCount: number;
-  imageUrl: string;
+  imageUrl: string | null;
 };
 
 export type FeedActivity = {
@@ -43,7 +44,7 @@ export type FeedActivity = {
   dish?: Dish;
   restaurant?: Restaurant;
   reviewText?: string;
-  photoUrl: string;
+  photoUrl: string | null;
   /** Pre-formatted relative time, e.g. "2h". */
   postedAgo: string;
   likeCount: number;

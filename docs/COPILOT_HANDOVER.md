@@ -97,10 +97,13 @@ bitebook/
 │   │   ├── cn.ts                 className merge utility (NativeWind)
 │   │   ├── format.ts              formatting helpers
 │   │   └── db/
-│   │       └── profiles.ts       Profile data-access functions (getProfile, setUsername)
-│   ├── mock-data/                Mock data still used by most screens (diary.ts,
-│   │                              discover.ts, feed.ts, profile.ts) — NOT yet wired to
-│   │                              Supabase (see §17)
+│   │       ├── profiles.ts   Profile data access (getProfile, setUsername, updateProfile)
+│   │       ├── diary.ts      Diary entries
+│   │       ├── feed.ts       Home feed (reviews by followed users)
+│   │       ├── stats.ts      Diary counters + cuisine breakdown
+│   │       ├── restaurants.ts  Discover list + trending dishes
+│   │       ├── cuisines.ts / preferences.ts / follows.ts
+│   │       └── storage.ts    Bucket paths → public or signed image URLs
 │   ├── constants/                 colors.ts, spacing.ts, typography.ts, config.ts, index.ts
 │   ├── types/
 │   │   └── database.ts            Hand-authored Supabase DB types (see §11 — IMPORTANT)
@@ -167,9 +170,10 @@ folder (they are outside the `bitebook/` git working tree structure referenced b
   IconButton, SearchBar). `src/components/food/` holds food-domain components (DishCard,
   FoodDiaryItem, RestaurantRow). Reuse these — do not create parallel/duplicate
   components for the same concept.
-- **Mock data**: `src/mock-data/*.ts` still backs most/all screens as of this handover.
-  Real Supabase wiring beyond auth/profile has **not** been done — this is intentional
-  (Phase 2's explicit scope was backend-only, no UI/mock-data replacement). See §17.
+- **Mock data**: deleted. `src/mock-data/` no longer exists — every tab reads live
+  Supabase data through `src/lib/db/*` and TanStack Query. Screens map rows into the
+  presentation types in `src/types/models.ts`, so a schema change touches one mapper
+  rather than every component.
 - **Supabase client**: gracefully degrades if env vars are missing (logs a warning,
   falls back to a placeholder URL/key so the app doesn't crash on boot) — see §5/§9.
 
@@ -561,10 +565,12 @@ to production via `db push`.
 - `EXPO_PUBLIC_*` variables are inlined at **bundle** time; after editing `.env`, restart
   Metro with `--clear` or the old values stay baked into the bundle.
 
-### Mock data still backs the UI
-- Most/all of the 5 tab screens still render from `src/mock-data/*.ts`, not live Supabase
-  queries. This is intentional per Phase 2's explicit scope (backend-only, no UI/mock-data
-  replacement) — not a bug, but remaining work for Phase 3.
+### Mock data still backs the UI — RESOLVED
+- All five tabs now read live Supabase data via TanStack Query. `src/mock-data/` is deleted,
+  and the decorative "stories" row is gone since no story feature exists in the schema or
+  the spec.
+- Most screens are legitimately empty: there are no restaurants or dishes yet, so Discover,
+  Diary and the feed render empty states rather than content. That is correct, not broken.
 
 ### Root-level report `.md` files may be out of date
 - `Bitebook_Phase2_Correction_Pass_Report.md` states migrations were "NOT YET RUNTIME
@@ -693,9 +699,9 @@ Only items supported by repository evidence or the historical report files.
   screens) — **verify current absence on the Mac first**.
 - Build the username/onboarding screen that calls `setUsername()` from
   `src/lib/db/profiles.ts`, gated by `needsOnboarding`.
-- Begin wiring real Supabase data into the 5 tab screens in place of `src/mock-data/*`,
-  starting with whichever screen the product plan prioritizes (Diary and Profile are
-  the most directly tied to the already-built auth/profile plumbing).
+- Restaurant and dish data: nothing can be logged until restaurants exist, and spec §20
+  forbids hand-building them. Needs an external places provider behind a server-side
+  layer (Supabase Edge Function), with the provider key never in the mobile client.
 
 ### Medium
 - Decide on and integrate a restaurant data provider for Phase 3 (explicitly deferred

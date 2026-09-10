@@ -21,7 +21,7 @@ export function RestaurantRow({ restaurant, onPress, onSave, className }: Restau
   return (
     <Pressable onPress={onPress} className={cn('flex-row items-center gap-sm', className)}>
       <Image
-        source={{ uri: restaurant.imageUrl }}
+        source={restaurant.imageUrl ?? undefined}
         transition={150}
         accessibilityLabel={restaurant.name}
         style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
