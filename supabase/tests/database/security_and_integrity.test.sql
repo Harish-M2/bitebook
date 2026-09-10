@@ -1,12 +1,11 @@
 -- supabase/tests/database/security_and_integrity.test.sql
 --
--- pgTAP tests for the 18 security/integrity checks required by the Phase 2 Stage B spec.
--- Run with: `supabase test db` (requires the local Supabase dev stack — Docker — which
--- was not available in the environment these were authored in; NOT YET EXECUTED. Written
--- so the approach and coverage is fully reviewable, and can be run immediately once a
--- local/linked Supabase environment is available).
+-- pgTAP tests for the security/integrity checks required by the Phase 2 Stage B spec.
+-- Run with: `supabase test db` against the local Supabase dev stack (requires Docker).
 --
--- Uses the pgTAP extension (bundled with the Supabase CLI's local Postgres image).
+-- Uses the pgTAP extension, which ships with the Supabase CLI's local Postgres image but
+-- is not enabled by default, and is dropped again by `supabase db reset`. The suite
+-- therefore enables it itself below, inside the transaction, so it never persists.
 --
 -- IMPORTANT: restaurants/dishes/restaurant_sources are NOT client-writable in Phase 2
 -- (see 0019_rls.sql — no client INSERT/UPDATE/DELETE policy exists on public.restaurants
@@ -17,7 +16,10 @@
 -- `reset role;` immediately afterward, so no test can leak session state into a later one.
 
 begin;
-select plan(18);
+
+create extension if not exists pgtap;
+
+select plan(21);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -65,6 +67,14 @@ from public.restaurants r join public.dishes d on d.restaurant_id = r.id
 where r.slug = 'test-restaurant';
 
 reset role;
+
+-- Capture user one's review id while running as the unrestricted role, before RLS starts
+-- hiding it from other users. The two tests further down that assert an INSERT is rejected
+-- must supply this id literally: sourcing it from an RLS-filtered SELECT returns zero rows,
+-- which makes the INSERT a silent no-op that can never raise, so the test would pass
+-- vacuously regardless of whether the policy or constraint actually works.
+select id as user_one_review_id from public.reviews
+where user_id = '11111111-1111-1111-1111-111111111111' \gset
 
 -- 3. User cannot read another user's private diary.
 set local role authenticated;
@@ -152,10 +162,12 @@ reset role;
 set local role authenticated;
 set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 select throws_ok(
-  $$insert into public.likes (user_id, review_id)
-    select '22222222-2222-2222-2222-222222222222', id from public.reviews
-    where user_id = '11111111-1111-1111-1111-111111111111'$$,
-  null, null,
+  format(
+    $$insert into public.likes (user_id, review_id) values ('22222222-2222-2222-2222-222222222222', %L)$$,
+    :'user_one_review_id'
+  ),
+  '42501',
+  null,
   'cannot like a private review not visible to the viewer'
 );
 reset role;
@@ -280,11 +292,20 @@ select throws_ok(
 );
 
 -- 16. A review cannot be linked to multiple diary entries.
+-- Link user one's diary entry to their own review first — no fixture above ever populates
+-- review_id, so without this there is nothing for the duplicate INSERT below to collide with.
+update public.diary_entries set review_id = :'user_one_review_id'
+  where user_id = '11111111-1111-1111-1111-111111111111';
+
 select throws_ok(
-  $$insert into public.diary_entries (user_id, restaurant_id, dish_id, review_id)
-    select de.user_id, de.restaurant_id, de.dish_id, de.review_id
-    from public.diary_entries de where de.review_id is not null limit 1$$,
-  null, null,
+  format(
+    $$insert into public.diary_entries (user_id, restaurant_id, dish_id, review_id)
+      select user_id, restaurant_id, dish_id, %L from public.diary_entries
+      where user_id = '11111111-1111-1111-1111-111111111111' limit 1$$,
+    :'user_one_review_id'
+  ),
+  '23505',
+  null,
   'a review already linked to one diary entry cannot be linked to a second (UNIQUE review_id)'
 );
 
