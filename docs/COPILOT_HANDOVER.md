@@ -751,11 +751,10 @@ Only items supported by repository evidence or the historical report files.
   holds the opaque photo resource name so this can be done later without a second search.
 
 ### Medium
-- Build the dish submission UI. `dishes` *is* client-writable (`auth.uid() =
-  created_by_profile_id`), and restaurants can now be created via import, so the log-a-dish
-  flow is finally unblocked.
-- Wire up Storage upload flows (avatar, dish photo, review photo) using the existing
-  bucket/RLS design.
+- _(Resolved)_ ~~Build the dish submission UI~~ — done. The full six-step log flow is built
+  and the `log_dish` RPC (`0031`) is verified against the hosted project. See §24.
+- Wire up the remaining Storage upload flows (avatar, dish photo). The **review** photo
+  path is done and verified end-to-end; avatar and dish photos still have no UI.
 
 ### Low
 - Re-run and, if needed, update the Playwright screenshot regression check
@@ -1102,3 +1101,89 @@ one and poison the catalogue.
   deferred to `details()`, which runs once for the one place the user actually chooses.
 - Both functions require a real user JWT. JWT verification alone is not enough — it does not
   distinguish a user token from the anon key, and the anon key ships inside the app.
+
+---
+
+## 24. Log a Dish
+
+The app's core loop (spec §11/§37). One screen, six steps, one write.
+
+### Why one screen and not six routes
+
+`src/app/(tabs)/log.tsx` holds the whole flow as a `Draft` in local state and switches on a
+`step` value. Six stacked routes would have to thread that draft through route params or a
+store to survive a back navigation, and there would then be six places that could
+half-complete it. Here there is exactly one place that writes, and going back never loses
+what was already entered.
+
+The draft is deliberately **discarded on blur** (`useFocusEffect` cleanup). Coming back to
+the tab a day later and finding a stale restaurant silently attached to a new dish is worse
+than starting again.
+
+### The steps
+
+| Step | Required | Notes |
+|---|---|---|
+| Restaurant | yes | Searches the local catalogue first, then offers the place provider for what it does not hold (§23). |
+| Dish | yes | Lists dishes already known at that restaurant before allowing a new name. |
+| Rating | yes | 0.5–5.0 in half steps. The only step with no skip. |
+| Photo | no | Resized before leaving the step, not at upload time. |
+| Notes | no | Plus review visibility (public / followers / private). |
+| Confirm | — | Read-only summary. |
+
+Restaurant and dish advance by choosing from a list, so those two steps have no Continue
+button; the rest share a footer button.
+
+### `log_dish` (migration `0031`)
+
+Dish find-or-create, review and diary entry in **one transaction**, via a single RPC. As
+three separate client calls, a failure part way through leaves either a review with no diary
+entry (invisible to its own author) or a diary entry with no rating — neither of which a
+retry repairs.
+
+It is SECURITY **INVOKER**, unlike `upsert_restaurant_from_place`. Everything it writes is
+the caller's own row and every table involved has an `auth.uid()` INSERT policy, so RLS
+stays the single boundary. A definer function here would mean re-implementing those checks
+in PL/pgSQL and having two places that can disagree.
+
+It also handles the `unique_violation` race on `(restaurant_id, normalized_name)` by
+re-selecting, validates that the dish actually belongs to the given restaurant (`23503`),
+rejects a blank dish name (`22023`), and nullifies whitespace-only review text.
+
+### The photo is outside the transaction — on purpose
+
+Storage cannot join a database transaction, and the `review-photos` Storage policy requires
+the path to be `{user id}/{review id}/…` **with the review already existing**, so the
+ordering is forced by the database rather than by convention. A photo failure therefore
+returns `photoFailed: true` and the log survives: losing the record of a meal because an
+image upload timed out is the worse outcome.
+
+Review photos go in the **private** `review-photos` bucket, never `dish-photos`. A review
+can be private or followers-only, and publishing its photo to a public bucket would leak
+what the user chose not to share.
+
+Bytes are read with `new File(uri).arrayBuffer()` from `expo-file-system` rather than
+`fetch(uri)`. The native read has no HTTP layer to misinterpret a `file://` URI, which is
+the usual cause of a zero-byte object being uploaded; `fetch` remains as a fallback.
+
+### Rating scale change (migration `0029`)
+
+`reviews.rating` was `smallint CHECK (1..5)`, which contradicted the spec and the existing
+`Rating` component, both of which use 0.5 steps. It is now `numeric(2,1)` with a CHECK
+enforcing 0.5–5.0 in half steps. Changing the type required dropping and recreating the two
+triggers declared `update of rating`; Postgres blocks the `ALTER` otherwise.
+
+`0030` added the missing INSERT/DELETE policies on `dish_photos`, which had a SELECT policy
+and no write policy at all.
+
+### What has actually been verified
+
+- 45/45 pgTAP, including six tests covering `log_dish` and six covering ratings/dish photos.
+- An end-to-end run against the **hosted** project as a real signed-in user: RPC → private
+  bucket upload → `review_photos` row → signed URL served the bytes → aggregates propagated
+  to `dishes.aggregate_rating` and `profiles.average_rating`.
+- `tsc` and `expo lint` clean; step 1 renders in the simulator.
+
+**Not verified:** the interactive path through the UI, and `expo-image-picker` /
+`expo-image-manipulator`, which need a real tap. Automated input into the simulator is not
+available in this environment.

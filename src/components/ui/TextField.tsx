@@ -12,6 +12,11 @@ type TextFieldProps = Omit<TextInputProps, 'style'> & {
   /** Supporting copy shown below the field while there is no error. */
   hint?: string;
   className?: string;
+  /**
+   * Minimum height of the input itself, in pixels. Needed for `multiline` fields: a
+   * multiline TextInput otherwise opens one line tall and reads as a single-line field.
+   */
+  minHeight?: number;
 };
 
 /**
@@ -23,6 +28,7 @@ export function TextField({
   error,
   hint,
   className,
+  minHeight,
   onFocus,
   onBlur,
   ...rest
@@ -41,7 +47,13 @@ export function TextField({
         <TextInput
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.accent}
-          style={{ fontSize: 15, lineHeight: 20, color: colors.textPrimary, padding: 0 }}
+          style={{
+            fontSize: 15,
+            lineHeight: 20,
+            color: colors.textPrimary,
+            padding: 0,
+            minHeight,
+          }}
           onFocus={(event) => {
             setIsFocused(true);
             onFocus?.(event);

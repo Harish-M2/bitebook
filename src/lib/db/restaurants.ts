@@ -74,6 +74,34 @@ export async function listRestaurants(cuisineSlug?: string | null): Promise<Rest
 }
 
 /**
+ * Restaurants already in the catalogue whose name matches `query`.
+ *
+ * The log flow checks here before offering to import from the place provider: a restaurant
+ * someone has already added should not be searched for again, both to save a paid provider
+ * call and because the local row carries the dishes other people have logged.
+ */
+export async function searchRestaurants(query: string): Promise<Restaurant[]> {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select(RESTAURANT_SELECT)
+    // Escaping matters: `%` and `_` in user input would otherwise widen the pattern, and a
+    // lone `%` would match the entire catalogue.
+    .ilike('name', `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`)
+    .limit(PAGE_SIZE);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(toRestaurant);
+}
+
+/**
  * "Trending" is currently the best-rated dishes with enough ratings to be meaningful. It is
  * deliberately not time-windowed yet — with no activity in the database, a 7-day window
  * would always be empty and look broken rather than simply new.

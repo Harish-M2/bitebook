@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { formatDiaryDate } from '@/lib/format';
+import { signedImageUrls } from '@/lib/db/storage';
 import type { DiaryEntry } from '@/types/models';
 
 /**
@@ -12,7 +13,7 @@ const DIARY_SELECT = `
   eaten_at,
   dish:dishes(id, name, image_url, aggregate_rating, rating_count),
   restaurant:restaurants(id, name),
-  review:reviews(rating)
+  review:reviews(rating, photos:review_photos(storage_path, position))
 `;
 
 export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
@@ -26,7 +27,23 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
     throw error;
   }
 
-  return (data ?? []).flatMap((row) => {
+  const rows = data ?? [];
+
+  // The user's own photo of the dish is the point of the diary, so it takes precedence over
+  // the generic dish image. `review-photos` is private, so paths must be signed — batched
+  // for the whole page rather than one request per entry.
+  const photoPathByEntry = new Map<string, string>();
+  for (const row of rows) {
+    const photos = [...(row.review?.photos ?? [])].sort(
+      (a, b) => (a.position ?? 0) - (b.position ?? 0)
+    );
+    if (photos[0]?.storage_path) {
+      photoPathByEntry.set(row.id, photos[0].storage_path);
+    }
+  }
+  const signed = await signedImageUrls('review-photos', [...photoPathByEntry.values()]);
+
+  return rows.flatMap((row) => {
     // A diary entry without its dish or restaurant cannot be rendered. This should be
     // impossible (both are non-null FKs) but dropping the row beats crashing the screen.
     if (!row.dish || !row.restaurant) {
@@ -44,7 +61,7 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
           restaurant: { id: row.restaurant.id, name: row.restaurant.name },
           rating: row.dish.aggregate_rating ?? 0,
           ratingCount: row.dish.rating_count ?? 0,
-          imageUrl: row.dish.image_url,
+          imageUrl: signed.get(photoPathByEntry.get(row.id) ?? '') ?? row.dish.image_url,
         },
       },
     ];

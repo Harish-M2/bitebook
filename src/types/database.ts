@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -1292,6 +1292,22 @@ export type Database = {
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
+      log_dish: {
+        Args: {
+          p_dish_id?: string
+          p_dish_name?: string
+          p_eaten_at?: string
+          p_rating: number
+          p_restaurant_id: string
+          p_review_text?: string
+          p_visibility?: Database["public"]["Enums"]["review_visibility"]
+        }
+        Returns: {
+          diary_entry_id: string
+          dish_id: string
+          review_id: string
+        }[]
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       nearby_restaurants: {
         Args: {
@@ -1355,6 +1371,7 @@ export type Database = {
       postgis_wagyu_version: { Args: never; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      slugify: { Args: { input: string }; Returns: string }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }
         Returns: unknown
@@ -1947,6 +1964,23 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_restaurant_from_place: {
+        Args: {
+          p_address?: string
+          p_city?: string
+          p_external_place_id: string
+          p_image_url?: string
+          p_latitude?: number
+          p_longitude?: number
+          p_name: string
+          p_phone?: string
+          p_price_level?: number
+          p_raw?: Json
+          p_source: Database["public"]["Enums"]["restaurant_source_provider"]
+          p_website_url?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       notification_type: "follow" | "like" | "comment" | "mention"
@@ -1956,7 +1990,11 @@ export type Database = {
         | "profile"
         | "restaurant"
         | "dish"
-      restaurant_source_provider: "manual" | "user_submitted" | "seed"
+      restaurant_source_provider:
+        | "manual"
+        | "user_submitted"
+        | "seed"
+        | "google_places"
       review_visibility: "public" | "followers" | "private"
       saved_dish_status: "want_to_eat" | "saved"
     }
@@ -2105,7 +2143,12 @@ export const Constants = {
         "restaurant",
         "dish",
       ],
-      restaurant_source_provider: ["manual", "user_submitted", "seed"],
+      restaurant_source_provider: [
+        "manual",
+        "user_submitted",
+        "seed",
+        "google_places",
+      ],
       review_visibility: ["public", "followers", "private"],
       saved_dish_status: ["want_to_eat", "saved"],
     },

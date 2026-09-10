@@ -11,3 +11,4 @@ export * from './TextField';
 export * from './EmptyState';
 export * from './ErrorState';
 export * from './Skeleton';
+export * from './RatingInput';

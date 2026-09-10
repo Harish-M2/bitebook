@@ -41,6 +41,13 @@
         {
           "locationWhenInUsePermission": "Bitebook uses your location to recommend restaurants and dishes near you."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Bitebook needs access to your photos so you can add a picture of the dish you logged.",
+          "cameraPermission": "Bitebook needs access to your camera so you can photograph the dish you logged."
+        }
       ]
     ],
     "experiments": {

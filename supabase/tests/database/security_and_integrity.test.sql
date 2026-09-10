@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(33);
+select plan(45);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -487,6 +487,171 @@ select is(
   '',
   'no SECURITY DEFINER function we own is executable by anon or authenticated'
 );
+
+-- 29-31. Half-star ratings (0029_rating_half_steps.sql).
+--
+-- The column was smallint until 0029, so a client sending 4.5 was silently rounded by the
+-- cast rather than rejected. Rounding a rating the user explicitly chose is worse than
+-- refusing it, so both the range and the 0.5 step are constraints, not conventions.
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+select lives_ok(
+  $$insert into public.reviews (user_id, restaurant_id, dish_id, rating)
+    select '22222222-2222-2222-2222-222222222222', r.id, d.id, 4.5
+    from public.restaurants r join public.dishes d on d.restaurant_id = r.id
+    where r.slug = 'test-restaurant'$$,
+  'a half-star rating of 4.5 is accepted'
+);
+
+select throws_ok(
+  $$insert into public.reviews (user_id, restaurant_id, dish_id, rating)
+    select '22222222-2222-2222-2222-222222222222', r.id, d.id, 4.3
+    from public.restaurants r join public.dishes d on d.restaurant_id = r.id
+    where r.slug = 'test-restaurant'$$,
+  '23514',
+  null,
+  'a rating off the 0.5 step is rejected, not rounded'
+);
+
+select throws_ok(
+  $$insert into public.reviews (user_id, restaurant_id, dish_id, rating)
+    select '22222222-2222-2222-2222-222222222222', r.id, d.id, 0
+    from public.restaurants r join public.dishes d on d.restaurant_id = r.id
+    where r.slug = 'test-restaurant'$$,
+  '23514',
+  null,
+  'a rating of 0 is rejected — the scale starts at 0.5'
+);
+reset role;
+
+-- 32. Half-star ratings reach the denormalised aggregate rather than being truncated
+-- somewhere between the review and the dish.
+--
+-- Uses its own dish: earlier tests have already left reviews on 'Test Dish', so asserting an
+-- average there would depend on how many of them ran first — a test that breaks whenever an
+-- unrelated one is added above it.
+insert into public.dishes (restaurant_id, name, created_by_profile_id)
+select id, 'Aggregate Test Dish', '11111111-1111-1111-1111-111111111111'
+from public.restaurants where slug = 'test-restaurant';
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+insert into public.reviews (user_id, restaurant_id, dish_id, rating)
+select '22222222-2222-2222-2222-222222222222', d.restaurant_id, d.id, v.rating
+from public.dishes d, (values (4.5), (5.0)) as v(rating)
+where d.name = 'Aggregate Test Dish';
+reset role;
+
+select is(
+  (select aggregate_rating from public.dishes where name = 'Aggregate Test Dish'),
+  4.75::numeric(3, 2),
+  'dishes.aggregate_rating averages half-star ratings without truncating (4.5 and 5.0)'
+);
+
+-- 33-34. dish_photos write policies (0030_dish_photos_write.sql).
+--
+-- dish_photos had a SELECT policy and nothing else, so no client could record a photo it had
+-- just uploaded. Storage already allowed the upload, so the failure mode was an orphaned
+-- object and a photo that silently never appeared.
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select lives_ok(
+  $$insert into public.dish_photos (dish_id, storage_path, uploaded_by_profile_id)
+    select d.id, 'dish-photos/test-one.jpg', '11111111-1111-1111-1111-111111111111'
+    from public.dishes d join public.restaurants r on r.id = d.restaurant_id
+    where r.slug = 'test-restaurant'$$,
+  'a user can add a dish photo attributed to themselves'
+);
+
+-- Attribution must be truthful: a photo cannot be credited to someone else.
+select throws_ok(
+  $$insert into public.dish_photos (dish_id, storage_path, uploaded_by_profile_id)
+    select d.id, 'dish-photos/test-two.jpg', '22222222-2222-2222-2222-222222222222'
+    from public.dishes d join public.restaurants r on r.id = d.restaurant_id
+    where r.slug = 'test-restaurant'$$,
+  '42501',
+  null,
+  'a user cannot attribute a dish photo to another user'
+);
+reset role;
+
+-- 35-40. log_dish (0031_log_dish.sql) — the core user action.
+--
+-- Logging writes up to three rows across three tables. The point of the function is that
+-- they land together or not at all, so these tests care about the relationships between the
+-- rows as much as the rows themselves.
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select is(
+  (select count(*)::int from public.log_dish(
+     (select id from public.restaurants where slug = 'test-restaurant'),
+     4.5, null, 'Logged Dish', 'Very good', 'public'
+   )),
+  1,
+  'log_dish returns exactly one row of ids'
+);
+
+-- The diary entry must be joined to the review; an entry with a null review_id has no
+-- rating, which is the failure mode a non-transactional client implementation produces.
+select is(
+  (select count(*)::int from public.diary_entries de
+     join public.reviews r on r.id = de.review_id
+    where de.user_id = '11111111-1111-1111-1111-111111111111'
+      and r.review_text = 'Very good'
+      and r.rating = 4.5),
+  1,
+  'log_dish links the diary entry to the review it created'
+);
+
+-- "Do not create duplicate dishes unnecessarily" (spec §37). Matching is on the generated
+-- normalized_name, so case and surrounding whitespace must not produce a second dish.
+select is(
+  (select dish_id from public.log_dish(
+     (select id from public.restaurants where slug = 'test-restaurant'),
+     3.0, null, '  logged dish  '
+   )),
+  (select id from public.dishes where name = 'Logged Dish'),
+  'logging the same dish name again reuses the existing dish rather than duplicating it'
+);
+
+-- An empty review box is "no review", not a review whose text is blank.
+select is(
+  (select review_text from public.reviews
+    where dish_id = (select id from public.dishes where name = 'Logged Dish')
+      and rating = 3.0),
+  null,
+  'a whitespace-only review is stored as null'
+);
+
+-- Both ids come from the client, so the pair has to be validated against each other — no
+-- constraint stops a review being filed under a restaurant that does not serve the dish.
+select throws_ok(
+  $$select public.log_dish(
+      (select id from public.restaurants where slug = 'test-tandoor-manchester'),
+      4.0,
+      (select id from public.dishes where name = 'Logged Dish')
+    )$$,
+  '23503',
+  null,
+  'log_dish rejects a dish that does not belong to the given restaurant'
+);
+
+select throws_ok(
+  $$select public.log_dish(
+      (select id from public.restaurants where slug = 'test-restaurant'), 4.0, null, '   '
+    )$$,
+  '22023',
+  null,
+  'log_dish requires either an existing dish or a non-blank new dish name'
+);
+reset role;
 
 select * from finish();
 rollback;
