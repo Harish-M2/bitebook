@@ -467,22 +467,32 @@ to production via `db push`.
 
 ## 12. Testing
 
-- **TypeScript**: `npx tsc --noEmit` — passes with 0 errors as of this handover (verified
-  against the current hand-authored `database.ts`).
-- **Lint**: `npx expo lint` (ESLint via `eslint-config-expo`) — passes with 0 errors as of
-  this handover.
-- **Expo Doctor**: `npx expo-doctor` — reported 21/21 passed in the prior correction-pass
-  report; **not independently re-run in this exact handover session** — re-run on the Mac
-  to confirm.
+- **TypeScript**: `npx tsc --noEmit` — passes with 0 errors, verified on macOS against the
+  regenerated `database.ts`.
+- **Lint**: `npx expo lint` (ESLint via `eslint-config-expo`) — passes with 0 errors,
+  verified on macOS.
+- **Expo Doctor**: `npx expo-doctor` — re-run on macOS: **1 check fails**, reporting 10
+  packages behind the SDK 57 recommended versions (`expo-router`, `react-native`,
+  `expo-image`, `eslint-config-expo` and others). Not a blocker; run
+  `npx expo install --check` to review and upgrade.
 - **Database/security tests (pgTAP)**: `supabase/tests/database/security_and_integrity.
-  test.sql` — 18 tests covering signup→profile creation, username case-insensitive
+  test.sql` — 21 tests covering signup→profile creation, username case-insensitive
   uniqueness, private-diary protection, review visibility (public/followers/private),
   like/comment visibility inheritance, self-follow prevention, list ownership, saved/
   want-to-eat mutual exclusivity, restaurant_sources uniqueness, dish-name deduplication,
-  diary↔review composite FK integrity, and counter consistency. **These have never been
-  executed** — `npx supabase test db --linked` fails on this machine because Docker
-  Desktop is not installed (see §8/§13). This is the single biggest verification gap in
-  the project.
+  diary↔review composite FK integrity, and counter consistency. **These now pass, 21/21**,
+  reproducibly from a clean `supabase db reset`. Run them with `npx supabase test db`
+  against the local stack (requires Docker, now installed).
+  - Their first-ever execution surfaced three defects **in the test file**, since fixed:
+    a `plan(18)` that understated the 21 assertions, and two tests whose INSERT sourced
+    rows from an RLS-filtered SELECT — which returns zero rows, making the INSERT a silent
+    no-op that could never raise, so they passed vacuously in intent but failed
+    `throws_ok`. Both now supply the review id literally and assert specific SQLSTATEs.
+  - **The schema and RLS policies were confirmed correct and were not changed.** The likes
+    INSERT policy does raise `42501` on an invisible review, and `UNIQUE(review_id)` on
+    `diary_entries` does raise `23505` — both verified directly.
+  - Note `supabase test db --linked` runs against the **live** database and is not the
+    right target for this suite; use the local stack.
 - **UI regression**: a prior development session used Playwright (`screenshot.mjs`,
   present in the repo) to screenshot all 5 tab routes (`/home /discover /log /diary
   /profile`) on the web target and visually confirm no regression after backend work —
@@ -497,32 +507,26 @@ to production via `db push`.
 
 ## 13. Current Problems / Known Issues
 
-### Docker / local Supabase dev stack
-- `npx supabase test db --linked` fails with:
-  `failed to run docker. Docker Desktop is a prerequisite for local development.`
-- The `docker` command itself is not recognized on this Windows machine (not installed,
-  or not on PATH) — confirmed by directly attempting `docker --version`.
-- **Why this happens**: even when targeting a linked remote project with `--linked`, the
-  Supabase CLI's `test db` command runs pgTAP by spinning up a local Postgres container
-  via Docker (it does not execute pgTAP against the remote database directly). Docker is
-  therefore required for this command regardless of whether a remote project is linked.
-- **Is it actually fixed?** No. This is an unresolved environment limitation, not a code
-  bug. It has nothing to do with the schema or migrations — those are independently
-  confirmed to be applied and correct on the remote project (see §10). The pgTAP test
-  file itself has been written and twice reviewed/corrected via static analysis (see
-  §14), but genuinely **executing** it still requires Docker.
-- **What needs to be done on the Mac**: install **Docker Desktop for Mac** if you want to
-  run `supabase test db` locally, or `supabase start`/`supabase db reset` for a fully
-  local dev database. This is very likely necessary to close out the "NOT YET RUNTIME
-  VERIFIED" items from the Phase 2 correction pass report. Without Docker, you can still:
-  develop against the linked remote database directly, push migrations with
-  `supabase db push`, and generate types with `supabase gen types typescript --linked`.
+### Docker / local Supabase dev stack — RESOLVED
+- Docker Desktop is now installed on the Mac (4.90.0, engine 29.7.2) and the full local
+  stack runs: `supabase start`, `supabase db reset` and `supabase test db` all work.
+- The Supabase CLI is installed as a local **devDependency**, so `npx supabase` resolves
+  without a global install. Note the `docker` CLI lives inside the app bundle at
+  `/Applications/Docker.app/Contents/Resources/bin` and may not be on your `PATH`.
+- Historical note on why this mattered: even with `--linked`, `supabase test db` spins up a
+  local pg_prove container via Docker, so Docker was required regardless. That blocked the
+  pgTAP suite from ever running until now.
+- **Use the local stack for the pgTAP suite, not `--linked`** — `--linked` points the tests
+  at the live production database, which is not an appropriate target for a suite that
+  creates fixture users and rows (it is wrapped in `begin; … rollback;`, but there is no
+  reason to run it there).
 
-### Type file staleness
-- `src/types/database.ts` is still hand-authored, not regenerated from the now-linked
-  live database, even though regeneration is confirmed to work (see §11). This is a
-  pending task, not a blocker — `tsc`/lint currently pass against the hand-authored
-  version.
+### Type file staleness — RESOLVED
+- `src/types/database.ts` is now generated from the live database via
+  `supabase gen types typescript --linked` (~2,100 lines, replacing the 412-line
+  hand-authored stand-in). The five convenience enum aliases are retained but re-derived
+  through the generated `Enums<...>` helper so they can no longer drift from the schema.
+  `tsc --noEmit` and `expo lint` both pass against it.
 
 ### No sign-in/sign-up/onboarding UI
 - `useAuth.tsx` exposes the auth actions and onboarding-gate flag, but as of the last
@@ -649,13 +653,13 @@ The following already exists and works — reuse it, do not recreate a parallel 
 Only items supported by repository evidence or the historical report files.
 
 ### Critical
-- **Regenerate `src/types/database.ts` from the now-linked live database** using
-  `npx supabase gen types typescript --linked`, then fix any resulting type errors and
-  commit. The hand-authored version is a known-temporary stand-in.
-- **Install Docker Desktop (on the Mac) and actually run the pgTAP test suite**
-  (`npx supabase test db --linked`) to close out the "NOT YET RUNTIME VERIFIED" items
-  from the correction-pass report — RLS policies, the PostGIS trigger, and all 18
-  security/integrity tests have only ever been reviewed statically, never executed.
+- _(Resolved)_ ~~Regenerate `src/types/database.ts` from the now-linked live database~~ —
+  done; the file is now generated output, with the five convenience enum aliases
+  re-derived via `Enums<...>` so they cannot drift. `tsc` and lint pass.
+- _(Resolved)_ ~~Install Docker Desktop and actually run the pgTAP test suite~~ — done;
+  Docker Desktop is installed, and the suite passes 21/21 from a clean
+  `supabase db reset`. See §12 for the three test-file defects this uncovered and for
+  confirmation that the schema/RLS themselves were correct and unchanged.
 
 ### High
 - Build sign-in/sign-up UI (currently only the auth *actions* exist in `useAuth.tsx`, no

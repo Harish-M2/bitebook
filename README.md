@@ -68,12 +68,12 @@ suite (`supabase test db`) requires **Docker Desktop** to be installed and runni
 npx tsc --noEmit                    # TypeScript
 npx expo lint                       # lint
 npx expo-doctor                     # environment health check
-npx supabase test db --linked       # pgTAP database/security tests (requires Docker)
+npx supabase test db                # pgTAP database/security tests (local stack, needs Docker)
 ```
 
-See `docs/COPILOT_HANDOVER.md` §12/§13 for current pass/fail status and known gaps
-(notably: the pgTAP suite has not yet been executed in this project's history due to
-Docker not being available in the original development environment).
+See `docs/COPILOT_HANDOVER.md` §12/§13 for current pass/fail status. The pgTAP suite
+passes 21/21 against the local stack; run it with `npx supabase test db` (not `--linked`,
+which targets the live database).
 
 ## Troubleshooting
 
