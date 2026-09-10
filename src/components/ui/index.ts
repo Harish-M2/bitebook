@@ -7,6 +7,7 @@ export * from './Avatar';
 export * from './Rating';
 export * from './Chip';
 export * from './SearchBar';
+export * from './TextField';
 export * from './EmptyState';
 export * from './ErrorState';
 export * from './Skeleton';

@@ -33,6 +33,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Bitebook uses your location to recommend restaurants and dishes near you."
+        }
       ]
     ],
     "experiments": {
