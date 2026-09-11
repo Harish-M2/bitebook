@@ -23,6 +23,12 @@ export interface NormalisedPlace {
   websiteUrl: string | null;
   imageUrl: string | null;
   /**
+   * Slugs from `public.cuisines`, most specific first. Empty when the provider says nothing
+   * useful — an unknown cuisine is left unknown rather than guessed, because a wrong chip is
+   * both misleading and undiscoverable, while a missing one is only the latter.
+   */
+  cuisineSlugs: string[];
+  /**
    * The provider's untouched response for this place. Kept in
    * restaurant_sources.normalized_source_fields so a later mapping change can be replayed
    * without spending another API call.

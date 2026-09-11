@@ -30,6 +30,12 @@ interface FixtureSeed {
   websiteUrl: string;
   /** Matched against the query in addition to the name, so "curry" finds Dishoom. */
   keywords: string[];
+  /**
+   * Stated outright rather than inferred from the keywords. These eight are hand-written,
+   * so guessing at them would only test the guesser; the point of the fixture is to feed
+   * the import path data of the same shape the real provider produces.
+   */
+  cuisineSlugs: string[];
 }
 
 const FIXTURES: FixtureSeed[] = [
@@ -44,6 +50,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 7420 9324',
     websiteUrl: 'https://www.dishoom.com',
     keywords: ['indian', 'curry', 'bombay', 'breakfast'],
+    cuisineSlugs: ['indian'],
   },
   {
     id: 'fixture-padella-borough',
@@ -56,6 +63,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 7952 4482',
     websiteUrl: 'https://www.padella.co',
     keywords: ['italian', 'pasta', 'pici', 'cacio e pepe'],
+    cuisineSlugs: ['italian'],
   },
   {
     id: 'fixture-bao-soho',
@@ -68,6 +76,9 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 3011 1632',
     websiteUrl: 'https://baolondon.com',
     keywords: ['taiwanese', 'bao', 'buns', 'asian'],
+    // The taxonomy has no Taiwanese entry and Taiwanese is not Chinese. Left empty on the
+    // same rule the mapper follows: a wrong chip is worse than a missing one.
+    cuisineSlugs: [],
   },
   {
     id: 'fixture-smoking-goat',
@@ -80,6 +91,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 3818 9160',
     websiteUrl: 'https://www.smokinggoatbar.com',
     keywords: ['thai', 'bbq', 'spicy', 'asian'],
+    cuisineSlugs: ['thai'],
   },
   {
     id: 'fixture-st-john-smithfield',
@@ -92,6 +104,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 7251 0848',
     websiteUrl: 'https://stjohnrestaurant.com',
     keywords: ['british', 'nose to tail', 'roast'],
+    cuisineSlugs: ['british'],
   },
   {
     id: 'fixture-mildreds-camden',
@@ -104,6 +117,9 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 7482 4200',
     websiteUrl: 'https://www.mildreds.co.uk',
     keywords: ['vegetarian', 'vegan', 'plant based'],
+    // Vegetarian is a diet, not a cuisine, and the taxonomy has no entry for it. Also
+    // exercises the "provider says nothing useful" path through the import.
+    cuisineSlugs: [],
   },
   {
     id: 'fixture-bundobust-manchester',
@@ -116,6 +132,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '0161 359 6757',
     websiteUrl: 'https://www.bundobust.com',
     keywords: ['indian', 'vegetarian', 'street food', 'beer'],
+    cuisineSlugs: ['indian'],
   },
   {
     id: 'fixture-ottolenghi-islington',
@@ -128,6 +145,7 @@ const FIXTURES: FixtureSeed[] = [
     phone: '020 7288 1454',
     websiteUrl: 'https://ottolenghi.co.uk',
     keywords: ['middle eastern', 'mediterranean', 'salads', 'brunch'],
+    cuisineSlugs: ['middle-eastern', 'mediterranean'],
   },
 ];
 
@@ -143,6 +161,7 @@ function toNormalised(fixture: FixtureSeed): NormalisedPlace {
     phone: fixture.phone,
     websiteUrl: fixture.websiteUrl,
     imageUrl: null,
+    cuisineSlugs: fixture.cuisineSlugs,
     raw: { ...fixture, bitebookFixture: true },
   };
 }

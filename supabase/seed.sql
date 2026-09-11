@@ -78,12 +78,17 @@ begin
   union all
   select r_pasta_bar, id from public.cuisines where slug = 'italian';
 
+  -- `on conflict do nothing` because dishes now inherit their restaurant's cuisines via a
+  -- trigger (0033), so these rows may already exist by the time the seed reaches this point.
+  -- Stated explicitly rather than removed: the seed should keep saying what these dishes
+  -- are, independently of what inheritance happens to produce.
   insert into public.dish_cuisines (dish_id, cuisine_id)
   select d_lamb, id from public.cuisines where slug = 'american'
   union all
   select d_burger, id from public.cuisines where slug = 'american'
   union all
-  select d_pappardelle, id from public.cuisines where slug = 'italian';
+  select d_pappardelle, id from public.cuisines where slug = 'italian'
+  on conflict (dish_id, cuisine_id) do nothing;
 
   -- Demo reviews + diary entries (linked, respecting the composite-FK integrity rules).
   insert into public.reviews (user_id, restaurant_id, dish_id, rating, review_text, visibility)

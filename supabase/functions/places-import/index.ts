@@ -77,6 +77,7 @@ Deno.serve(async (request) => {
         p_website_url: place.websiteUrl,
         p_image_url: place.imageUrl,
         p_raw: place.raw,
+        p_cuisine_slugs: place.cuisineSlugs,
       },
     );
 

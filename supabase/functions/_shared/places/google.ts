@@ -14,6 +14,11 @@ import type {
   PlacesProvider,
 } from './types.ts';
 import { PlacesRequestError } from './types.ts';
+import {
+  cuisineSlugsFromGoogleTypes,
+  cuisineSlugsFromText,
+  sanitiseCuisineSlugs,
+} from './cuisines.ts';
 
 const HOST = 'https://places.googleapis.com/v1';
 
@@ -29,6 +34,9 @@ const SEARCH_FIELD_MASK = [
   'places.location',
   'places.priceLevel',
   'places.addressComponents',
+  // Adds no SKU tier: displayName/formattedAddress/location already put this call in Pro.
+  'places.types',
+  'places.primaryType',
 ].join(',');
 
 const DETAILS_FIELD_MASK = [
@@ -41,6 +49,8 @@ const DETAILS_FIELD_MASK = [
   'nationalPhoneNumber',
   'websiteUri',
   'photos',
+  'types',
+  'primaryType',
 ].join(',');
 
 /** Google's enum, mapped onto the smallint 1–4 that restaurants.price_level accepts. */
@@ -58,6 +68,8 @@ interface GooglePlace {
   location?: { latitude?: number; longitude?: number };
   priceLevel?: string;
   addressComponents?: { longText?: string; types?: string[] }[];
+  types?: string[];
+  primaryType?: string;
   nationalPhoneNumber?: string;
   websiteUri?: string;
   photos?: { name?: string }[];
@@ -104,6 +116,12 @@ function normalise(place: GooglePlace): NormalisedPlace | null {
     websiteUrl: place.websiteUri ?? null,
     // Deliberately not the Google photo URL: it would carry the key. Resolved at import.
     imageUrl: null,
+    // Categories first; the name is only consulted when Google's types say nothing, which
+    // is common for independents it has filed under a plain `restaurant`.
+    cuisineSlugs: sanitiseCuisineSlugs([
+      ...cuisineSlugsFromGoogleTypes(place.types, place.primaryType),
+      ...cuisineSlugsFromText(place.displayName.text),
+    ]),
     raw: { ...place, bitebookPhotoName: extractPhotoName(place) },
   };
 }

@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(45);
+select plan(56);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -344,14 +344,14 @@ select ok(
 -- explicitly and stay revoked.
 select ok(
   not has_function_privilege(
-    'authenticated', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+    'authenticated', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb,text[])', 'EXECUTE'
   ),
   'authenticated cannot EXECUTE upsert_restaurant_from_place (no SECURITY DEFINER bypass)'
 );
 
 select ok(
   not has_function_privilege(
-    'anon', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+    'anon', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb,text[])', 'EXECUTE'
   ),
   'anon cannot EXECUTE upsert_restaurant_from_place'
 );
@@ -444,7 +444,7 @@ select isnt(
 -- local test passed. See 0027_places_import_grants.sql.
 select ok(
   has_function_privilege(
-    'service_role', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb)', 'EXECUTE'
+    'service_role', 'public.upsert_restaurant_from_place(public.restaurant_source_provider,text,text,text,text,double precision,double precision,smallint,text,text,text,jsonb,text[])', 'EXECUTE'
   ),
   'service_role CAN execute upsert_restaurant_from_place (the Edge Function depends on it)'
 );
@@ -652,6 +652,181 @@ select throws_ok(
   'log_dish requires either an existing dish or a non-blank new dish name'
 );
 reset role;
+
+
+-- 46-51. Cuisine attachment on import (0032_place_cuisines.sql).
+--
+-- Imported restaurants previously had no restaurant_cuisines rows at all, so they matched no
+-- cuisine chip and never counted towards a user's "cuisines explored" stat. The mapping from
+-- a provider's vocabulary lives in the Edge Function; what the database owes is resolving
+-- slugs it knows and ignoring the rest.
+
+-- 46. Slugs are resolved to cuisine ids and attached.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_cuisine', 'Test Cuisine House', null, 'London',
+  51.51, -0.11, null, null, null, null, null, array['indian', 'british']
+) as restaurant_cuisine \gset
+
+select is(
+  (select count(*)::int from public.restaurant_cuisines where restaurant_id = :'restaurant_cuisine'),
+  2,
+  'importing a place with cuisine slugs attaches one row per slug'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.restaurant_cuisines rc
+    join public.cuisines c on c.id = rc.cuisine_id
+    where rc.restaurant_id = :'restaurant_cuisine' and c.slug = 'indian'
+  ),
+  'the attached cuisine resolves back to the slug that was passed in'
+);
+
+-- 47. An unknown slug must not fail the import. The taxonomy is fixed and the provider layer
+-- already filters against it, so a slug arriving here that does not resolve means the mapping
+-- drifted — losing the whole restaurant over a cosmetic tag would be the worse outcome.
+select lives_ok(
+  $$select public.upsert_restaurant_from_place(
+      'google_places', 'test_place_unknown_cuisine', 'Test Unknown Cuisine', null, 'London',
+      51.52, -0.12, null, null, null, null, null, array['not-a-real-cuisine']
+    )$$,
+  'an unrecognised cuisine slug is ignored rather than failing the import'
+);
+
+select is(
+  (select count(*)::int
+     from public.restaurant_cuisines rc
+     join public.restaurant_sources rs on rs.restaurant_id = rc.restaurant_id
+    where rs.external_place_id = 'test_place_unknown_cuisine'),
+  0,
+  'an unrecognised cuisine slug attaches nothing'
+);
+
+-- 48. Re-importing must be idempotent. The unique key is the primary key on
+-- (restaurant_id, cuisine_id), so a second pass has to conflict-do-nothing rather than error.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_cuisine', 'Test Cuisine House', null, 'London',
+  51.51, -0.11, null, null, null, null, null, array['indian', 'french']
+) as restaurant_cuisine_again \gset
+
+select is(
+  (select count(*)::int from public.restaurant_cuisines where restaurant_id = :'restaurant_cuisine'),
+  3,
+  're-importing adds newly reported cuisines without duplicating existing ones'
+);
+
+-- 49. …and must not remove one it no longer reports. A re-sync should not silently drop a
+-- cuisine a different provider or a later curation step added.
+select ok(
+  exists (
+    select 1
+    from public.restaurant_cuisines rc
+    join public.cuisines c on c.id = rc.cuisine_id
+    where rc.restaurant_id = :'restaurant_cuisine' and c.slug = 'british'
+  ),
+  're-importing preserves a cuisine that is no longer reported by the provider'
+);
+
+-- 50. attach_restaurant_cuisines is SECURITY DEFINER and restaurant_cuisines has no client
+-- INSERT policy, so it must not be reachable from a client. EXECUTE is granted to PUBLIC by
+-- default — the same trap 0025 fell into.
+select ok(
+  not has_function_privilege(
+    'authenticated', 'public.attach_restaurant_cuisines(uuid,text[])', 'EXECUTE'
+  ),
+  'authenticated cannot EXECUTE attach_restaurant_cuisines'
+);
+
+
+-- 52-53. A new dish inherits its restaurant's cuisines (0033).
+--
+-- profiles.cuisines_explored_count counts distinct dish_cuisines, and nothing wrote that
+-- table, so the stat sat at 0 no matter how much a user logged. Attaching cuisines to
+-- restaurants (0032) does not fix that on its own.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_inherit', 'Test Inheritance Kitchen', null, 'London',
+  51.53, -0.13, null, null, null, null, null, array['thai']
+) as restaurant_inherit \gset
+
+insert into public.dishes (restaurant_id, name)
+values (:'restaurant_inherit'::uuid, 'Inherited Dish')
+returning id as inherited_dish \gset
+
+select ok(
+  exists (
+    select 1
+    from public.dish_cuisines dc
+    join public.cuisines c on c.id = dc.cuisine_id
+    where dc.dish_id = :'inherited_dish'::uuid and c.slug = 'thai'
+  ),
+  'a new dish inherits the cuisines of its restaurant'
+);
+
+-- A restaurant with no cuisines must not break dish creation — the provider often says
+-- nothing useful, and that is the common case rather than an edge case.
+select lives_ok(
+  $$insert into public.dishes (restaurant_id, name)
+    values (
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      'Dish At Uncategorised Restaurant'
+    )$$,
+  'a dish at a restaurant with no cuisines is still created'
+);
+
+
+-- 54-55. Categorising a restaurant after its dishes exist (0034).
+--
+-- The common ordering in practice: a restaurant is imported with no usable category, dishes
+-- are logged against it, and only a later re-sync attaches a cuisine. Without propagation
+-- those dishes stay untagged and the user's cuisines_explored_count stays at 0.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_late_cuisine', 'Test Late Categorisation', null, 'London',
+  51.54, -0.14
+) as restaurant_late \gset
+
+insert into public.dishes (restaurant_id, name)
+values (:'restaurant_late'::uuid, 'Dish Logged Before Categorisation')
+returning id as late_dish \gset
+
+-- Re-sync, this time with a cuisine the provider now reports.
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_late_cuisine', 'Test Late Categorisation', null, 'London',
+  51.54, -0.14, null, null, null, null, null, array['greek']
+);
+
+select ok(
+  exists (
+    select 1
+    from public.dish_cuisines dc
+    join public.cuisines c on c.id = dc.cuisine_id
+    where dc.dish_id = :'late_dish'::uuid and c.slug = 'greek'
+  ),
+  'categorising a restaurant propagates to dishes that already existed'
+);
+
+-- A dish that already carries a cuisine must not be touched: this fills in a default, it
+-- does not correct an existing answer.
+insert into public.dishes (restaurant_id, name)
+values (
+  (select id from public.restaurants where slug = 'test-restaurant'),
+  'Dish With Its Own Cuisine'
+)
+returning id as curated_dish \gset
+
+insert into public.dish_cuisines (dish_id, cuisine_id)
+values (:'curated_dish'::uuid, (select id from public.cuisines where slug = 'french'));
+
+select public.upsert_restaurant_from_place(
+  'google_places', 'test_place_curated', 'Test Curated', null, 'London', 51.55, -0.15,
+  null, null, null, null, null, array['mexican']
+);
+
+select is(
+  (select count(*)::int from public.dish_cuisines where dish_id = :'curated_dish'::uuid),
+  1,
+  'a dish that already has a cuisine is left alone by propagation'
+);
 
 select * from finish();
 rollback;

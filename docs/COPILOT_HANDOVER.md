@@ -1212,3 +1212,71 @@ complete, and only the contribution to the shared catalogue was lost.
 
 Verified against the hosted project: upload accepted, `dish_photos` insert accepted, a
 spoofed `uploaded_by_profile_id` rejected by RLS, and the public URL served without auth.
+
+---
+
+## 25. Cuisine Mapping
+
+Imported restaurants used to appear under no cuisine chip, which made the Discover filters
+useless for anything the user had actually added. Fixing that needed a decision about where
+the mapping lives and two triggers to carry it down to dishes.
+
+### Where the mapping lives
+
+In the **provider layer**, not the database: `supabase/functions/_shared/places/cuisines.ts`.
+Provider categories are provider-specific by nature — Google's `indian_restaurant` is a
+Google fact, not a Bitebook one — so the translation belongs next to the thing being
+translated, and a second provider brings its own file rather than a second set of rows.
+
+Two passes, in order:
+
+1. `GOOGLE_TYPE_TO_SLUG` — an explicit map from Google Place types onto the `cuisines`
+   taxonomy seeded in `0023`.
+2. A keyword fallback over the place's name and summary, for the many restaurants whose only
+   type is the generic `restaurant`.
+
+`sanitiseCuisineSlugs()` then caps the result at **3** and drops anything not in
+`KNOWN_SLUGS`. That constant must stay in sync with `0023_seed_cuisines.sql`; an unknown slug
+would otherwise fail the insert and take the whole import down with it.
+
+**Unrecognised categories map to nothing.** `fusion` is never used as a catch-all. A wrong
+chip is both misleading and unfilterable; a missing one is only the latter. BAO Soho and
+Mildreds are the live examples — the taxonomy has no Taiwanese or vegetarian entry, so they
+carry no cuisine until it gains one.
+
+### Carrying it down to dishes
+
+`profiles.cuisines_explored_count` is computed from **`dish_cuisines`**, not
+`restaurant_cuisines`, and until now nothing had ever written that table — so the counter was
+structurally stuck at 0. Two triggers fix it from both directions:
+
+- **`0033`** — a new dish inherits its restaurant's cuisines.
+- **`0034`** — a restaurant *gaining* a cuisine tags dishes that already existed. This is the
+  common ordering in practice: a restaurant is imported with no usable category, dishes get
+  logged against it, and only a later re-sync attaches one. `0034` also runs a one-off
+  catch-up for rows that predate it.
+
+Both only ever **fill in a default** — a dish that already carries a cuisine is left alone,
+so propagation can never overwrite a deliberate answer. The seed states its own
+`dish_cuisines` rows `on conflict do nothing` for the same reason: it should keep saying what
+those dishes are, independently of what inheritance happens to produce.
+
+Both are SECURITY DEFINER trigger functions. Trigger functions need no `EXECUTE` grant
+because the system invokes them, which makes a trigger a strictly safer way to write an
+RLS-protected table than exposing a helper function to `authenticated`.
+
+### The signature change
+
+`0032` adds `p_cuisine_slugs text[]` to `upsert_restaurant_from_place`. Note that it **drops
+and recreates** the function rather than `create or replace`: changing the argument list
+creates an *overload*, and with default arguments on both, calls become ambiguous and fail.
+Dropping also drops the function's grants, so `0032` restates the revoke-from-public and the
+grant to `service_role`. Three hardcoded signature strings in the pgTAP suite had to move to
+`,jsonb,text[])` to match.
+
+### Verified
+
+56/56 pgTAP (tests 46–51 cover attachment, 52–53 inheritance, 54–55 propagation), 6/6 remote
+privilege checks, both Edge Functions deployed, and the two existing hosted restaurants
+re-imported through the real function path: Dishoom → `indian`, BAO Soho → none, and
+`cuisines_explored_count` moved 0 → 1.
