@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { localDateString } from '@/lib/format';
 import { uploadReviewPhoto } from '@/lib/db/photos';
 import type { ReviewVisibility } from '@/types/database';
 
@@ -26,7 +27,7 @@ export interface LogDishInput {
   rating: number;
   reviewText?: string | null;
   visibility?: ReviewVisibility;
-  /** Defaults to today in the database. `YYYY-MM-DD`. */
+  /** Defaults to today in the device's own timezone, not the server's. `YYYY-MM-DD`. */
   eatenAt?: string;
   /** Local file URI from the picker, already resized by `preparePhoto`. */
   photoUri?: string | null;
@@ -55,7 +56,10 @@ export async function logDish(
       p_dish_name: input.dishId ? undefined : (input.dishName ?? undefined),
       p_review_text: input.reviewText ?? undefined,
       p_visibility: input.visibility ?? 'public',
-      p_eaten_at: input.eatenAt ?? undefined,
+      // "The day I ate it" is a local calendar date. The database default is `current_date`,
+      // which is UTC, so a late-evening log east of UTC would land on tomorrow and an early
+      // one west of it on yesterday. The client is the only party that knows the timezone.
+      p_eaten_at: input.eatenAt ?? localDateString(),
     })
     .single();
 

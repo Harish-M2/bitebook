@@ -5,7 +5,7 @@ import { Bookmark } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
 import { cn } from '@/lib/cn';
 import { formatCount } from '@/lib/format';
-import { BodyText, Caption } from '@/components/ui/Typography';
+import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
 import { Rating } from '@/components/ui/Rating';
 import type { Restaurant } from '@/types/models';
 
@@ -38,7 +38,14 @@ export function RestaurantRow({ restaurant, onPress, onSave, className }: Restau
             .filter(Boolean)
             .join(' · ')}
         </Caption>
-        <Rating value={restaurant.rating} size="sm" count={formatCount(restaurant.reviewCount)} />
+        {/* A restaurant nobody has rated is not a nought-star restaurant. Until there is a
+            real aggregate, say so in words rather than rendering "0.0 (0)", which reads as
+            a damning score. */}
+        {restaurant.reviewCount > 0 ? (
+          <Rating value={restaurant.rating} size="sm" count={formatCount(restaurant.reviewCount)} />
+        ) : (
+          <MetadataText>No ratings yet</MetadataText>
+        )}
       </View>
       <Pressable
         onPress={onSave}
