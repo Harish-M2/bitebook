@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { formatPriceLevel, formatRelativeTime } from '@/lib/format';
 import { signedImageUrls } from '@/lib/db/storage';
+import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
 import type { FeedActivity } from '@/types/models';
 
 /**
@@ -16,7 +17,7 @@ const FEED_SELECT = `
   like_count,
   comment_count,
   author:profiles(id, username, display_name, avatar_url),
-  dish:dishes(id, name, image_url, aggregate_rating, rating_count),
+  dish:dishes(id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}),
   restaurant:restaurants(id, name, city, price_level, image_url),
   photos:review_photos(storage_path, position)
 `;
@@ -97,7 +98,7 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
                 restaurant: { id: row.restaurant.id, name: row.restaurant.name },
                 rating: row.dish.aggregate_rating ?? 0,
                 ratingCount: row.dish.rating_count ?? 0,
-                imageUrl: row.dish.image_url,
+                imageUrl: dishCoverUrl(row.dish.dish_photos, row.dish.image_url),
               }
             : undefined,
         restaurant: row.restaurant
@@ -114,7 +115,11 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
           : undefined,
         reviewText: row.review_text ?? undefined,
         // Falls back to the subject's own image so a text-only review still renders.
-        photoUrl: reviewPhoto ?? row.dish?.image_url ?? row.restaurant?.image_url ?? null,
+        photoUrl:
+          reviewPhoto ??
+          dishCoverUrl(row.dish?.dish_photos, row.dish?.image_url ?? null) ??
+          row.restaurant?.image_url ??
+          null,
         postedAgo: formatRelativeTime(row.created_at),
         likeCount: row.like_count ?? 0,
         commentCount: row.comment_count ?? 0,

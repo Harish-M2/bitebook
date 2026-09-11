@@ -31,6 +31,32 @@ export interface PreparedPhoto {
 }
 
 /**
+ * Reads a local file into bytes, once.
+ *
+ * `new File(uri).arrayBuffer()` is a native read with no HTTP layer to misinterpret a
+ * `file://` URI, which is the usual cause of a zero-byte object being uploaded. `fetch` is
+ * kept only as a fallback for URIs the file API cannot open.
+ *
+ * Separated from the uploads because a single picked photo can end up in two buckets — the
+ * user's private review photo and, when the review is public, the dish's shared cover — and
+ * reading a multi-megabyte file twice for that is pure waste.
+ */
+export async function readPhotoBytes(photoUri: string): Promise<ArrayBuffer> {
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await new File(photoUri).arrayBuffer();
+  } catch {
+    bytes = await (await fetch(photoUri)).arrayBuffer();
+  }
+
+  if (bytes.byteLength === 0) {
+    throw new Error('The selected photo could not be read.');
+  }
+
+  return bytes;
+}
+
+/**
  * Resizes and re-encodes a picked image to something reasonable to upload.
  *
  * Only ever scales down — enlarging a small photo would add bytes without adding detail.
@@ -69,23 +95,8 @@ export async function preparePhoto(uri: string): Promise<PreparedPhoto> {
 export async function uploadReviewPhoto(
   userId: string,
   reviewId: string,
-  photoUri: string,
+  bytes: ArrayBuffer,
 ): Promise<string> {
-  // Reading the file through expo-file-system rather than `fetch(uri)`: it is a native read
-  // with no HTTP layer to misinterpret a `file://` URI, which is the usual cause of a
-  // zero-byte object being uploaded. `fetch` is kept only as a fallback for URIs the file
-  // API cannot open (e.g. a remote one).
-  let bytes: ArrayBuffer;
-  try {
-    bytes = await new File(photoUri).arrayBuffer();
-  } catch {
-    bytes = await (await fetch(photoUri)).arrayBuffer();
-  }
-
-  if (bytes.byteLength === 0) {
-    throw new Error('The selected photo could not be read.');
-  }
-
   // Path shape is dictated by the Storage RLS policy: folder 1 is the owner, folder 2 is
   // the review it belongs to.
   const storagePath = `${userId}/${reviewId}/${Date.now()}.jpg`;
@@ -103,6 +114,45 @@ export async function uploadReviewPhoto(
   if (rowError) {
     // Nothing references the object now, so leaving it would waste storage silently.
     await supabase.storage.from('review-photos').remove([storagePath]);
+    throw rowError;
+  }
+
+  return storagePath;
+}
+
+/**
+ * Contributes the same photo to the dish's shared, public gallery.
+ *
+ * Only ever called for a **public** review. A private or followers-only review's photo must
+ * stay in the private bucket — copying it here would publish exactly what the user chose not
+ * to share, and `dish-photos` is public-read with no way to walk that back.
+ *
+ * This is a second object rather than a reference to the first because the two have
+ * genuinely different lifetimes and audiences: deleting a private review should remove the
+ * user's copy, but the dish's catalogue photo is a contribution to everyone and outlives it.
+ */
+export async function uploadDishPhoto(
+  userId: string,
+  dishId: string,
+  bytes: ArrayBuffer,
+): Promise<string> {
+  // Convention from 0020_storage.sql: dish-photos/{dish_id}/{unique}.ext
+  const storagePath = `${dishId}/${Date.now()}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('dish-photos')
+    .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: false });
+
+  if (uploadError) throw uploadError;
+
+  // `uploaded_by_profile_id` is required by the RLS policy, not merely decorative:
+  // attribution has to be truthful because it is also what governs deletion.
+  const { error: rowError } = await supabase
+    .from('dish_photos')
+    .insert({ dish_id: dishId, storage_path: storagePath, uploaded_by_profile_id: userId, position: 0 });
+
+  if (rowError) {
+    await supabase.storage.from('dish-photos').remove([storagePath]);
     throw rowError;
   }
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { formatPriceLevel } from '@/lib/format';
+import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
 import type { Dish, Restaurant } from '@/types/models';
 
 const RESTAURANT_SELECT = `
@@ -109,7 +110,9 @@ export async function searchRestaurants(query: string): Promise<Restaurant[]> {
 export async function listTrendingDishes(): Promise<Dish[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id, name, image_url, aggregate_rating, rating_count, restaurant:restaurants(id, name)')
+    .select(
+      `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants(id, name)`,
+    )
     .gt('rating_count', 0)
     .order('aggregate_rating', { ascending: false, nullsFirst: false })
     .order('rating_count', { ascending: false })
@@ -130,7 +133,7 @@ export async function listTrendingDishes(): Promise<Dish[]> {
         restaurant: { id: row.restaurant.id, name: row.restaurant.name },
         rating: row.aggregate_rating ?? 0,
         ratingCount: row.rating_count ?? 0,
-        imageUrl: row.image_url,
+        imageUrl: dishCoverUrl(row.dish_photos, row.image_url),
       },
     ];
   });

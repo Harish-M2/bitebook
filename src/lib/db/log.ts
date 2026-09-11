@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { localDateString } from '@/lib/format';
-import { uploadReviewPhoto } from '@/lib/db/photos';
+import { readPhotoBytes, uploadDishPhoto, uploadReviewPhoto } from '@/lib/db/photos';
 import type { ReviewVisibility } from '@/types/database';
 
 /**
@@ -75,7 +75,22 @@ export async function logDish(
 
   if (input.photoUri) {
     try {
-      await uploadReviewPhoto(userId, result.reviewId, input.photoUri);
+      const bytes = await readPhotoBytes(input.photoUri);
+      await uploadReviewPhoto(userId, result.reviewId, bytes);
+
+      // A public review's photo also becomes part of the dish's shared gallery, which is
+      // what gives the catalogue any pictures at all. Deliberately gated on visibility: a
+      // private or followers-only photo must never reach the public bucket.
+      if ((input.visibility ?? 'public') === 'public') {
+        try {
+          await uploadDishPhoto(userId, result.dishId, bytes);
+        } catch (dishPhotoError) {
+          // Not reported as a failure. The user's own record — the thing they asked for — is
+          // complete; only the contribution to the shared catalogue was lost, and telling
+          // them their log failed would be untrue.
+          console.warn('[Bitebook] Dish photo contribution failed:', dishPhotoError);
+        }
+      }
     } catch (photoError) {
       console.warn('[Bitebook] Review photo upload failed:', photoError);
       result.photoFailed = true;

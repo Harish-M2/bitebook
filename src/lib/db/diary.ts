@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { formatDiaryDate } from '@/lib/format';
 import { signedImageUrls } from '@/lib/db/storage';
+import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
 import type { DiaryEntry } from '@/types/models';
 
 /**
@@ -11,7 +12,7 @@ import type { DiaryEntry } from '@/types/models';
 const DIARY_SELECT = `
   id,
   eaten_at,
-  dish:dishes(id, name, image_url, aggregate_rating, rating_count),
+  dish:dishes(id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}),
   restaurant:restaurants(id, name),
   review:reviews(rating, photos:review_photos(storage_path, position))
 `;
@@ -61,7 +62,9 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
           restaurant: { id: row.restaurant.id, name: row.restaurant.name },
           rating: row.dish.aggregate_rating ?? 0,
           ratingCount: row.dish.rating_count ?? 0,
-          imageUrl: signed.get(photoPathByEntry.get(row.id) ?? '') ?? row.dish.image_url,
+          imageUrl:
+            signed.get(photoPathByEntry.get(row.id) ?? '') ??
+            dishCoverUrl(row.dish.dish_photos, row.dish.image_url),
         },
       },
     ];

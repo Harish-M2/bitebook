@@ -1187,3 +1187,28 @@ and no write policy at all.
 **Not verified:** the interactive path through the UI, and `expo-image-picker` /
 `expo-image-manipulator`, which need a real tap. Automated input into the simulator is not
 available in this environment.
+
+### Dish cover photos
+
+Nothing populated `dishes.image_url`, so the catalogue rendered as black squares in an
+image-first app. When a review is **public**, its photo is now also contributed to the
+dish's shared gallery.
+
+Two things this deliberately does *not* do:
+
+- It does not copy photos from private or followers-only reviews. `dish-photos` is
+  public-read with no way to walk that back, so that would publish precisely what the user
+  chose not to share. The visibility check is in `logDish`, next to the decision it depends
+  on.
+- It does not write `dishes.image_url`. Doing so would need an UPDATE policy on `dishes`,
+  which would also let any user overwrite any dish's name. The cover is **derived** at query
+  time from `dish_photos` (`dishCoverUrl()` in `src/lib/db/dishes.ts`) instead, so it cannot
+  disagree with the gallery it came from. Earliest photo wins, so a later contributor cannot
+  quietly replace the image everyone recognises.
+
+The bytes are read once (`readPhotoBytes`) and uploaded to both buckets. A failure of the
+public contribution is logged but **not** reported as a failure: the user's own record is
+complete, and only the contribution to the shared catalogue was lost.
+
+Verified against the hosted project: upload accepted, `dish_photos` insert accepted, a
+spoofed `uploaded_by_profile_id` rejected by RLS, and the public URL served without auth.
