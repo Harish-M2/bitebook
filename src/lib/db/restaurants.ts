@@ -141,6 +141,34 @@ export async function listTrendingDishes(): Promise<Dish[]> {
 }
 
 /**
+ * Get a single restaurant by ID with full details and relationships
+ */
+export async function getRestaurant(restaurantId: string): Promise<any> {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select(`
+      id,
+      name,
+      city,
+      address,
+      price_level,
+      image_url,
+      restaurant_cuisines(
+        id,
+        cuisine:cuisines(id, name, slug)
+      )
+    `)
+    .eq('id', restaurantId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+/**
  * All photos for a restaurant from the `restaurant_photos` table.
  * Photos are ordered by position (primary sort indicator) then creation time.
  * Returns URLs that can be used directly in Image components.
