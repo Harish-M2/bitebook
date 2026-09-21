@@ -22,6 +22,8 @@ import {
   deleteReviewPhoto,
 } from '@/lib/db/reviews';
 import { uploadReviewPhoto } from '@/lib/storage/photos';
+import { logActivity } from '@/lib/db/activity';
+import { supabase } from '@/lib/supabase';
 import { colors } from '@/constants/colors';
 
 interface ReviewFormProps {
@@ -122,6 +124,10 @@ export const ReviewForm = ({
     setError(null);
 
     try {
+      // Get user ID for activity logging
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user.user?.id;
+
       // Upload new photos first
       let uploadedUrls: string[] = [];
       if (newPhotos.length > 0) {
@@ -131,12 +137,28 @@ export const ReviewForm = ({
       }
 
       // Submit review
-      await submitReview(
+      const review = await submitReview(
         restaurantId,
         rating,
         text || null,
         [...photos, ...uploadedUrls]
       );
+
+      // Log activity (only if it's a new review, not an edit)
+      if (!existingReview && userId) {
+        try {
+          await logActivity(
+            userId,
+            'new_review',
+            `Reviewed a restaurant ${rating} stars`,
+            restaurantId,
+            review?.id
+          );
+        } catch (activityError) {
+          console.error('[Bitebook] Failed to log activity:', activityError);
+          // Don't fail the review submission if activity logging fails
+        }
+      }
 
       setRating(0);
       setText('');
