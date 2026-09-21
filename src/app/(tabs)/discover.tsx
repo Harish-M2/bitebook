@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Compass, Search } from 'lucide-react-native';
-import { Alert, FlatList, View } from 'react-native';
+import { Compass, Search, Heart } from 'lucide-react-native';
+import { Alert, FlatList, View, Pressable } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 
 import { colors } from '@/constants/colors';
 import { queryKeys } from '@/lib/queryClient';
@@ -29,6 +30,7 @@ const MIN_QUERY_LENGTH = 2;
 
 /** Discover tab — search, cuisine filters, trending dishes rail, nearby restaurants list. */
 export default function DiscoverScreen() {
+  const router = useRouter();
   const [activeCuisine, setActiveCuisine] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [galleryVisible, setGalleryVisible] = useState(false);
@@ -127,7 +129,15 @@ export default function DiscoverScreen() {
   const header = (
     <View className="gap-lg pb-md">
       <View className="gap-md px-lg pt-xs">
-        <Heading level={2}>Discover</Heading>
+        <View className="flex-row items-center justify-between">
+          <Heading level={2}>Discover</Heading>
+          <Pressable
+            onPress={() => router.push('/(tabs)/discover/(modal)/saved')}
+            hitSlop={8}
+          >
+            <Heart size={24} color={colors.accent} />
+          </Pressable>
+        </View>
         <SearchBar
           value={query}
           onChangeText={setQuery}
