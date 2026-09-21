@@ -11,6 +11,8 @@ import type { FeedActivity } from '@/types/models';
  */
 const FEED_SELECT = `
   id,
+  user_id,
+  restaurant_id,
   rating,
   review_text,
   created_at,
@@ -83,6 +85,8 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
     return [
       {
         id: row.id,
+        review_id: row.id,
+        restaurant_id: row.restaurant_id,
         actor: {
           id: row.author.id,
           username: row.author.username ?? '',
