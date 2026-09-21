@@ -43,15 +43,16 @@ export const FollowButton = ({
       setIsLoading(true);
       setError(null);
 
+      const newFollowingState = !isFollowingState;
+
       if (isFollowingState) {
         await unfollowUser(userId);
-        setIsFollowingState(false);
       } else {
         await followUser(userId);
-        setIsFollowingState(true);
       }
 
-      onFollowChange?.(isFollowingState);
+      setIsFollowingState(newFollowingState);
+      onFollowChange?.(newFollowingState);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update';
       setError(message);

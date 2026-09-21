@@ -1,26 +1,65 @@
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 import { Bookmark, Heart, MessageCircle } from 'lucide-react-native';
+import { useState } from 'react';
 
 import { colors } from '@/constants/colors';
 import { cn } from '@/lib/cn';
 import { Avatar } from '@/components/ui/Avatar';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
 import { Rating } from '@/components/ui/Rating';
+import { toggleLikeReview } from '@/lib/db/reviews';
+import { saveRestaurant } from '@/lib/db/saved';
 import type { FeedActivity } from '@/types/models';
 
 type FeedItemProps = {
   activity: FeedActivity;
   className?: string;
+  onCommentPress?: () => void;
 };
 
 /** Single home-feed card: actor row, hero photo, dish/restaurant + rating, actions. */
-export function FeedItem({ activity, className }: FeedItemProps) {
+export function FeedItem({ activity, className, onCommentPress }: FeedItemProps) {
   const isDish = activity.kind === 'logged_dish';
   const actionLabel = isDish ? 'logged a dish' : 'reviewed a restaurant';
   const subjectLine = isDish ? activity.dish?.restaurant.name : activity.restaurant?.name;
   const title = isDish ? activity.dish?.name : activity.restaurant?.name;
   const rating = isDish ? activity.dish?.rating : activity.restaurant?.rating;
+
+  const [isLiking, setIsLiking] = useState(false);
+  const [likeCount, setLikeCount] = useState(activity.likeCount ?? 0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleLike = async () => {
+    if (isLiking || !activity.review_id) return;
+    setIsLiking(true);
+    try {
+      const result = await toggleLikeReview(activity.review_id);
+      setLikeCount((prev) => (result.liked ? prev + 1 : Math.max(0, prev - 1)));
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving || !activity.restaurant_id) return;
+    setIsSaving(true);
+    try {
+      if (isSaved) {
+        await saveRestaurant(activity.restaurant_id);
+      } else {
+        await saveRestaurant(activity.restaurant_id);
+      }
+      setIsSaved(!isSaved);
+    } catch (error) {
+      console.error('Failed to save:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <View className={cn('gap-sm', className)}>
@@ -54,13 +93,16 @@ export function FeedItem({ activity, className }: FeedItemProps) {
       <View className="flex-row items-center gap-lg">
         <Pressable
           className="flex-row items-center gap-xxs"
+          onPress={handleLike}
+          disabled={isLiking}
           accessibilityRole="button"
           accessibilityLabel="Like">
-          <Heart size={18} color={colors.textSecondary} />
-          <MetadataText>{activity.likeCount}</MetadataText>
+          <Heart size={18} color={colors.textSecondary} fill={isLiking ? colors.accent : undefined} />
+          <MetadataText>{likeCount}</MetadataText>
         </Pressable>
         <Pressable
           className="flex-row items-center gap-xxs"
+          onPress={onCommentPress}
           accessibilityRole="button"
           accessibilityLabel="Comment">
           <MessageCircle size={18} color={colors.textSecondary} />
@@ -68,9 +110,11 @@ export function FeedItem({ activity, className }: FeedItemProps) {
         </Pressable>
         <Pressable
           className="ml-auto"
+          onPress={handleSave}
+          disabled={isSaving}
           accessibilityRole="button"
           accessibilityLabel="Save">
-          <Bookmark size={18} color={colors.textSecondary} />
+          <Bookmark size={18} color={colors.textSecondary} fill={isSaved ? colors.accent : undefined} />
         </Pressable>
       </View>
     </View>

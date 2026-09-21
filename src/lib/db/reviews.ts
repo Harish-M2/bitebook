@@ -253,3 +253,127 @@ export async function deleteReviewPhoto(photoId: string) {
     throw error;
   }
 }
+
+/**
+ * Toggle like on a review
+ */
+export async function toggleLikeReview(reviewId: string) {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user?.id) {
+    throw new Error('Not authenticated');
+  }
+
+  // Check if already liked
+  const { data: existingLike, error: checkError } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('review_id', reviewId)
+    .eq('user_id', user.user.id)
+    .single();
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('[Bitebook] Failed to check like status:', checkError);
+    throw checkError;
+  }
+
+  if (existingLike) {
+    // Unlike
+    const { error: deleteError } = await supabase
+      .from('likes')
+      .delete()
+      .eq('id', existingLike.id);
+
+    if (deleteError) {
+      console.error('[Bitebook] Failed to unlike:', deleteError);
+      throw deleteError;
+    }
+
+    return { liked: false };
+  } else {
+    // Like
+    const { error: insertError } = await supabase
+      .from('likes')
+      .insert({
+        review_id: reviewId,
+        user_id: user.user.id,
+      });
+
+    if (insertError) {
+      console.error('[Bitebook] Failed to like:', insertError);
+      throw insertError;
+    }
+
+    return { liked: true };
+  }
+}
+
+/**
+ * Get all comments for a review
+ */
+export async function getReviewComments(reviewId: string) {
+  const { data, error } = await supabase
+    .from('comments')
+    .select(
+      `
+        id,
+        text,
+        created_at,
+        user:profiles(id, full_name, avatar_url)
+      `
+    )
+    .eq('review_id', reviewId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[Bitebook] Failed to fetch comments:', error);
+    throw error;
+  }
+
+  return data || [];
+}
+
+/**
+ * Add a comment to a review
+ */
+export async function addReviewComment(reviewId: string, text: string) {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user?.id) {
+    throw new Error('Not authenticated');
+  }
+
+  if (!text.trim()) {
+    throw new Error('Comment cannot be empty');
+  }
+
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({
+      review_id: reviewId,
+      user_id: user.user.id,
+      text: text.trim(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[Bitebook] Failed to add comment:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Delete a comment
+ */
+export async function deleteReviewComment(commentId: string) {
+  const { error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) {
+    console.error('[Bitebook] Failed to delete comment:', error);
+    throw error;
+  }
+}

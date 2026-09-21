@@ -11,6 +11,7 @@ import { listRestaurants, listTrendingDishes, getRestaurantPhotos } from '@/lib/
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
 import { getRestaurantMenu } from '@/lib/db/menus';
 import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
+import { saveRestaurant } from '@/lib/db/saved';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Screen } from '@/components/ui/Screen';
 import { Heading } from '@/components/ui/Typography';
@@ -43,8 +44,17 @@ export default function DiscoverScreen() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [menuTitle, setMenuTitle] = useState('');
   const [menuLoading, setMenuLoading] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const queryClient = useQueryClient();
+
+  const handleRestaurantSave = async (restaurantId: string) => {
+    try {
+      await saveRestaurant(restaurantId);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.saved.restaurants() });
+    } catch (error) {
+      console.error('Failed to save restaurant:', error);
+      Alert.alert('Error', 'Could not save restaurant');
+    }
+  };
 
   // The provider bills per call, so the request follows the pause, not the keystroke.
   const debouncedQuery = useDebouncedValue(query.trim());
@@ -262,6 +272,7 @@ export default function DiscoverScreen() {
             className="px-lg pb-lg"
             onPress={() => handleRestaurantPress(item)}
             onViewMenu={() => handleLoadMenu(item)}
+            onSave={() => handleRestaurantSave(item.id)}
           />
         )}
         ListEmptyComponent={
