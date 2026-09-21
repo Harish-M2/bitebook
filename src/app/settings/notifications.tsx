@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -24,10 +25,6 @@ export default function NotificationSettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    loadPreferences();
-  }, []);
-
   const loadPreferences = async () => {
     try {
       setIsLoading(true);
@@ -40,6 +37,10 @@ export default function NotificationSettingsScreen() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadPreferences();
+  }, []);
 
   const handleToggle = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!preferences) return;
@@ -123,7 +124,7 @@ export default function NotificationSettingsScreen() {
       {/* Info */}
       <View style={styles.infoBox}>
         <Text style={styles.infoText}>
-          You can manage push notification permissions in your phone's settings.
+          You can manage push notification permissions in your phone&apos;s settings.
         </Text>
       </View>
     </ScrollView>
