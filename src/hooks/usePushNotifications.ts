@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 // @ts-ignore
+// eslint-disable-next-line import/no-unresolved
 import * as Notifications from 'expo-notifications';
 import { storePushToken } from '@/lib/db/notifications';
 

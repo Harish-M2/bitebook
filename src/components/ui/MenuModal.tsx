@@ -61,7 +61,7 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
           <View style={styles.emptyContainer}>
             <BodyText style={styles.emptyText}>Menu not available</BodyText>
             <Caption style={styles.emptyCaption}>
-              This restaurant doesn't have menu information available yet.
+              This restaurant doesn&apos;t have menu information available yet.
             </Caption>
           </View>
         ) : (

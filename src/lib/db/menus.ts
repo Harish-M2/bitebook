@@ -102,7 +102,6 @@ async function searchAndCacheMenu(
     // Caching and logging are handled by Edge Function
     return items;
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[Bitebook] Failed to search menu for ${restaurantName}:`, err);
     // Logging is handled by Edge Function (service_role)
     return [];
@@ -176,7 +175,7 @@ export async function getMenuBudget(month?: string): Promise<{
  * Get recent fetch logs for debugging and analytics.
  */
 export async function getMenuFetchLogs(limit = 50): Promise<
-  Array<{
+  {
     restaurantId: string;
     restaurantName: string;
     success: boolean;
@@ -184,7 +183,7 @@ export async function getMenuFetchLogs(limit = 50): Promise<
     cached: boolean;
     fetchedAt: string;
     errorMessage: string | null;
-  }>
+  }[]
 > {
   const { data, error } = await (supabase
     .from('menu_fetch_log' as any)

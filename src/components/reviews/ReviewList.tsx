@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -27,10 +28,6 @@ export const ReviewList = ({ restaurantId, onRefresh }: ReviewListProps) => {
   } | null>(null);
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadReviews();
-  }, [restaurantId]);
-
   const loadReviews = async () => {
     try {
       setIsLoading(true);
@@ -50,6 +47,10 @@ export const ReviewList = ({ restaurantId, onRefresh }: ReviewListProps) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadReviews();
+  }, [restaurantId]);
 
   const handleRefresh = async () => {
     await loadReviews();

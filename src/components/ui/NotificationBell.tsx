@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,10 +12,8 @@ import {
 } from 'react-native';
 import { Bell, X, Check } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
 import { colors } from '@/constants/colors';
 import {
-  getUnreadNotifications,
   getAllNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
@@ -192,7 +190,7 @@ export function NotificationBell({ size = 24, showBadge = true }: NotificationBe
                 <Bell size={48} color={colors.textSecondary} />
                 <Text style={styles.emptyTitle}>No notifications</Text>
                 <Text style={styles.emptyText}>
-                  We'll let you know when something interesting happens
+                  We&apos;ll let you know when something interesting happens
                 </Text>
               </View>
             ) : (
