@@ -316,9 +316,9 @@ export async function getReviewComments(reviewId: string) {
     .select(
       `
         id,
-        text,
+        body,
         created_at,
-        user:profiles(id, full_name, avatar_url)
+        user:profiles(id, display_name, avatar_url)
       `
     )
     .eq('review_id', reviewId)
@@ -329,7 +329,12 @@ export async function getReviewComments(reviewId: string) {
     throw error;
   }
 
-  return data || [];
+  return (data || []) as Array<{
+    id: string;
+    body: string;
+    created_at: string;
+    user: { id: string; display_name: string; avatar_url: string | null } | null;
+  }>;
 }
 
 /**

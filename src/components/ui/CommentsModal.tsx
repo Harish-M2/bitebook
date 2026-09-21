@@ -21,7 +21,7 @@ interface Comment {
   created_at: string;
   user?: {
     id: string;
-    full_name: string;
+    display_name: string;
     avatar_url: string | null;
   };
 }
@@ -139,11 +139,11 @@ export function CommentsModal({ visible, reviewId, onClose }: CommentsModalProps
                   }}>
                   <Avatar
                     uri={item.user?.avatar_url}
-                    name={item.user?.full_name ?? 'User'}
+                    name={item.user?.display_name ?? 'User'}
                     size="sm"
                   />
                   <View style={{ flex: 1 }}>
-                    <BodyText medium>{item.user?.full_name ?? 'Anonymous'}</BodyText>
+                    <BodyText medium>{item.user?.display_name ?? 'Anonymous'}</BodyText>
                     <Caption>{item.body}</Caption>
                     <MetadataText style={{ marginTop: 4 }}>
                       {new Date(item.created_at).toLocaleDateString()}
