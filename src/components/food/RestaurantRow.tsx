@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
-import { Bookmark } from 'lucide-react-native';
+import { Bookmark, Menu } from 'lucide-react-native';
 
 import { colors } from '@/constants/colors';
 import { cn } from '@/lib/cn';
@@ -13,11 +13,12 @@ type RestaurantRowProps = {
   restaurant: Restaurant;
   onPress?: () => void;
   onSave?: () => void;
+  onViewMenu?: () => void;
   className?: string;
 };
 
-/** Horizontal restaurant list row — thumbnail, name/cuisine/price/distance, rating, save. */
-export function RestaurantRow({ restaurant, onPress, onSave, className }: RestaurantRowProps) {
+/** Horizontal restaurant list row — thumbnail, name/cuisine/price/distance, rating, menu & save buttons. */
+export function RestaurantRow({ restaurant, onPress, onSave, onViewMenu, className }: RestaurantRowProps) {
   return (
     <Pressable onPress={onPress} className={cn('flex-row items-center gap-sm', className)}>
       <Image
@@ -47,6 +48,13 @@ export function RestaurantRow({ restaurant, onPress, onSave, className }: Restau
           <MetadataText>No ratings yet</MetadataText>
         )}
       </View>
+      <Pressable
+        onPress={onViewMenu}
+        hitSlop={8}
+        accessibilityLabel={`View menu for ${restaurant.name}`}
+        accessibilityRole="button">
+        <Menu size={20} color={colors.accent} />
+      </Pressable>
       <Pressable
         onPress={onSave}
         hitSlop={8}

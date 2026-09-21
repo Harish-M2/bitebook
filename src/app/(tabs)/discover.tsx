@@ -6,8 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { colors } from '@/constants/colors';
 import { queryKeys } from '@/lib/queryClient';
 import { listCuisines } from '@/lib/db/cuisines';
-import { listRestaurants, listTrendingDishes } from '@/lib/db/restaurants';
+import { listRestaurants, listTrendingDishes, getRestaurantPhotos } from '@/lib/db/restaurants';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
+import { getRestaurantMenu } from '@/lib/db/menus';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Screen } from '@/components/ui/Screen';
 import { Heading } from '@/components/ui/Typography';
@@ -18,7 +19,10 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { DishCard } from '@/components/food/DishCard';
 import { RestaurantRow } from '@/components/food/RestaurantRow';
 import { PlaceResultRow } from '@/components/food/PlaceResultRow';
+import { PhotoGalleryModal } from '@/components/ui/PhotoGalleryModal';
+import { MenuModal } from '@/components/ui/MenuModal';
 import type { Restaurant } from '@/types/models';
+import type { MenuItem } from '@/lib/db/menus';
 
 /** Below this the provider rejects the query anyway; matches the Edge Function's guard. */
 const MIN_QUERY_LENGTH = 2;
@@ -27,6 +31,14 @@ const MIN_QUERY_LENGTH = 2;
 export default function DiscoverScreen() {
   const [activeCuisine, setActiveCuisine] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
+  const [galleryTitle, setGalleryTitle] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuTitle, setMenuTitle] = useState('');
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const queryClient = useQueryClient();
 
   // The provider bills per call, so the request follows the pause, not the keystroke.
@@ -66,6 +78,37 @@ export default function DiscoverScreen() {
       Alert.alert('Could not add restaurant', error.message);
     },
   });
+
+  const handleRestaurantPress = async (restaurant: Restaurant) => {
+    try {
+      const photos = await getRestaurantPhotos(restaurant.id);
+      if (photos && photos.length > 0) {
+        setGalleryPhotos(photos);
+        setGalleryTitle(restaurant.name);
+        setGalleryVisible(true);
+      }
+    } catch (error) {
+      console.error('Failed to load restaurant photos:', error);
+    }
+  };
+
+  const handleLoadMenu = async (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setMenuLoading(true);
+    setMenuTitle(restaurant.name);
+    setMenuItems([]);
+
+    try {
+      const items = await getRestaurantMenu(restaurant.id, restaurant.name);
+      setMenuItems(items);
+      setMenuVisible(true);
+    } catch (error) {
+      console.error('Failed to load restaurant menu:', error);
+      Alert.alert('Could not load menu', 'Failed to fetch menu for this restaurant.');
+    } finally {
+      setMenuLoading(false);
+    }
+  };
 
   if (restaurants.isError && !isSearching) {
     return (
@@ -188,7 +231,14 @@ export default function DiscoverScreen() {
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={header}
-        renderItem={({ item }) => <RestaurantRow restaurant={item} className="px-lg pb-lg" />}
+        renderItem={({ item }) => (
+          <RestaurantRow
+            restaurant={item}
+            className="px-lg pb-lg"
+            onPress={() => handleRestaurantPress(item)}
+            onViewMenu={() => handleLoadMenu(item)}
+          />
+        )}
         ListEmptyComponent={
           restaurants.isPending ? null : (
             <EmptyState
@@ -203,6 +253,19 @@ export default function DiscoverScreen() {
           )
         }
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+      />
+      <PhotoGalleryModal
+        visible={galleryVisible}
+        photos={galleryPhotos.map((url) => ({ url }))}
+        onClose={() => setGalleryVisible(false)}
+        title={galleryTitle}
+      />
+      <MenuModal
+        visible={menuVisible}
+        title={menuTitle}
+        items={menuItems}
+        isLoading={menuLoading}
+        onClose={() => setMenuVisible(false)}
       />
     </Screen>
   );

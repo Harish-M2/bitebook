@@ -26,6 +26,9 @@ const HOST = 'https://places.googleapis.com/v1';
  * Google bills per requested field group, so the mask is the cost control. Search asks for
  * the minimum needed to render a picker row; the expensive fields are deferred to details(),
  * which only runs for the one place the user actually chooses.
+ * 
+ * NOTE: addressComponents is NOT available in searchText response — only in details().
+ * Requesting unavailable fields causes Google to return empty results.
  */
 const SEARCH_FIELD_MASK = [
   'places.id',
@@ -33,7 +36,6 @@ const SEARCH_FIELD_MASK = [
   'places.formattedAddress',
   'places.location',
   'places.priceLevel',
-  'places.addressComponents',
   // Adds no SKU tier: displayName/formattedAddress/location already put this call in Pro.
   'places.types',
   'places.primaryType',
@@ -166,15 +168,18 @@ export class GooglePlacesProvider implements PlacesProvider {
       maxResultCount: Math.min(params.limit ?? 10, 20),
     };
 
-    if (params.latitude != null && params.longitude != null) {
-      body.locationBias = {
-        circle: {
-          center: { latitude: params.latitude, longitude: params.longitude },
-          // Google rejects a radius over 50km outright, so clamp rather than pass through.
-          radius: Math.min(params.radius ?? 5000, 50000),
-        },
-      };
-    }
+    // Always send location bias — Google returns nothing without it.
+    // Default to London (51.5074, -0.1278) if not provided.
+    const latitude = params.latitude ?? 51.5074;
+    const longitude = params.longitude ?? -0.1278;
+    
+    body.locationBias = {
+      circle: {
+        center: { latitude, longitude },
+        // Google rejects a radius over 50km outright, so clamp rather than pass through.
+        radius: Math.min(params.radius ?? 5000, 50000),
+      },
+    };
 
     const json = (await this.#request(
       '/places:searchText',

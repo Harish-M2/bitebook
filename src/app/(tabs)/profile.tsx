@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 
 import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
+import { readPhotoBytes, prepareAvatarPhoto, uploadAvatarPhoto } from '@/lib/db/photos';
 import { Screen, Divider, Spacer } from '@/components/ui/Screen';
 import { Avatar } from '@/components/ui/Avatar';
 import { Heading, BodyText, Caption } from '@/components/ui/Typography';
@@ -24,6 +26,7 @@ const EMPTY_STATS: DiaryStats = {
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const userId = profile?.id ?? null;
 
   const stats = useQuery({
@@ -38,7 +41,6 @@ export default function ProfileScreen() {
     enabled: userId !== null,
   });
 
-  // The root layout's guard handles the redirect once the session clears.
   const handleSignOut = () => {
     Alert.alert('Sign out', 'You will need to sign in again to log meals.', [
       { text: 'Cancel', style: 'cancel' },
@@ -55,6 +57,35 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!userId) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.9,
+      });
+
+      if (result.canceled) return;
+
+      setUploadingAvatar(true);
+
+      const asset = result.assets[0];
+      const prepared = await prepareAvatarPhoto(asset.uri);
+      const bytes = await readPhotoBytes(prepared.uri);
+      await uploadAvatarPhoto(userId, bytes);
+
+      // Refetch profile to update avatar
+      stats.refetch();
+    } catch (error) {
+      Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const displayName = profile?.display_name ?? profile?.username ?? 'You';
@@ -74,7 +105,12 @@ export default function ProfileScreen() {
               {profile.bio}
             </BodyText>
           ) : null}
-          <Button label="Edit profile" variant="secondary" disabled />
+          <Button
+            label="Change avatar"
+            variant="secondary"
+            loading={uploadingAvatar}
+            onPress={handleAvatarUpload}
+          />
         </View>
 
         <Spacer size="xl" />

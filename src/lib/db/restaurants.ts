@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { formatPriceLevel } from '@/lib/format';
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
+import { publicImageUrl } from '@/lib/db/storage';
 import type { Dish, Restaurant } from '@/types/models';
 
 const RESTAURANT_SELECT = `
@@ -138,3 +139,27 @@ export async function listTrendingDishes(): Promise<Dish[]> {
     ];
   });
 }
+
+/**
+ * All photos for a restaurant from the `restaurant_photos` table.
+ * Photos are ordered by position (primary sort indicator) then creation time.
+ * Returns URLs that can be used directly in Image components.
+ */
+export async function getRestaurantPhotos(restaurantId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('restaurant_photos')
+    .select('storage_path')
+    .eq('restaurant_id', restaurantId)
+    .order('position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.warn(`[Bitebook] Failed to fetch photos for restaurant ${restaurantId}:`, error);
+    return [];
+  }
+
+  return (data ?? [])
+    .map((row) => publicImageUrl('restaurant-photos', row.storage_path))
+    .filter((url): url is string => url !== null);
+}
+

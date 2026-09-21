@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 import type { GestureResponderEvent } from 'react-native';
-import { BookOpen, Compass, House, Plus, User } from 'lucide-react-native';
+import { BookOpen, Compass, House, Plus, User, Images } from 'lucide-react-native';
 import { Tabs } from 'expo-router/js-tabs';
 
 import { colors } from '@/constants/colors';
@@ -85,6 +85,13 @@ export default function TabsLayout() {
         options={{
           title: '',
           tabBarButton: (props) => <LogTabButton onPress={props.onPress} />,
+        }}
+      />
+      <Tabs.Screen
+        name="gallery"
+        options={{
+          title: 'Gallery',
+          tabBarIcon: ({ color }) => <Images size={24} color={color} />,
         }}
       />
       <Tabs.Screen

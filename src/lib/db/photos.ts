@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
  * renders larger than a full-width card, so the rest is upload time the user waits through.
  */
 const MAX_EDGE_PX = 1600;
+const AVATAR_SIZE_PX = 400;
 const JPEG_QUALITY = 0.8;
 
 export interface PreparedPhoto {
@@ -154,6 +155,63 @@ export async function uploadDishPhoto(
   if (rowError) {
     await supabase.storage.from('dish-photos').remove([storagePath]);
     throw rowError;
+  }
+
+  return storagePath;
+}
+
+/**
+ * Prepares an avatar photo — resizes to a square suitable for profile display.
+ */
+export async function prepareAvatarPhoto(uri: string): Promise<PreparedPhoto> {
+  const context = ImageManipulator.ImageManipulator.manipulate(uri);
+  const image = await context.renderAsync();
+
+  const size = Math.min(image.width, image.height);
+  const padding = Math.max(image.width, image.height) - size;
+  const offsetX = Math.floor(padding / 2);
+  const offsetY = Math.floor(padding / 2);
+
+  context.crop({
+    originX: offsetX,
+    originY: offsetY,
+    width: size,
+    height: size,
+  });
+
+  if (size > AVATAR_SIZE_PX) {
+    context.resize({ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX });
+  }
+
+  const rendered = await context.renderAsync();
+  const result = await rendered.saveAsync({
+    compress: JPEG_QUALITY,
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  return { uri: result.uri, width: result.width, height: result.height };
+}
+
+/**
+ * Uploads a prepared avatar photo and updates the user's profile.
+ */
+export async function uploadAvatarPhoto(userId: string, bytes: ArrayBuffer): Promise<string> {
+  const storagePath = `${userId}/avatar.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(storagePath, bytes, { contentType: 'image/jpeg', upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: storagePath })
+    .eq('id', userId);
+
+  if (updateError) {
+    await supabase.storage.from('avatars').remove([storagePath]);
+    throw updateError;
   }
 
   return storagePath;
