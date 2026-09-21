@@ -49,6 +49,8 @@ export type FeedActivity = {
   postedAgo: string;
   likeCount: number;
   commentCount: number;
+  review_id?: string;
+  restaurant_id?: string;
 };
 
 export type DiaryEntry = {

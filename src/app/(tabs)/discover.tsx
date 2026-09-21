@@ -49,7 +49,7 @@ export default function DiscoverScreen() {
   const handleRestaurantSave = async (restaurantId: string) => {
     try {
       await saveRestaurant(restaurantId);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.saved.restaurants() });
+      void queryClient.invalidateQueries({ queryKey: ['saved-restaurants'] });
     } catch (error) {
       console.error('Failed to save restaurant:', error);
       Alert.alert('Error', 'Could not save restaurant');
@@ -108,7 +108,6 @@ export default function DiscoverScreen() {
   };
 
   const handleLoadMenu = async (restaurant: Restaurant) => {
-    setSelectedRestaurant(restaurant);
     setMenuLoading(true);
     setMenuTitle(restaurant.name);
     setMenuItems([]);

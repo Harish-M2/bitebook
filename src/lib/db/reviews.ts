@@ -350,7 +350,7 @@ export async function addReviewComment(reviewId: string, text: string) {
     .insert({
       review_id: reviewId,
       user_id: user.user.id,
-      text: text.trim(),
+      body: text.trim(),
     })
     .select()
     .single();
