@@ -10,6 +10,7 @@ import { listCuisines } from '@/lib/db/cuisines';
 import { listRestaurants, listTrendingDishes, getRestaurantPhotos } from '@/lib/db/restaurants';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
 import { getRestaurantMenu } from '@/lib/db/menus';
+import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Screen } from '@/components/ui/Screen';
 import { Heading } from '@/components/ui/Typography';
@@ -20,6 +21,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { DishCard } from '@/components/food/DishCard';
 import { RestaurantRow } from '@/components/food/RestaurantRow';
 import { PlaceResultRow } from '@/components/food/PlaceResultRow';
+import { FilterBar } from '@/components/food/FilterBar';
 import { PhotoGalleryModal } from '@/components/ui/PhotoGalleryModal';
 import { MenuModal } from '@/components/ui/MenuModal';
 import type { Restaurant } from '@/types/models';
@@ -33,6 +35,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const [activeCuisine, setActiveCuisine] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<RestaurantFilters>({});
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
   const [galleryTitle, setGalleryTitle] = useState('');
@@ -126,6 +129,9 @@ export default function DiscoverScreen() {
 
   const trendingDishes = trending.data ?? [];
 
+  // Apply filters to restaurants
+  const filteredRestaurants = filterRestaurants(restaurants.data ?? [], activeFilters);
+
   const header = (
     <View className="gap-lg pb-md">
       <View className="gap-md px-lg pt-xs">
@@ -166,6 +172,15 @@ export default function DiscoverScreen() {
               />
             )}
           />
+
+          {/* Filter Bar */}
+          {(restaurants.data ?? []).length > 0 && (
+            <FilterBar
+              restaurants={restaurants.data ?? []}
+              activeFilters={activeFilters}
+              onFiltersChange={setActiveFilters}
+            />
+          )}
 
           {trendingDishes.length > 0 ? (
             <View className="gap-sm">
@@ -237,7 +252,7 @@ export default function DiscoverScreen() {
   return (
     <Screen>
       <FlatList<Restaurant>
-        data={restaurants.data ?? []}
+        data={filteredRestaurants}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={header}
