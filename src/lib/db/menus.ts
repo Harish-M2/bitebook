@@ -68,8 +68,7 @@ export async function getRestaurantMenu(
   // Check cache first
   const cached = await getCachedMenu(restaurantId);
   if (cached) {
-    // Log cache hit
-    void logMenuFetch(restaurantId, restaurantName, true, 0, null);
+    // Cache hit - don't log from client, Edge Function logs during fetch
     return cached;
   }
 
@@ -95,27 +94,17 @@ async function searchAndCacheMenu(
 
     if (error) {
       console.error(`[Bitebook] Menu API error for ${restaurantName}:`, error);
-      // Log failed attempt
-      await logMenuFetch(restaurantId, restaurantName, false, 0, error?.message ?? 'Unknown error');
+      // Logging is handled by Edge Function (service_role)
       return [];
     }
 
     const items = data?.items ?? [];
-
-    // Log successful fetch
-    if (items.length > 0) {
-      const totalSize = JSON.stringify(items).length;
-      await logMenuFetch(restaurantId, restaurantName, true, totalSize, null);
-
-      // Cache items (insertion happens in Edge Function)
-      // This function just returns the items
-    }
-
+    // Caching and logging are handled by Edge Function
     return items;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error(`[Bitebook] Failed to search menu for ${restaurantName}:`, err);
-    await logMenuFetch(restaurantId, restaurantName, false, 0, errorMessage);
+    // Logging is handled by Edge Function (service_role)
     return [];
   }
 }
@@ -140,36 +129,6 @@ export async function refreshMenuCache(
 
   // Fetch fresh data
   return searchAndCacheMenu(restaurantId, restaurantName);
-}
-
-/**
- * Log menu fetch attempt for cost tracking and analytics.
- */
-async function logMenuFetch(
-  restaurantId: string,
-  restaurantName: string,
-  success: boolean,
-  responseSize: number,
-  errorMessage: string | null,
-  cached = false,
-): Promise<void> {
-  try {
-    const { error } = await (supabase.from('menu_fetch_log' as any).insert({
-      restaurant_id: restaurantId,
-      restaurant_name: restaurantName,
-      success,
-      cost: success && !cached ? 0.01 : 0, // Only charge for actual API calls
-      response_size: responseSize > 0 ? responseSize : null,
-      error_message: errorMessage,
-      cached,
-    }) as any);
-
-    if (error) {
-      console.warn('[Bitebook] Failed to log menu fetch:', error);
-    }
-  } catch (err) {
-    console.warn('[Bitebook] Error logging menu fetch:', err);
-  }
 }
 
 /**
