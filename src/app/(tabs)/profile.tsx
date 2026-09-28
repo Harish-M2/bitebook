@@ -27,10 +27,10 @@ const EMPTY_STATS: DiaryStats = {
 
 /** Profile tab — identity, lifetime stats, and cuisine breakdown. */
 export default function ProfileScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const userId = profile?.id ?? null;
+  const userId = user?.id ?? null;
 
   const stats = useQuery({
     queryKey: queryKeys.diaryStats(userId ?? ''),

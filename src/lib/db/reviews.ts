@@ -425,6 +425,5 @@ export async function getUserReviews(userId: string) {
     dish: dishMap[review.dish_id] || null,
   }));
 
-  console.log('[Bitebook] User reviews:', result);
   return result;
 }
