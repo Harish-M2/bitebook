@@ -197,7 +197,7 @@ export default function ProfileScreen() {
                         ★ {review.rating}/5
                       </MetadataText>
                       {review.review_text ? (
-                        <Caption style={{ marginTop: 8 }}>"{review.review_text}"</Caption>
+                        <Caption style={{ marginTop: 8 }}>&quot;{review.review_text}&quot;</Caption>
                       ) : null}
                     </View>
                     <Pressable
