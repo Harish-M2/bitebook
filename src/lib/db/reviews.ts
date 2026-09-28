@@ -387,18 +387,9 @@ export async function deleteReviewComment(commentId: string) {
  * Get all reviews by the current user
  */
 export async function getUserReviews(userId: string) {
-  const { data, error } = await supabase
+  const { data: reviews, error } = await supabase
     .from('reviews')
-    .select(
-      `
-        id,
-        rating,
-        review_text,
-        created_at,
-        restaurant:restaurants(id, name),
-        dish:dishes(id, name)
-      `
-    )
+    .select('id, rating, review_text, created_at, restaurant_id, dish_id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -407,5 +398,33 @@ export async function getUserReviews(userId: string) {
     throw error;
   }
 
-  return data || [];
+  if (!reviews || reviews.length === 0) {
+    console.log('[Bitebook] User reviews: empty');
+    return [];
+  }
+
+  // Fetch restaurants and dishes
+  const restaurantIds = [...new Set(reviews.map((r: any) => r.restaurant_id).filter(Boolean))];
+  const dishIds = [...new Set(reviews.map((r: any) => r.dish_id).filter(Boolean))];
+
+  const [restauRes, dishRes] = await Promise.all([
+    restaurantIds.length > 0
+      ? supabase.from('restaurants').select('id, name').in('id', restaurantIds)
+      : Promise.resolve({ data: [] }),
+    dishIds.length > 0
+      ? supabase.from('dishes').select('id, name').in('id', dishIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const restaurantMap = Object.fromEntries((restauRes.data || []).map((r: any) => [r.id, r]));
+  const dishMap = Object.fromEntries((dishRes.data || []).map((d: any) => [d.id, d]));
+
+  const result = reviews.map((review: any) => ({
+    ...review,
+    restaurant: restaurantMap[review.restaurant_id] || null,
+    dish: dishMap[review.dish_id] || null,
+  }));
+
+  console.log('[Bitebook] User reviews:', result);
+  return result;
 }

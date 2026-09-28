@@ -177,7 +177,11 @@ export default function ProfileScreen() {
 
         <View className="px-lg gap-md">
           <Heading level={3}>Your reviews</Heading>
-          {reviews.data && reviews.data.length > 0 ? (
+          {reviews.isLoading ? (
+            <BodyText color="textSecondary">Loading reviews...</BodyText>
+          ) : reviews.error ? (
+            <BodyText color="textSecondary">Error loading reviews</BodyText>
+          ) : reviews.data && reviews.data.length > 0 ? (
             <View className="gap-md">
               {reviews.data.map((review: any) => (
                 <View
