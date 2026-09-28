@@ -68,26 +68,22 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleDeleteReview = (reviewId: string, dishName?: string) => {
-    Alert.alert(
-      'Delete review',
-      `Are you sure you want to delete your review of "${dishName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteReview(reviewId);
-              await reviews.refetch();
-            } catch (error) {
-              Alert.alert('Failed to delete review', String(error));
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteReview = async (reviewId: string, dishName?: string) => {
+    // Use native browser confirm for web compatibility
+    const confirmed = typeof window !== 'undefined' 
+      ? window.confirm(`Are you sure you want to delete your review of "${dishName}"? This cannot be undone.`)
+      : false;
+    
+    if (!confirmed) return;
+
+    try {
+      await deleteReview(reviewId);
+      await reviews.refetch();
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        window.alert('Failed to delete review: ' + String(error));
+      }
+    }
   };
 
   const handleAvatarUpload = async () => {
