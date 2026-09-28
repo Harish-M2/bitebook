@@ -75,12 +75,14 @@ export function FeedItem({ activity, className, onCommentPress }: FeedItemProps)
         <MetadataText>{activity.postedAgo}</MetadataText>
       </View>
 
-      <Image
-        source={activity.photoUrl ?? undefined}
-        transition={150}
-        accessibilityLabel={title ?? 'Food photo'}
-        style={{ width: '100%', aspectRatio: 0.65, borderRadius: 16, backgroundColor: colors.surfaceElevated }}
-      />
+      {activity.photoUrl ? (
+        <Image
+          source={activity.photoUrl}
+          transition={150}
+          accessibilityLabel={title ?? 'Food photo'}
+          style={{ width: '100%', aspectRatio: 0.65, borderRadius: 16, backgroundColor: colors.surfaceElevated }}
+        />
+      ) : null}
 
       <View className="gap-xxs">
         <View className="flex-row items-center justify-between">
