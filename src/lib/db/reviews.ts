@@ -382,3 +382,18 @@ export async function deleteReviewComment(commentId: string) {
     throw error;
   }
 }
+
+/**
+ * Delete a review (only the review owner can delete)
+ */
+export async function deleteReview(reviewId: string) {
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) {
+    console.error('[Bitebook] Failed to delete review:', error);
+    throw error;
+  }
+}
