@@ -397,3 +397,30 @@ export async function deleteReview(reviewId: string) {
     throw error;
   }
 }
+
+/**
+ * Get all reviews by the current user
+ */
+export async function getUserReviews(userId: string) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(
+      `
+        id,
+        rating,
+        review_text,
+        created_at,
+        restaurant:restaurants(id, name),
+        dish:dishes(id, name)
+      `
+    )
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[Bitebook] Failed to fetch user reviews:', error);
+    throw error;
+  }
+
+  return data || [];
+}

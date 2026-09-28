@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { Trash2 } from 'lucide-react-native';
 
 import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
 import { readPhotoBytes, prepareAvatarPhoto, uploadAvatarPhoto } from '@/lib/db/photos';
+import { getUserReviews, deleteReview } from '@/lib/db/reviews';
 import { Screen, Divider, Spacer } from '@/components/ui/Screen';
 import { Avatar } from '@/components/ui/Avatar';
-import { Heading, BodyText, Caption } from '@/components/ui/Typography';
+import { Heading, BodyText, Caption, MetadataText } from '@/components/ui/Typography';
 import { Button } from '@/components/ui/Button';
 import { ProfileStats } from '@/components/profile/ProfileStats';
 import { CuisineBreakdown } from '@/components/profile/CuisineBreakdown';
+import { colors } from '@/constants/colors';
 import type { DiaryStats } from '@/types/models';
 
 const EMPTY_STATS: DiaryStats = {
@@ -41,6 +44,12 @@ export default function ProfileScreen() {
     enabled: userId !== null,
   });
 
+  const reviews = useQuery({
+    queryKey: ['user-reviews', userId],
+    queryFn: () => getUserReviews(userId as string),
+    enabled: userId !== null,
+  });
+
   const handleSignOut = () => {
     Alert.alert('Sign out', 'You will need to sign in again to log meals.', [
       { text: 'Cancel', style: 'cancel' },
@@ -57,6 +66,28 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteReview = (reviewId: string, dishName?: string) => {
+    Alert.alert(
+      'Delete review',
+      `Are you sure you want to delete your review of "${dishName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteReview(reviewId);
+              await reviews.refetch();
+            } catch (error) {
+              Alert.alert('Failed to delete review', String(error));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleAvatarUpload = async () => {
@@ -135,6 +166,51 @@ export default function ProfileScreen() {
             <BodyText color="textSecondary">
               Log a few dishes and your most-eaten cuisines will appear here.
             </BodyText>
+          )}
+        </View>
+
+        <Spacer size="xl" />
+        <View className="px-lg">
+          <Divider />
+        </View>
+        <Spacer size="lg" />
+
+        <View className="px-lg gap-md">
+          <Heading level={3}>Your reviews</Heading>
+          {reviews.data && reviews.data.length > 0 ? (
+            <View className="gap-md">
+              {reviews.data.map((review: any) => (
+                <View
+                  key={review.id}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    padding: 12,
+                    gap: 8,
+                  }}>
+                  <View className="flex-row items-start justify-between gap-md">
+                    <View className="flex-1">
+                      <BodyText medium>{review.dish?.name}</BodyText>
+                      <Caption color="textSecondary">{review.restaurant?.name}</Caption>
+                      <MetadataText color="textSecondary" style={{ marginTop: 4 }}>
+                        ★ {review.rating}/5
+                      </MetadataText>
+                      {review.review_text ? (
+                        <Caption style={{ marginTop: 8 }}>"{review.review_text}"</Caption>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      onPress={() => handleDeleteReview(review.id, review.dish?.name)}
+                      style={{ padding: 8 }}>
+                      <Trash2 size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <BodyText color="textSecondary">No reviews yet. Log your first dish!</BodyText>
           )}
         </View>
 
