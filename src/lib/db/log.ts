@@ -52,9 +52,9 @@ export async function logDish(
     .rpc('log_dish', {
       p_restaurant_id: input.restaurantId,
       p_rating: input.rating,
-      p_dish_id: input.dishId ?? undefined,
-      p_dish_name: input.dishId ? undefined : (input.dishName ?? undefined),
-      p_review_text: input.reviewText ?? undefined,
+      p_dish_id: input.dishId ?? null,
+      p_dish_name: input.dishId ? null : (input.dishName ?? null),
+      p_review_text: input.reviewText ?? null,
       p_visibility: input.visibility ?? 'public',
       // "The day I ate it" is a local calendar date. The database default is `current_date`,
       // which is UTC, so a late-evening log east of UTC would land on tomorrow and an early

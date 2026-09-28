@@ -150,10 +150,10 @@ export type Database = {
           },
           {
             foreignKeyName: "diary_entries_review_fk"
-            columns: ["review_id", "review_user_id", "review_dish_id"]
+            columns: ["review_id"]
             isOneToOne: false
             referencedRelation: "reviews"
-            referencedColumns: ["id", "user_id", "dish_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "diary_entries_user_id_fkey"
