@@ -79,7 +79,7 @@ export function FeedItem({ activity, className, onCommentPress }: FeedItemProps)
         source={activity.photoUrl ?? undefined}
         transition={150}
         accessibilityLabel={title ?? 'Food photo'}
-        style={{ width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: colors.surfaceElevated }}
+        style={{ width: '100%', aspectRatio: 0.65, borderRadius: 16, backgroundColor: colors.surfaceElevated }}
       />
 
       <View className="gap-xxs">
