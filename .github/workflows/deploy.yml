@@ -26,10 +26,11 @@ jobs:
 
       - name: Fix paths for GitHub Pages
         run: |
-          sed -i 's|href="/|href="|g' dist/index.html
-          sed -i 's|src="/|src="|g' dist/index.html
-          sed -i '/<head>/a\    <base href="/bitebook/" />' dist/index.html
+          # Add base href to the HTML
+          sed -i '/<head>/a\    <base href="/bitebook/">' dist/index.html
+          # Copy index.html to 404.html for SPA routing
           cp dist/index.html dist/404.html
+          # Add .nojekyll to disable Jekyll processing
           touch dist/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
