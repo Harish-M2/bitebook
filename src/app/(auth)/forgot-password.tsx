@@ -8,7 +8,6 @@ import {
   Button,
   Heading,
   IconButton,
-  MetadataText,
   Screen,
   Spacer,
   TextField,
@@ -49,81 +48,79 @@ export default function ForgotPassword() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerClassName="grow px-xl pb-xxl"
+          contentContainerClassName="flex-1 justify-center px-xl"
           keyboardShouldPersistTaps="handled">
-          <View className="py-md">
-            <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
-              <ChevronLeft size={20} color={colors.textPrimary} />
-            </IconButton>
-          </View>
-
-          <Spacer size="md" />
-
-          <View className="items-center justify-center mb-md">
-            <View className="bg-accent/10 p-lg rounded-full">
-              {success ? (
-                <Send size={32} color={colors.accent} />
-              ) : (
-                <Mail size={32} color={colors.accent} />
-              )}
+          <View className="w-full max-w-md mx-auto">
+            <View className="pb-md mb-md">
+              <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
+                <ChevronLeft size={20} color={colors.textPrimary} />
+              </IconButton>
             </View>
+
+            <View className="items-center justify-center mb-md">
+              <View className="bg-accent/10 p-lg rounded-full">
+                {success ? (
+                  <Send size={32} color={colors.accent} />
+                ) : (
+                  <Mail size={32} color={colors.accent} />
+                )}
+              </View>
+            </View>
+
+            <Heading style={{ textAlign: 'center' }}>
+              {success ? 'Check your email' : 'Reset your password'}
+            </Heading>
+            <Spacer size="xxs" />
+            <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
+              {success
+                ? 'We sent a password reset link. Click it to create a new password.'
+                : 'Enter your email and we\'ll send you a link to reset your password.'}
+            </BodyText>
+
+            <Spacer size="xl" />
+
+            {!success && (
+              <>
+                <TextField
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  returnKeyType="send"
+                  onSubmitEditing={handleSubmit}
+                  error={error}
+                  leftIcon={<Mail size={18} color={colors.textSecondary} />}
+                />
+
+                <Spacer size="xl" />
+
+                <Button
+                  label="Send reset link"
+                  size="lg"
+                  fullWidth
+                  loading={isSubmitting}
+                  disabled={!canSubmit}
+                  onPress={handleSubmit}
+                />
+              </>
+            )}
+
+            {success && (
+              <>
+                <Spacer size="xl" />
+                <Button
+                  label="Back to sign in"
+                  size="lg"
+                  fullWidth
+                  onPress={() => router.back()}
+                />
+              </>
+            )}
           </View>
-
-          <Heading style={{ textAlign: 'center' }}>
-            {success ? 'Check your email' : 'Reset your password'}
-          </Heading>
-          <Spacer size="xxs" />
-          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
-            {success
-              ? 'We sent a password reset link. Click it to create a new password.'
-              : 'Enter your email and we\'ll send you a link to reset your password.'}
-          </BodyText>
-
-          <Spacer size="xl" />
-
-          {!success && (
-            <>
-              <TextField
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="send"
-                onSubmitEditing={handleSubmit}
-                error={error}
-                leftIcon={<Mail size={18} color={colors.textSecondary} />}
-              />
-
-              <Spacer size="xl" />
-
-              <Button
-                label="Send reset link"
-                size="lg"
-                fullWidth
-                loading={isSubmitting}
-                disabled={!canSubmit}
-                onPress={handleSubmit}
-              />
-            </>
-          )}
-
-          {success && (
-            <>
-              <Spacer size="xl" />
-              <Button
-                label="Back to sign in"
-                size="lg"
-                fullWidth
-                onPress={() => router.back()}
-              />
-            </>
-          )}
-
-          <View className="grow" />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

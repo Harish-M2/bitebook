@@ -49,90 +49,90 @@ export default function SignIn() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerClassName="grow px-xl pb-xxl"
+          contentContainerClassName="flex-1 justify-center px-xl"
           keyboardShouldPersistTaps="handled">
-          <View className="py-md">
-            <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
-              <ChevronLeft size={20} color={colors.textPrimary} />
-            </IconButton>
-          </View>
-
-          <Spacer size="md" />
-          
-          <View className="items-center justify-center mb-md">
-            <View className="bg-accent/10 p-lg rounded-full">
-              <Lock size={32} color={colors.accent} />
-            </View>
-          </View>
-
-          <Heading style={{ textAlign: 'center' }}>Welcome back</Heading>
-          <Spacer size="xxs" />
-          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
-            Sign in to your account and continue logging your food diary
-          </BodyText>
-
-          <Spacer size="xl" />
-
-          <View className="gap-lg">
-            <View>
-              <TextField
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                leftIcon={<Mail size={18} color={colors.textSecondary} />}
-              />
+          <View className="w-full max-w-md mx-auto">
+            <View className="pb-md mb-md">
+              <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
+                <ChevronLeft size={20} color={colors.textPrimary} />
+              </IconButton>
             </View>
 
-            <View>
-              <TextField
-                label="Password"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Your password"
-                autoCapitalize="none"
-                autoComplete="current-password"
-                textContentType="password"
-                secureTextEntry
-                returnKeyType="go"
-                onSubmitEditing={handleSubmit}
-                error={error}
-                leftIcon={<Lock size={18} color={colors.textSecondary} />}
-              />
+            <View className="items-center justify-center mb-md">
+              <View className="bg-accent/10 p-lg rounded-full">
+                <Lock size={32} color={colors.accent} />
+              </View>
             </View>
-          </View>
 
-          <Spacer size="sm" />
+            <Heading style={{ textAlign: 'center' }}>Welcome back</Heading>
+            <Spacer size="xxs" />
+            <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
+              Sign in to your account and continue logging your food diary
+            </BodyText>
 
-          <Link href="/forgot-password" asChild>
-            <MetadataText color="accent">Forgot password?</MetadataText>
-          </Link>
+            <Spacer size="xl" />
 
-          <Spacer size="xl" />
+            <View className="gap-lg">
+              <View>
+                <TextField
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  leftIcon={<Mail size={18} color={colors.textSecondary} />}
+                />
+              </View>
 
-          <Button
-            label="Sign in"
-            size="lg"
-            fullWidth
-            loading={isSubmitting}
-            disabled={!canSubmit}
-            onPress={handleSubmit}
-          />
+              <View>
+                <TextField
+                  label="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Your password"
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  textContentType="password"
+                  secureTextEntry
+                  returnKeyType="go"
+                  onSubmitEditing={handleSubmit}
+                  error={error}
+                  leftIcon={<Lock size={18} color={colors.textSecondary} />}
+                />
+              </View>
+            </View>
 
-          <Spacer size="xl" />
+            <Spacer size="sm" />
 
-          <View className="flex-row items-center justify-center gap-xxs">
-            <MetadataText>Don&apos;t have an account?</MetadataText>
-            <Link href="/sign-up" replace>
-              <MetadataText color="accent" style={{ fontWeight: '600' }}>
-                Sign up
-              </MetadataText>
+            <Link href="/forgot-password" asChild>
+              <MetadataText color="accent">Forgot password?</MetadataText>
             </Link>
+
+            <Spacer size="xl" />
+
+            <Button
+              label="Sign in"
+              size="lg"
+              fullWidth
+              loading={isSubmitting}
+              disabled={!canSubmit}
+              onPress={handleSubmit}
+            />
+
+            <Spacer size="xl" />
+
+            <View className="flex-row items-center justify-center gap-xxs">
+              <MetadataText>Don&apos;t have an account?</MetadataText>
+              <Link href="/sign-up" replace>
+                <MetadataText color="accent" style={{ fontWeight: '600' }}>
+                  Sign up
+                </MetadataText>
+              </Link>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
