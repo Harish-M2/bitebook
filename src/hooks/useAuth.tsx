@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getProfile, type Profile } from '@/lib/db/profiles';
@@ -138,8 +139,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return { error: error?.message ?? null };
       },
       resetPassword: async (email) => {
+        const redirectUrl = Platform.OS === 'web' 
+          ? 'https://harish-m2.vercel.app/reset-password'
+          : 'bitebook://auth/reset-password';
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: 'bitebook://auth/reset-password',
+          redirectTo: redirectUrl,
         });
         return { error: error?.message ?? null };
       },
