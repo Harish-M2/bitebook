@@ -140,7 +140,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       resetPassword: async (email) => {
         const redirectUrl = Platform.OS === 'web' 
-          ? 'https://harish-m2.vercel.app/reset-password'
+          ? 'https://bitebook-alpha.vercel.app/reset-password'
           : 'bitebook://auth/reset-password';
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: redirectUrl,
