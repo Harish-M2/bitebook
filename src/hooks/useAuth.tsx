@@ -32,6 +32,7 @@ type AuthContextValue = {
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
   signUpWithPassword: (email: string, password: string) => Promise<SignUpResult>;
   signOut: () => Promise<AuthResult>;
+  resetPassword: (email: string) => Promise<AuthResult>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -134,6 +135,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       signOut: async () => {
         const { error } = await supabase.auth.signOut();
+        return { error: error?.message ?? null };
+      },
+      resetPassword: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: 'bitebook://auth/reset-password',
+        });
         return { error: error?.message ?? null };
       },
     }),

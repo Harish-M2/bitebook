@@ -94,6 +94,12 @@ export default function SignIn() {
             error={error}
           />
 
+          <Spacer size="sm" />
+
+          <Link href="/forgot-password" asChild>
+            <MetadataText color="accent">Forgot password?</MetadataText>
+          </Link>
+
           <Spacer size="xl" />
 
           <Button
@@ -119,3 +125,4 @@ export default function SignIn() {
     </Screen>
   );
 }
+
