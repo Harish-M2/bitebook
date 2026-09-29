@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Lock, Mail } from 'lucide-react-native';
 import { Link, router } from 'expo-router';
 
 import {
@@ -40,8 +40,6 @@ export default function SignIn() {
       return;
     }
 
-    // Leave isSubmitting true: the guard in (auth)/_layout tears this screen down as soon
-    // as the session lands, and index resolves whether that means onboarding or Home.
     router.replace('/');
   };
 
@@ -59,40 +57,55 @@ export default function SignIn() {
             </IconButton>
           </View>
 
-          <Spacer size="lg" />
-          <Heading>Welcome back</Heading>
+          <Spacer size="md" />
+          
+          <View className="items-center justify-center mb-md">
+            <View className="bg-accent/10 p-lg rounded-full">
+              <Lock size={32} color={colors.accent} />
+            </View>
+          </View>
+
+          <Heading style={{ textAlign: 'center' }}>Welcome back</Heading>
           <Spacer size="xxs" />
-          <BodyText color="textSecondary">Sign in to pick up your food diary.</BodyText>
+          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
+            Sign in to your account and continue logging your food diary
+          </BodyText>
 
           <Spacer size="xl" />
 
-          <TextField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            returnKeyType="next"
-          />
+          <View className="gap-lg">
+            <View>
+              <TextField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                leftIcon={<Mail size={18} color={colors.textSecondary} />}
+              />
+            </View>
 
-          <Spacer size="md" />
-
-          <TextField
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Your password"
-            autoCapitalize="none"
-            autoComplete="current-password"
-            textContentType="password"
-            secureTextEntry
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-            error={error}
-          />
+            <View>
+              <TextField
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Your password"
+                autoCapitalize="none"
+                autoComplete="current-password"
+                textContentType="password"
+                secureTextEntry
+                returnKeyType="go"
+                onSubmitEditing={handleSubmit}
+                error={error}
+                leftIcon={<Lock size={18} color={colors.textSecondary} />}
+              />
+            </View>
+          </View>
 
           <Spacer size="sm" />
 
@@ -111,13 +124,14 @@ export default function SignIn() {
             onPress={handleSubmit}
           />
 
-          <View className="grow" />
           <Spacer size="xl" />
 
           <View className="flex-row items-center justify-center gap-xxs">
-            <MetadataText>New to Bitebook?</MetadataText>
+            <MetadataText>Don&apos;t have an account?</MetadataText>
             <Link href="/sign-up" replace>
-              <MetadataText color="accent">Create an account</MetadataText>
+              <MetadataText color="accent" style={{ fontWeight: '600' }}>
+                Sign up
+              </MetadataText>
             </Link>
           </View>
         </ScrollView>

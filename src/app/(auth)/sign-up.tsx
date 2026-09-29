@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { ChevronLeft, MailCheck } from 'lucide-react-native';
+import { ChevronLeft, Lock, Mail, MailCheck, Utensils } from 'lucide-react-native';
 import { Link, router } from 'expo-router';
 
 import {
@@ -49,8 +49,6 @@ export default function SignUp() {
     }
 
     if (needsEmailConfirmation) {
-      // Email confirmation is enabled on the project, so no session exists yet and the
-      // route guards will not move us. Tell the user to go and confirm.
       setAwaitingConfirmation(true);
       setIsSubmitting(false);
       return;
@@ -63,15 +61,20 @@ export default function SignUp() {
     return (
       <Screen edges={['top', 'bottom', 'left', 'right']}>
         <View className="flex-1 items-center justify-center px-xl">
-          <MailCheck size={40} color={colors.accent} />
-          <Spacer size="lg" />
+          <View className="bg-accent/10 p-lg rounded-full mb-lg">
+            <MailCheck size={40} color={colors.accent} />
+          </View>
           <Heading level={2} style={{ textAlign: 'center' }}>
-            Confirm your email
+            Verify your email
           </Heading>
           <Spacer size="xs" />
           <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
-            We sent a confirmation link to {email.trim()}. Open it to finish setting up your
-            account, then sign in.
+            We sent a confirmation link to{'\n'}
+            <BodyText style={{ fontWeight: '600' }}>{email.trim()}</BodyText>
+          </BodyText>
+          <Spacer size="md" />
+          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
+            Click the link to confirm your account, then come back to sign in.
           </BodyText>
           <Spacer size="xl" />
           <Link href="/sign-in" replace asChild>
@@ -96,43 +99,56 @@ export default function SignUp() {
             </IconButton>
           </View>
 
-          <Spacer size="lg" />
-          <Heading>Create your account</Heading>
+          <Spacer size="md" />
+
+          <View className="items-center justify-center mb-md">
+            <View className="bg-accent/10 p-lg rounded-full">
+              <Utensils size={32} color={colors.accent} />
+            </View>
+          </View>
+
+          <Heading style={{ textAlign: 'center' }}>Start your food diary</Heading>
           <Spacer size="xxs" />
-          <BodyText color="textSecondary">
-            Start logging the dishes you love — and the ones you don&apos;t.
+          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
+            Log dishes, track ratings, and explore new flavors
           </BodyText>
 
           <Spacer size="xl" />
 
-          <TextField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            returnKeyType="next"
-          />
+          <View className="gap-lg">
+            <View>
+              <TextField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                leftIcon={<Mail size={18} color={colors.textSecondary} />}
+              />
+            </View>
 
-          <Spacer size="md" />
-
-          <TextField
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="At least 6 characters"
-            autoCapitalize="none"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            secureTextEntry
-            returnKeyType="go"
-            onSubmitEditing={handleSubmit}
-            error={error}
-            hint={`Use ${MIN_PASSWORD_LENGTH} characters or more.`}
-          />
+            <View>
+              <TextField
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="At least 6 characters"
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                secureTextEntry
+                returnKeyType="go"
+                onSubmitEditing={handleSubmit}
+                error={error}
+                hint={`Use ${MIN_PASSWORD_LENGTH} characters or more.`}
+                leftIcon={<Lock size={18} color={colors.textSecondary} />}
+              />
+            </View>
+          </View>
 
           <Spacer size="xl" />
 
@@ -145,13 +161,14 @@ export default function SignUp() {
             onPress={handleSubmit}
           />
 
-          <View className="grow" />
           <Spacer size="xl" />
 
           <View className="flex-row items-center justify-center gap-xxs">
             <MetadataText>Already have an account?</MetadataText>
             <Link href="/sign-in" replace>
-              <MetadataText color="accent">Sign in</MetadataText>
+              <MetadataText color="accent" style={{ fontWeight: '600' }}>
+                Sign in
+              </MetadataText>
             </Link>
           </View>
         </ScrollView>

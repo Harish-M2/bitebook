@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Mail, Send } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 import {
@@ -57,12 +57,25 @@ export default function ForgotPassword() {
             </IconButton>
           </View>
 
-          <Spacer size="lg" />
-          <Heading>Reset your password</Heading>
+          <Spacer size="md" />
+
+          <View className="items-center justify-center mb-md">
+            <View className="bg-accent/10 p-lg rounded-full">
+              {success ? (
+                <Send size={32} color={colors.accent} />
+              ) : (
+                <Mail size={32} color={colors.accent} />
+              )}
+            </View>
+          </View>
+
+          <Heading style={{ textAlign: 'center' }}>
+            {success ? 'Check your email' : 'Reset your password'}
+          </Heading>
           <Spacer size="xxs" />
-          <BodyText color="textSecondary">
+          <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
             {success
-              ? 'Check your email for a password reset link.'
+              ? 'We sent a password reset link. Click it to create a new password.'
               : 'Enter your email and we\'ll send you a link to reset your password.'}
           </BodyText>
 
@@ -82,6 +95,7 @@ export default function ForgotPassword() {
                 returnKeyType="send"
                 onSubmitEditing={handleSubmit}
                 error={error}
+                leftIcon={<Mail size={18} color={colors.textSecondary} />}
               />
 
               <Spacer size="xl" />
