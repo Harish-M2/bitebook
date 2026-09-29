@@ -24,8 +24,7 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png",
-      "baseUrl": "/bitebook/"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",

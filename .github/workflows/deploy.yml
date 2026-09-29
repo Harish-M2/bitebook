@@ -24,13 +24,9 @@ jobs:
 
       - run: npx expo export --platform web
 
-      - name: Fix paths for GitHub Pages
+      - name: Setup SPA routing for GitHub Pages
         run: |
-          # Add base href to the HTML
-          sed -i '/<head>/a\    <base href="/bitebook/">' dist/index.html
-          # Copy index.html to 404.html for SPA routing
           cp dist/index.html dist/404.html
-          # Add .nojekyll to disable Jekyll processing
           touch dist/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
