@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build || npx expo export --platform web --output-dir dist",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}
