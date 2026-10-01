@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
@@ -14,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
 import { prepareAvatarPhoto, readPhotoBytes, uploadAvatarPhoto } from '@/lib/db/photos';
 import { deleteReview, getUserReviews } from '@/lib/db/reviews';
+import { getUserFollowCounts } from '@/lib/db/social';
 import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
 import { queryKeys } from '@/lib/queryClient';
 import type { DiaryStats } from '@/types/models';
@@ -50,6 +52,12 @@ export default function ProfileScreen() {
   const reviews = useQuery({
     queryKey: ['user-reviews', userId],
     queryFn: () => getUserReviews(userId as string),
+    enabled: userId !== null,
+  });
+
+  const followCounts = useQuery({
+    queryKey: ['profile-follow-counts', userId],
+    queryFn: () => getUserFollowCounts(userId as string),
     enabled: userId !== null,
   });
 
@@ -200,6 +208,26 @@ export default function ProfileScreen() {
             loading={uploadingAvatar}
             onPress={handleAvatarUpload}
           />
+        </View>
+
+        <Spacer size="md" />
+        <View className="flex-row items-center justify-center gap-xxl border-y border-border py-md">
+          <Pressable
+            onPress={() => router.push('/followers')}
+            accessibilityRole="button"
+            accessibilityLabel="View your followers"
+            className="items-center gap-xxs">
+            <BodyText medium>{followCounts.data?.followerCount ?? 0}</BodyText>
+            <MetadataText>Followers</MetadataText>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/following')}
+            accessibilityRole="button"
+            accessibilityLabel="View profiles you follow"
+            className="items-center gap-xxs">
+            <BodyText medium>{followCounts.data?.followingCount ?? 0}</BodyText>
+            <MetadataText>Following</MetadataText>
+          </Pressable>
         </View>
 
         <View className="px-lg pt-lg">
