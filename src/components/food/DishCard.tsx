@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
+import { Rating } from '@/components/ui/Rating';
+import { BodyText, Caption } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
 import { cn } from '@/lib/cn';
-import { BodyText, Caption } from '@/components/ui/Typography';
-import { Rating } from '@/components/ui/Rating';
 import type { Dish } from '@/types/models';
 
 type DishCardProps = {
@@ -22,9 +22,9 @@ export function DishCard({ dish, onPress, showRestaurant = true, className }: Di
         source={dish.imageUrl ?? undefined}
         transition={150}
         accessibilityLabel={dish.name}
-        style={{ width: 140, height: 140, borderRadius: 16, backgroundColor: colors.surfaceElevated }}
+        style={{ width: 140, height: 140, borderRadius: 18, backgroundColor: colors.surfaceElevated }}
       />
-      <View className="mt-xs gap-xxs">
+      <View className="mt-sm gap-xxs">
         <Rating value={dish.rating} size="sm" />
         <BodyText medium numberOfLines={1}>
           {dish.name}

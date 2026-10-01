@@ -1,20 +1,21 @@
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  Text,
-  ActivityIndicator,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Heart } from 'lucide-react-native';
+/* eslint-disable react-hooks/set-state-in-effect */
 import { colors } from '@/constants/colors';
 import { getSavedRestaurants, unsaveRestaurant } from '@/lib/db/saved';
 import type { Restaurant } from '@/types/models';
+import { useRouter } from 'expo-router';
+import { Heart } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface SavedListProps {
   onRestaurantPress?: (restaurantId: string) => void;
@@ -60,22 +61,35 @@ export function SavedList({
     loadSavedRestaurants();
   };
 
+  const removeSavedRestaurant = async (restaurantId: string) => {
+    try {
+      await unsaveRestaurant(restaurantId);
+      setRestaurants((current) => current.filter((restaurant) => restaurant.id !== restaurantId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to remove restaurant';
+      if (Platform.OS === 'web') {
+        window.alert(`Could not remove restaurant\n\n${message}`);
+      } else {
+        Alert.alert('Could not remove restaurant', message);
+      }
+    }
+  };
+
   const handleUnsave = (restaurantId: string, restaurantName: string) => {
+    const message = `Remove "${restaurantName}" from your saved list?`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void removeSavedRestaurant(restaurantId);
+      return;
+    }
+
     Alert.alert(
       'Remove Saved Restaurant',
-      `Remove "${restaurantName}" from your saved list?`,
+      message,
       [
         { text: 'Cancel', onPress: () => {} },
         {
           text: 'Remove',
-          onPress: async () => {
-            try {
-              await unsaveRestaurant(restaurantId);
-              setRestaurants(restaurants.filter(r => r.id !== restaurantId));
-            } catch (err) {
-              Alert.alert('Error', 'Failed to remove restaurant');
-            }
-          },
+          onPress: () => void removeSavedRestaurant(restaurantId),
           style: 'destructive',
         },
       ]
@@ -86,9 +100,8 @@ export function SavedList({
     if (onRestaurantPress) {
       onRestaurantPress(restaurantId);
     } else {
-      // Navigate to restaurant detail via parent stack
       router.push({
-        pathname: '/(tabs)/discover',
+        pathname: '/restaurant-detail',
         params: { restaurantId },
       });
     }

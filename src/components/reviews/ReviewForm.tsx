@@ -1,31 +1,30 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Alert,
-  Image,
-  FlatList,
-  ActivityIndicator,
-} from 'react-native';
-import { Camera, X, AlertCircle } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { StarPicker } from './StarPicker';
 import { Button } from '@/components/ui/Button';
+import { colors } from '@/constants/colors';
+import { logActivity } from '@/lib/db/activity';
 import {
-  submitReview,
-  getUserRestaurantReview,
-  deleteReview,
-  deleteReviewPhoto,
+    deleteReview,
+    getUserRestaurantReview,
+    submitReview,
 } from '@/lib/db/reviews';
 import { uploadReviewPhoto } from '@/lib/storage/photos';
-import { logActivity } from '@/lib/db/activity';
 import { supabase } from '@/lib/supabase';
-import { colors } from '@/constants/colors';
+import * as ImagePicker from 'expo-image-picker';
+import { AlertCircle, Camera, X } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { StarPicker } from './StarPicker';
 
 interface ReviewFormProps {
   restaurantId: string;
@@ -57,8 +56,8 @@ export const ReviewForm = ({
         setText(review.text || '');
         setPhotos(review.review_photos?.map((p: any) => p.photo_url) || []);
       }
-    } catch (err) {
-      console.error('[Bitebook] Failed to load review:', err);
+    } catch {
+      console.error('[Bitebook] Failed to load review');
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +79,7 @@ export const ReviewForm = ({
       if (!result.canceled) {
         setNewPhotos([...newPhotos, result.assets[0].uri]);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to pick image');
     }
   };
@@ -102,7 +101,7 @@ export const ReviewForm = ({
       if (!result.canceled) {
         setNewPhotos([...newPhotos, result.assets[0].uri]);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to take photo');
     }
   };
@@ -196,7 +195,7 @@ export const ReviewForm = ({
               setNewPhotos([]);
               setExistingReview(null);
               onSubmitSuccess?.();
-            } catch (err) {
+            } catch {
               setError('Failed to delete review');
             }
           },

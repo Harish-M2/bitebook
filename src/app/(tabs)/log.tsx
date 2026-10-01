@@ -1,23 +1,23 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
-import { queryKeys } from '@/lib/queryClient';
+import { ConfirmStep } from '@/components/log/ConfirmStep';
+import { DishStep, type ChosenDish } from '@/components/log/DishStep';
+import { LogStepHeader } from '@/components/log/LogStepHeader';
+import { PhotoStep } from '@/components/log/PhotoStep';
+import { RatingStep } from '@/components/log/RatingStep';
+import { RestaurantStep, type ChosenRestaurant } from '@/components/log/RestaurantStep';
+import { ReviewStep } from '@/components/log/ReviewStep';
+import { Button } from '@/components/ui/Button';
+import { Screen } from '@/components/ui/Screen';
+import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { logDish } from '@/lib/db/log';
+import { queryKeys } from '@/lib/queryClient';
 import type { ReviewVisibility } from '@/types/database';
-import { Screen } from '@/components/ui/Screen';
-import { Button } from '@/components/ui/Button';
-import { MetadataText } from '@/components/ui/Typography';
-import { LogStepHeader } from '@/components/log/LogStepHeader';
-import { RestaurantStep, type ChosenRestaurant } from '@/components/log/RestaurantStep';
-import { DishStep, type ChosenDish } from '@/components/log/DishStep';
-import { RatingStep } from '@/components/log/RatingStep';
-import { PhotoStep } from '@/components/log/PhotoStep';
-import { ReviewStep } from '@/components/log/ReviewStep';
-import { ConfirmStep } from '@/components/log/ConfirmStep';
 
 const STEPS = ['restaurant', 'dish', 'rating', 'photo', 'review', 'confirm'] as const;
 type Step = (typeof STEPS)[number];
@@ -112,19 +112,50 @@ export default function LogScreen() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.restaurants() });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-dishes'] });
 
+      if (Platform.OS === 'web') {
+        reset();
+        router.replace('/(tabs)/diary');
+        window.alert(
+          result.photoFailed
+            ? 'Dish logged. Your dish is in your diary, but the photo did not upload.'
+            : 'Dish logged. Your review was saved to your diary.',
+        );
+        return;
+      }
+
       if (result.photoFailed) {
         Alert.alert(
           'Logged, but the photo did not upload',
           'Your dish is in your diary. You can add the photo again later.',
+          [
+            {
+              text: 'View diary',
+              onPress: () => {
+                reset();
+                router.push('/(tabs)/diary');
+              },
+            },
+          ],
         );
+      } else {
+        Alert.alert('Dish logged', 'Your review was saved to your diary.', [
+          {
+            text: 'View diary',
+            onPress: () => {
+              reset();
+              router.push('/(tabs)/diary');
+            },
+          },
+        ]);
       }
-
-      reset();
-      router.push('/diary');
     },
     onError: (error: Error) => {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Could not log this dish', error.message);
+      if (Platform.OS === 'web') {
+        window.alert(`Could not log this dish\n\n${error.message}`);
+      } else {
+        Alert.alert('Could not log this dish', error.message);
+      }
     },
   });
 
@@ -156,101 +187,105 @@ export default function LogScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1">
-        <LogStepHeader
-          title={TITLES[step]}
-          stepIndex={stepIndex}
-          stepCount={STEPS.length}
-          onBack={goBack}
-          action={
-            step === 'photo' || step === 'review' ? (
-              <Pressable onPress={goNext} accessibilityRole="button" hitSlop={12}>
-                <MetadataText color="accent">Skip</MetadataText>
-              </Pressable>
-            ) : null
-          }
-        />
-
-        {step === 'restaurant' && (
-          <RestaurantStep
-            onSelect={(restaurant) => {
-              setDraft((current) => ({ ...current, restaurant, dish: null }));
-              setStep('dish');
-            }}
-          />
-        )}
-
-        {step === 'dish' && draft.restaurant && (
-          <DishStep
-            restaurantId={draft.restaurant.id}
-            onSelect={(dish) => {
-              setDraft((current) => ({ ...current, dish }));
-              setStep('rating');
-            }}
-          />
-        )}
-
-        {step === 'rating' && draft.dish && (
-          <RatingStep
-            dishName={draft.dish.name}
-            value={draft.rating}
-            onChange={(rating) => setDraft((current) => ({ ...current, rating }))}
-          />
-        )}
-
-        {step === 'photo' && (
-          <PhotoStep
-            photoUri={draft.photoUri}
-            onChange={(photoUri) => setDraft((current) => ({ ...current, photoUri }))}
-          />
-        )}
-
-        {step === 'review' && (
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <ReviewStep
-              text={draft.reviewText}
-              onChangeText={(reviewText) => setDraft((current) => ({ ...current, reviewText }))}
-              visibility={draft.visibility}
-              onChangeVisibility={(visibility) =>
-                setDraft((current) => ({ ...current, visibility }))
+        <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
+          <View style={{ width: '100%', maxWidth: 980, flex: 1 }}>
+            <LogStepHeader
+              title={TITLES[step]}
+              stepIndex={stepIndex}
+              stepCount={STEPS.length}
+              onBack={goBack}
+              action={
+                step === 'photo' || step === 'review' ? (
+                  <Pressable onPress={goNext} accessibilityRole="button" hitSlop={12}>
+                    <MetadataText color="accent">Skip</MetadataText>
+                  </Pressable>
+                ) : null
               }
             />
-          </ScrollView>
-        )}
 
-        {step === 'confirm' && draft.restaurant && draft.dish && (
-          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-            <ConfirmStep
-              restaurantName={draft.restaurant.name}
-              city={draft.restaurant.city}
-              dishName={draft.dish.name}
-              rating={draft.rating}
-              photoUri={draft.photoUri}
-              reviewText={draft.reviewText}
-              visibility={draft.visibility}
-            />
-          </ScrollView>
-        )}
+            {step === 'restaurant' && (
+              <RestaurantStep
+                onSelect={(restaurant) => {
+                  setDraft((current) => ({ ...current, restaurant, dish: null }));
+                  setStep('dish');
+                }}
+              />
+            )}
 
-        {showFooter ? (
-          <View className="px-lg pb-md pt-sm">
-            <Button
-              label={step === 'confirm' ? 'Log it' : 'Continue'}
-              variant="primary"
-              size="lg"
-              fullWidth
-              disabled={!canAdvance}
-              loading={submit.isPending}
-              onPress={() => {
-                if (step === 'confirm') {
-                  submit.mutate();
-                } else {
-                  void Haptics.selectionAsync();
-                  goNext();
-                }
-              }}
-            />
+            {step === 'dish' && draft.restaurant && (
+              <DishStep
+                restaurantId={draft.restaurant.id}
+                onSelect={(dish) => {
+                  setDraft((current) => ({ ...current, dish }));
+                  setStep('rating');
+                }}
+              />
+            )}
+
+            {step === 'rating' && draft.dish && (
+              <RatingStep
+                dishName={draft.dish.name}
+                value={draft.rating}
+                onChange={(rating) => setDraft((current) => ({ ...current, rating }))}
+              />
+            )}
+
+            {step === 'photo' && (
+              <PhotoStep
+                photoUri={draft.photoUri}
+                onChange={(photoUri) => setDraft((current) => ({ ...current, photoUri }))}
+              />
+            )}
+
+            {step === 'review' && (
+              <ScrollView keyboardShouldPersistTaps="handled">
+                <ReviewStep
+                  text={draft.reviewText}
+                  onChangeText={(reviewText) => setDraft((current) => ({ ...current, reviewText }))}
+                  visibility={draft.visibility}
+                  onChangeVisibility={(visibility) =>
+                    setDraft((current) => ({ ...current, visibility }))
+                  }
+                />
+              </ScrollView>
+            )}
+
+            {step === 'confirm' && draft.restaurant && draft.dish && (
+              <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+                <ConfirmStep
+                  restaurantName={draft.restaurant.name}
+                  city={draft.restaurant.city}
+                  dishName={draft.dish.name}
+                  rating={draft.rating}
+                  photoUri={draft.photoUri}
+                  reviewText={draft.reviewText}
+                  visibility={draft.visibility}
+                />
+              </ScrollView>
+            )}
+
+            {showFooter ? (
+              <View className="px-lg pb-md pt-sm">
+                <Button
+                  label={step === 'confirm' ? 'Log it' : 'Continue'}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  disabled={!canAdvance}
+                  loading={submit.isPending}
+                  onPress={() => {
+                    if (step === 'confirm') {
+                      submit.mutate();
+                    } else {
+                      void Haptics.selectionAsync();
+                      goNext();
+                    }
+                  }}
+                />
+              </View>
+            ) : null}
           </View>
-        ) : null}
+        </View>
       </KeyboardAvoidingView>
     </Screen>
   );

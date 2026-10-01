@@ -1,7 +1,7 @@
-import { supabase } from '@/lib/supabase';
-import { formatPriceLevel } from '@/lib/format';
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
 import { publicImageUrl } from '@/lib/db/storage';
+import { formatPriceLevel } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
 import type { Dish, Restaurant } from '@/types/models';
 
 const RESTAURANT_SELECT = `
@@ -140,10 +140,19 @@ export async function listTrendingDishes(): Promise<Dish[]> {
   });
 }
 
-/**
- * Get a single restaurant by ID with full details and relationships
- */
-export async function getRestaurant(restaurantId: string): Promise<any> {
+export interface RestaurantDetail {
+  id: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  price_level: number | null;
+  image_url: string | null;
+  restaurant_cuisines: {
+    cuisine: { id: string; name: string; slug: string } | null;
+  }[];
+}
+
+export async function getRestaurant(restaurantId: string): Promise<RestaurantDetail> {
   const { data, error } = await supabase
     .from('restaurants')
     .select(`
@@ -154,7 +163,6 @@ export async function getRestaurant(restaurantId: string): Promise<any> {
       price_level,
       image_url,
       restaurant_cuisines(
-        id,
         cuisine:cuisines(id, name, slug)
       )
     `)

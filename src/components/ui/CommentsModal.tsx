@@ -1,13 +1,24 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import React, { useState, useEffect } from 'react';
-import { View, TextInput, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
-import { X, Send } from 'lucide-react-native';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MessageCircle, Send, X } from 'lucide-react-native';
+import { useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    TextInput,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors } from '@/constants/colors';
-import { getReviewComments, addReviewComment } from '@/lib/db/reviews';
-import { BodyText, Caption, MetadataText } from './Typography';
-import { Avatar } from './Avatar';
+import { Avatar } from '@/components/ui/Avatar';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
+import { useAppTheme } from '@/hooks/useTheme';
+import { addReviewComment, getReviewComments } from '@/lib/db/reviews';
 
 export interface CommentsModalProps {
   visible: boolean;
@@ -15,99 +26,72 @@ export interface CommentsModalProps {
   onClose: () => void;
 }
 
-interface Comment {
-  id: string;
-  body: string;
-  created_at: string;
-  user?: {
-    id: string;
-    display_name: string;
-    avatar_url: string | null;
-  };
-}
-
 export function CommentsModal({ visible, reviewId, onClose }: CommentsModalProps) {
   const insets = useSafeAreaInsets();
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { colors } = useAppTheme();
   const [newComment, setNewComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
-  const loadComments = async () => {
-    setLoading(true);
-    try {
-      const data = (await getReviewComments(reviewId)) as unknown as Comment[];
-      setComments(data);
-    } catch (error) {
-      console.error('Failed to load comments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const comments = useQuery({
+    queryKey: ['review-comments', reviewId],
+    queryFn: () => getReviewComments(reviewId),
+    enabled: visible && Boolean(reviewId),
+  });
 
-  useEffect(() => {
-    if (visible) {
-      void loadComments();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, reviewId]);
-
-  const handleSubmit = async () => {
-    if (!newComment.trim()) return;
-
-    setSubmitting(true);
-    try {
-      await addReviewComment(reviewId, newComment);
+  const addComment = useMutation({
+    mutationFn: (body: string) => addReviewComment(reviewId, body),
+    onSuccess: async () => {
       setNewComment('');
-      await loadComments();
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-    } finally {
-      setSubmitting(false);
-    }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['review-comments', reviewId] }),
+        queryClient.invalidateQueries({ queryKey: ['feed'] }),
+      ]);
+    },
+  });
+
+  const handleSubmit = () => {
+    const body = newComment.trim();
+    if (!body || addComment.isPending) return;
+    addComment.mutate(body);
   };
 
-  if (!visible) return null;
+  const inputBottomPadding = Math.max(12, insets.bottom, Platform.OS === 'web' ? 24 : 0);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}>
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          top: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        }}
-        onTouchEnd={onClose}>
-        <View
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable
           style={{
             position: 'absolute',
+            top: 0,
+            right: 0,
             bottom: 0,
             left: 0,
-            right: 0,
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            maxHeight: '80%',
-            paddingTop: 16,
+            backgroundColor: 'rgba(0, 0, 0, 0.58)',
           }}
-          onTouchEnd={(e) => e.stopPropagation()}>
-          {/* Header */}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close comments" />
+        <View
+          style={{
+            height: '80%',
+            maxHeight: '80%',
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            paddingTop: 16,
+          }}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingBottom: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}>
-            <BodyText medium>Comments ({comments.length})</BodyText>
+            className="flex-row items-center justify-between border-b border-border px-lg pb-sm"
+            style={{ borderBottomColor: colors.border }}>
+            <BodyText medium>Comments ({comments.data?.length ?? 0})</BodyText>
             <Pressable
               onPress={onClose}
               hitSlop={8}
@@ -117,87 +101,93 @@ export function CommentsModal({ visible, reviewId, onClose }: CommentsModalProps
             </Pressable>
           </View>
 
-          {/* Comments List */}
-          {loading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {comments.isPending ? (
+            <View className="flex-1 items-center justify-center">
               <ActivityIndicator color={colors.accent} />
             </View>
+          ) : comments.isError ? (
+            <ErrorState
+              title="Could not load comments"
+              description={comments.error.message}
+              onRetry={() => void comments.refetch()}
+            />
           ) : (
             <FlatList
-              data={comments}
+              data={comments.data}
               keyExtractor={(item) => item.id}
-              scrollEnabled
+              keyboardShouldPersistTaps="handled"
               style={{ flex: 1 }}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 12 }}
               renderItem={({ item }) => (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: 8,
-                    padding: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.border,
-                  }}>
+                <View className="flex-row gap-sm border-b border-border p-md">
                   <Avatar
                     uri={item.user?.avatar_url}
                     name={item.user?.display_name ?? 'User'}
                     size="sm"
                   />
-                  <View style={{ flex: 1 }}>
+                  <View className="flex-1 gap-xxs">
                     <BodyText medium>{item.user?.display_name ?? 'Anonymous'}</BodyText>
                     <Caption>{item.body}</Caption>
-                    <MetadataText style={{ marginTop: 4 }}>
+                    <MetadataText>
                       {new Date(item.created_at).toLocaleDateString()}
                     </MetadataText>
                   </View>
                 </View>
               )}
               ListEmptyComponent={
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                  <Caption color="textSecondary">No comments yet. Be the first!</Caption>
-                </View>
+                <EmptyState
+                  icon={<MessageCircle size={32} color={colors.textMuted} />}
+                  title="No comments yet"
+                  description="Start the conversation."
+                />
               }
             />
           )}
 
-          {/* Input */}
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              padding: 12,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              paddingBottom: Math.max(12, insets.bottom),
-            }}>
+            className="flex-row items-end gap-sm border-t border-border p-md"
+            style={{ borderTopColor: colors.border, paddingBottom: inputBottomPadding }}>
             <TextInput
               style={{
                 flex: 1,
                 backgroundColor: colors.surfaceMuted,
-                borderRadius: 8,
+                borderRadius: 12,
                 paddingHorizontal: 12,
-                paddingVertical: 8,
+                paddingVertical: 10,
                 color: colors.textPrimary,
-                maxHeight: 100,
+                maxHeight: 112,
               }}
               placeholder="Add a comment..."
               placeholderTextColor={colors.textMuted}
               value={newComment}
               onChangeText={setNewComment}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="send"
               multiline
-              editable={!submitting}
+              maxLength={1000}
+              editable={!addComment.isPending}
             />
             <Pressable
               onPress={handleSubmit}
-              disabled={!newComment.trim() || submitting}
+              disabled={!newComment.trim() || addComment.isPending}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Submit comment">
-              <Send size={20} color={newComment.trim() ? colors.accent : colors.textMuted} />
+              accessibilityLabel="Submit comment"
+              accessibilityState={{ disabled: !newComment.trim() || addComment.isPending }}>
+              {addComment.isPending ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Send size={20} color={newComment.trim() ? colors.accent : colors.textMuted} />
+              )}
             </Pressable>
           </View>
+          {addComment.isError ? (
+            <Caption color="danger" style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+              {addComment.error.message}
+            </Caption>
+          ) : null}
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }

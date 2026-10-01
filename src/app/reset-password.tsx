@@ -1,31 +1,29 @@
-import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { CheckCircle, Lock } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { Lock, CheckCircle } from 'lucide-react-native';
-import { useLocalSearchParams, router } from 'expo-router';
 
 import {
-  BodyText,
-  Button,
-  Heading,
-  Screen,
-  Spacer,
-  TextField,
+    BodyText,
+    Button,
+    Heading,
+    Screen,
+    Spacer,
+    TextField,
 } from '@/components/ui';
 import { colors } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPassword() {
-  const { token_hash, type } = useLocalSearchParams<{
-    token_hash?: string;
-    type?: string;
-  }>();
+  const { code } = useLocalSearchParams<{ code?: string }>();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isCheckingRecovery, setIsCheckingRecovery] = useState(true);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
 
   const canSubmit =
     password.length >= 6 &&
@@ -33,13 +31,51 @@ export default function ResetPassword() {
     !isSubmitting;
 
   useEffect(() => {
-    if (!token_hash || type !== 'recovery') {
-      setError('Invalid or missing reset link');
-      setIsVerifying(false);
-      return;
-    }
-    setIsVerifying(false);
-  }, [token_hash, type]);
+    let isCancelled = false;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!isCancelled && nextSession) {
+        setHasRecoverySession(true);
+        setIsCheckingRecovery(false);
+      }
+    });
+
+    const resolveRecoverySession = async () => {
+      let exchangeError: string | null = null;
+
+      if (code) {
+        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
+        exchangeError = codeError?.message ?? null;
+      }
+
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (isCancelled) return;
+
+      if (data.session) {
+        setHasRecoverySession(true);
+      } else if (sessionError || exchangeError) {
+        setError(sessionError?.message ?? exchangeError);
+      }
+      setIsCheckingRecovery(false);
+    };
+
+    void resolveRecoverySession();
+    return () => {
+      isCancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [code]);
+
+  if (isCheckingRecovery) {
+    return (
+      <Screen edges={['top', 'bottom', 'left', 'right']}>
+        <View className="flex-1 items-center justify-center">
+          <BodyText>Loading reset link...</BodyText>
+        </View>
+      </Screen>
+    );
+  }
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -62,21 +98,11 @@ export default function ResetPassword() {
       setTimeout(() => {
         router.replace('/sign-in');
       }, 2000);
-    } catch (err) {
+    } catch {
       setError('Failed to reset password');
       setIsSubmitting(false);
     }
   };
-
-  if (isVerifying) {
-    return (
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
-        <View className="flex-1 items-center justify-center">
-          <BodyText>Loading...</BodyText>
-        </View>
-      </Screen>
-    );
-  }
 
   if (isSuccess) {
     return (
@@ -99,7 +125,7 @@ export default function ResetPassword() {
     );
   }
 
-  if (error && !token_hash) {
+  if (!hasRecoverySession) {
     return (
       <Screen edges={['top', 'bottom', 'left', 'right']}>
         <View className="flex-1 justify-center items-center px-xl">
@@ -148,7 +174,7 @@ export default function ResetPassword() {
             {error && (
               <>
                 <View className="bg-red-500/10 border border-red-500/30 rounded-lg p-md mb-lg">
-                  <BodyText color="red-500">{error}</BodyText>
+                  <BodyText color="danger">{error}</BodyText>
                 </View>
               </>
             )}

@@ -1,288 +1,127 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-} from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { MapPin, Utensils, Star, MessageSquare, X } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MapPin, Share2 } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
-import { Screen } from '@/components/ui/Screen';
+import { ReviewList } from '@/components/reviews';
+import { SaveButton } from '@/components/social/SaveButton';
+import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
-import { ReviewList, ReviewForm } from '@/components/reviews';
-import { getRestaurant } from '@/lib/db/restaurants';
-import { getRestaurantRatingStats } from '@/lib/db/reviews';
+import { Screen } from '@/components/ui/Screen';
+import { BodyText, Caption, Heading } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
+import { listDishesForRestaurant } from '@/lib/db/dishes';
+import { getRestaurant, getRestaurantPhotos } from '@/lib/db/restaurants';
+import { formatPriceLevel } from '@/lib/format';
 
 export default function RestaurantDetailScreen() {
+  const router = useRouter();
   const { restaurantId } = useLocalSearchParams<{ restaurantId: string }>();
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const restaurant = useQuery({
     queryKey: ['restaurant', restaurantId],
     queryFn: () => getRestaurant(restaurantId!),
-    enabled: !!restaurantId,
+    enabled: Boolean(restaurantId),
+  });
+  const dishes = useQuery({
+    queryKey: ['restaurant-dishes', restaurantId],
+    queryFn: () => listDishesForRestaurant(restaurantId!),
+    enabled: Boolean(restaurantId),
+  });
+  const photos = useQuery({
+    queryKey: ['restaurant-photos', restaurantId],
+    queryFn: () => getRestaurantPhotos(restaurantId!),
+    enabled: Boolean(restaurantId),
   });
 
-  const ratingStats = useQuery({
-    queryKey: ['restaurant-rating-stats', restaurantId, refreshKey],
-    queryFn: () => getRestaurantRatingStats(restaurantId!),
-    enabled: !!restaurantId,
-  });
-
-  if (restaurant.isLoading) {
+  if (restaurant.isPending) {
     return (
       <Screen>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={colors.accent} size="large" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={colors.accent} />
         </View>
       </Screen>
     );
   }
 
-  if (restaurant.isError || !restaurant.data) {
+  if (restaurant.isError || !restaurant.data || !restaurantId) {
     return (
       <Screen>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Restaurant not found</Text>
-        </View>
+        <ErrorState
+          title="Could not load this restaurant"
+          description={restaurant.error?.message ?? 'Restaurant not found.'}
+          onRetry={() => void restaurant.refetch()}
+        />
       </Screen>
     );
   }
 
   const data = restaurant.data;
+  const cuisine = data.restaurant_cuisines[0]?.cuisine?.name;
+  const heroImage = photos.data?.[0] ?? data.image_url ?? undefined;
 
   return (
     <Screen>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header Image */}
-        {data.image_url && (
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center' }}>
           <Image
-            source={{ uri: data.image_url }}
-            style={styles.headerImage}
+            source={heroImage}
+            accessibilityLabel={data.name}
+            style={{ width: '100%', height: 320, backgroundColor: colors.surfaceElevated, borderRadius: 24 }}
+            contentFit="cover"
           />
-        )}
+          <View className="gap-lg px-lg pt-lg">
+            <View className="gap-xs">
+              <Heading level={1}>{data.name}</Heading>
+              <View className="flex-row items-center gap-xs">
+                <MapPin size={15} color={colors.textSecondary} />
+                <Caption>{[cuisine, formatPriceLevel(data.price_level), data.city].filter(Boolean).join(' · ')}</Caption>
+              </View>
+              {data.address ? <Caption color="textSecondary">{data.address}</Caption> : null}
+            </View>
 
-        {/* Restaurant Info */}
-        <View style={styles.infoSection}>
-          <View>
-            <Text style={styles.name}>{data.name}</Text>
-            <View style={styles.metaRow}>
-              <MapPin size={14} color={colors.textSecondary} />
-              <Text style={styles.metaText}>{data.address}</Text>
+            <View className="flex-row items-center gap-sm">
+              <SaveButton restaurantId={data.id} showLabel />
+              <Pressable
+                className="h-[40px] w-[40px] items-center justify-center rounded-md border border-border"
+                accessibilityRole="button"
+                accessibilityLabel="Share restaurant">
+                <Share2 size={18} color={colors.textPrimary} />
+              </Pressable>
+              <Button label="Log a dish" onPress={() => router.push('/(tabs)/log')} />
+            </View>
+
+            <View className="gap-md">
+              <Heading level={2}>Popular dishes</Heading>
+              {dishes.isPending ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : dishes.data && dishes.data.length > 0 ? (
+                dishes.data.slice(0, 6).map((dish) => (
+                  <Pressable
+                    key={dish.id}
+                    className="flex-row items-center justify-between border-b border-border py-sm"
+                    onPress={() => router.push({ pathname: '/dish-detail', params: { dishId: dish.id } })}
+                    accessibilityRole="button">
+                    <View className="flex-1 gap-xxs">
+                      <BodyText medium>{dish.name}</BodyText>
+                      {dish.rating !== null ? <Rating value={dish.rating} size="sm" count={`${dish.ratingCount}`} /> : <Caption>No ratings yet</Caption>}
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <Caption>No dishes have been logged here yet.</Caption>
+              )}
+            </View>
+
+            <View className="gap-md">
+              <Heading level={2}>Reviews</Heading>
+              <ReviewList restaurantId={data.id} />
             </View>
           </View>
-
-          {ratingStats.data && (
-            <View style={styles.ratingBox}>
-              <Text style={styles.ratingNumber}>
-                {typeof ratingStats.data.avg_rating === 'number' ? ratingStats.data.avg_rating.toFixed(1) : 'N/A'}
-              </Text>
-              <Star
-                size={16}
-                color={colors.accent}
-                fill={colors.accent}
-              />
-              <Text style={styles.reviewCountSmall}>
-                {ratingStats.data.review_count}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Cuisines */}
-        {data.restaurant_cuisines && data.restaurant_cuisines.length > 0 && (
-          <View style={styles.cuisinesSection}>
-            <View style={styles.cuisineChips}>
-              {data.restaurant_cuisines.map((rc: any) => (
-                <View key={rc.id} style={styles.chip}>
-                  <Utensils size={12} color={colors.accent} />
-                  <Text style={styles.chipText}>
-                    {rc.cuisine?.name || 'Unknown'}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Review Button */}
-        <TouchableOpacity
-          style={styles.reviewButton}
-          onPress={() => setShowReviewForm(true)}
-        >
-          <MessageSquare size={18} color="white" />
-          <Text style={styles.reviewButtonText}>Write a Review</Text>
-        </TouchableOpacity>
-
-        {/* Reviews Section */}
-        <View style={styles.reviewsSection}>
-          <Text style={styles.sectionTitle}>Reviews</Text>
-          <ReviewList
-            restaurantId={restaurantId!}
-            onRefresh={() => setRefreshKey((k) => k + 1)}
-          />
         </View>
       </ScrollView>
-
-      {/* Review Form Modal */}
-      <Modal
-        visible={showReviewForm}
-        animationType="slide"
-        onRequestClose={() => setShowReviewForm(false)}
-      >
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={() => setShowReviewForm(false)}>
-            <X size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Review {data.name}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ReviewForm
-          restaurantId={restaurantId!}
-          onSubmitSuccess={() => {
-            setShowReviewForm(false);
-            setRefreshKey((k) => k + 1);
-          }}
-          onCancel={() => setShowReviewForm(false)}
-        />
-      </Modal>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 16,
-  },
-  headerImage: {
-    width: '100%',
-    height: 240,
-    backgroundColor: colors.border,
-  },
-  infoSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  ratingBox: {
-    alignItems: 'center',
-    gap: 4,
-    padding: 8,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 6,
-  },
-  ratingNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.accent,
-  },
-  reviewCountSmall: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  cuisinesSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  cuisineChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 16,
-  },
-  chipText: {
-    fontSize: 12,
-    color: colors.accent,
-    fontWeight: '500',
-  },
-  reviewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingVertical: 12,
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-  },
-  reviewButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  reviewsSection: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-});

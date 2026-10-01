@@ -1,35 +1,51 @@
 /**
  * Bitebook design tokens — colours.
  *
- * Source of truth: Bitebook_Build_Instructions.md, section 6 "Visual Design System".
- * Do not hard-code these hex values elsewhere in the app — always import from here
- * (or use the matching Tailwind/NativeWind utility class, e.g. `bg-background`).
- *
- * MVP is dark-only. `light` is a placeholder so a future light theme can slot in
- * without changing every call site.
+ * The app now supports a premium dark and light mode with a warmer luxury palette.
+ * Keep the token names stable so the rest of the UI can swap theme values without
+ * chasing hard-coded hex values across the codebase.
  */
-export const colors = {
-  background: '#080A09',
-  surface: '#111412',
-  surfaceElevated: '#171A18',
-  surfaceMuted: '#202420',
-  border: '#2A2E2B',
-  textPrimary: '#F5F5F2',
-  textSecondary: '#A8ADA8',
-  textMuted: '#737973',
-  accent: '#39E56A',
-  accentDark: '#1B8F3A',
-  rating: '#FFB547',
-  danger: '#FF5C5C',
+
+const darkPalette = {
+  background: '#0B0D0E',
+  surface: '#12171A',
+  surfaceElevated: '#1A2125',
+  surfaceMuted: '#20282C',
+  border: '#2F383D',
+  textPrimary: '#F4F1EC',
+  textSecondary: '#BAB7B1',
+  textMuted: '#7D8488',
+  accent: '#D7B98A',
+  accentDark: '#A6814D',
+  accentSoft: '#F2E4C9',
+  rating: '#E5B566',
+  danger: '#E86F5D',
   white: '#FFFFFF',
 } as const;
 
-export type ColorToken = keyof typeof colors;
+const lightPalette = {
+  background: '#F3EFE9',
+  surface: '#FFFFFF',
+  surfaceElevated: '#F8F3EE',
+  surfaceMuted: '#EEE5D9',
+  border: '#D9CBB7',
+  textPrimary: '#171A1D',
+  textSecondary: '#545E66',
+  textMuted: '#7A7F82',
+  accent: '#A66E3A',
+  accentDark: '#7A4E24',
+  accentSoft: '#F2E3C6',
+  rating: '#D69A4D',
+  danger: '#C85A4F',
+  white: '#FFFFFF',
+} as const;
+
+export const colors = darkPalette;
 
 export const theme = {
-  dark: colors,
-  // Reserved for a future light theme (see spec section 6, "Light mode").
-  light: colors,
+  dark: darkPalette,
+  light: lightPalette,
 } as const;
 
 export type ThemeName = keyof typeof theme;
+export type ColorToken = keyof typeof colors;

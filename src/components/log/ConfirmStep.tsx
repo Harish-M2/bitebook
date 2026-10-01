@@ -1,12 +1,12 @@
-import { View } from 'react-native';
 import { Image } from 'expo-image';
 import { Globe, Lock, MapPin, Users, UtensilsCrossed } from 'lucide-react-native';
+import { View } from 'react-native';
 
-import { colors } from '@/constants/colors';
-import type { ReviewVisibility } from '@/types/database';
 import { Rating } from '@/components/ui/Rating';
 import { Surface } from '@/components/ui/Surface';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
+import type { ReviewVisibility } from '@/types/database';
 
 type ConfirmStepProps = {
   restaurantName: string;
@@ -40,43 +40,52 @@ export function ConfirmStep({
 
   return (
     <View className="gap-md px-lg pt-lg">
-      {photoUri ? (
-        <Image
-          source={photoUri}
-          contentFit="cover"
-          transition={150}
-          style={{ width: '100%', aspectRatio: 1, borderRadius: 16 }}
-        />
-      ) : null}
-
-      <Surface className="gap-sm p-md">
-        <View className="gap-xxs">
-          <Heading level={3} numberOfLines={2}>
-            {dishName}
-          </Heading>
-          <View className="flex-row items-center gap-xxs">
-            <UtensilsCrossed size={13} color={colors.textMuted} />
-            <Caption numberOfLines={1}>
-              {city ? `${restaurantName} · ${city}` : restaurantName}
-            </Caption>
+      <View style={{ width: '100%', maxWidth: 760, alignSelf: 'center' }}>
+        <View className="mb-sm flex-row items-center justify-between">
+          <MetadataText color="accent">Review preview</MetadataText>
+          <View className="rounded-full border border-border bg-surface-muted px-sm py-xxs">
+            <MetadataText>Logged for today</MetadataText>
           </View>
         </View>
 
-        <Rating value={rating} size="lg" />
-
-        {reviewText.trim().length > 0 ? (
-          <BodyText color="textSecondary">{reviewText.trim()}</BodyText>
+        {photoUri ? (
+          <Image
+            source={photoUri}
+            contentFit="cover"
+            transition={150}
+            style={{ width: '100%', aspectRatio: 1.28, borderRadius: 24, alignSelf: 'center' }}
+          />
         ) : null}
 
-        <View className="flex-row items-center gap-xxs">
-          <VisibilityIcon size={12} color={colors.textMuted} />
-          <MetadataText>{VISIBILITY_COPY[visibility]}</MetadataText>
-        </View>
-      </Surface>
+        <Surface className="gap-sm p-md mt-md" variant="elevated" radius="xl" bordered>
+          <View className="gap-xxs">
+            <Heading level={3} numberOfLines={2}>
+              {dishName}
+            </Heading>
+            <View className="flex-row items-center gap-xxs">
+              <UtensilsCrossed size={13} color={colors.textMuted} />
+              <Caption numberOfLines={1}>
+                {city ? `${restaurantName} · ${city}` : restaurantName}
+              </Caption>
+            </View>
+          </View>
 
-      <View className="flex-row items-center gap-xxs">
-        <MapPin size={12} color={colors.textMuted} />
-        <MetadataText>Logged for today</MetadataText>
+          <Rating value={rating} size="lg" />
+
+          {reviewText.trim().length > 0 ? (
+            <BodyText color="textSecondary">{reviewText.trim()}</BodyText>
+          ) : null}
+
+          <View className="flex-row items-center gap-xxs">
+            <VisibilityIcon size={12} color={colors.textMuted} />
+            <MetadataText>{VISIBILITY_COPY[visibility]}</MetadataText>
+          </View>
+        </Surface>
+
+        <View className="mt-sm flex-row items-center gap-xxs px-xs">
+          <MapPin size={12} color={colors.textMuted} />
+          <MetadataText>{city ? `${restaurantName} · ${city}` : restaurantName}</MetadataText>
+        </View>
       </View>
     </View>
   );

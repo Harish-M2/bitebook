@@ -2,13 +2,16 @@ import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { config } from '@/constants/config';
 import type { Database } from '@/types/database';
 
-const isConfigured = Boolean(config.supabaseUrl && config.supabasePublishableKey);
+export const isSupabaseConfigured = Boolean(
+  config.supabaseUrl && config.supabasePublishableKey,
+);
 
-if (!isConfigured) {
+if (!isSupabaseConfigured) {
   // Surface a clear signal during development instead of failing silently.
   console.warn(
     '[Bitebook] Missing Supabase environment variables. Copy .env.example to .env and set ' +
@@ -32,6 +35,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

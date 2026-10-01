@@ -500,6 +500,50 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          app_announcements: boolean
+          created_at: string
+          friend_follows: boolean
+          friend_reviews: boolean
+          id: string
+          push_token: string | null
+          restaurant_updates: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_announcements?: boolean
+          created_at?: string
+          friend_follows?: boolean
+          friend_reviews?: boolean
+          id?: string
+          push_token?: string | null
+          restaurant_updates?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_announcements?: boolean
+          created_at?: string
+          friend_follows?: boolean
+          friend_reviews?: boolean
+          id?: string
+          push_token?: string | null
+          restaurant_updates?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1294,12 +1338,12 @@ export type Database = {
       gettransactionid: { Args: never; Returns: unknown }
       log_dish: {
         Args: {
-          p_dish_id?: string
-          p_dish_name?: string
+          p_dish_id?: string | null
+          p_dish_name?: string | null
           p_eaten_at?: string
           p_rating: number
           p_restaurant_id: string
-          p_review_text?: string
+          p_review_text?: string | null
           p_visibility?: Database["public"]["Enums"]["review_visibility"]
         }
         Returns: {

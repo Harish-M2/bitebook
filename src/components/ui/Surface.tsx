@@ -32,8 +32,20 @@ export function Surface({
   variant = 'default',
   radius = 'lg',
   bordered = true,
+  style,
   ...rest
 }: SurfaceProps) {
+  const elevatedShadow =
+    variant === 'elevated'
+      ? {
+          shadowColor: '#000000',
+          shadowOpacity: 0.14,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 3,
+        }
+      : undefined;
+
   return (
     <View
       className={cn(
@@ -42,6 +54,7 @@ export function Surface({
         bordered && 'border border-border',
         className
       )}
+      style={[elevatedShadow, style]}
       {...rest}>
       {children}
     </View>

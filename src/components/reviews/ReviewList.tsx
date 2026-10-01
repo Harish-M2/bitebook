@@ -1,18 +1,18 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
-import { Star, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { getRestaurantReviews, getRestaurantRatingStats, Review } from '@/lib/db/reviews';
 import { colors } from '@/constants/colors';
+import { getRestaurantRatingStats, getRestaurantReviews, Review } from '@/lib/db/reviews';
+import { ChevronDown, ChevronUp, Star } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 interface ReviewListProps {
   restaurantId: string;
@@ -51,11 +51,6 @@ export const ReviewList = ({ restaurantId, onRefresh }: ReviewListProps) => {
   useEffect(() => {
     loadReviews();
   }, [restaurantId]);
-
-  const handleRefresh = async () => {
-    await loadReviews();
-    onRefresh?.();
-  };
 
   if (isLoading) {
     return (

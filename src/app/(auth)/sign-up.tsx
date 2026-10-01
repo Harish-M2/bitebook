@@ -1,17 +1,17 @@
+import { Link, router } from 'expo-router';
+import { ChevronLeft, Lock, Mail, MailCheck, Utensils } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { ChevronLeft, Lock, Mail, MailCheck, Utensils } from 'lucide-react-native';
-import { Link, router } from 'expo-router';
 
 import {
-  BodyText,
-  Button,
-  Heading,
-  IconButton,
-  MetadataText,
-  Screen,
-  Spacer,
-  TextField,
+    BodyText,
+    Button,
+    Heading,
+    IconButton,
+    MetadataText,
+    Screen,
+    Spacer,
+    TextField,
 } from '@/components/ui';
 import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
@@ -105,8 +105,18 @@ export default function SignUp() {
             </View>
 
             <View className="items-center justify-center mb-md">
-              <View className="bg-accent/10 p-lg rounded-full">
-                <Utensils size={32} color={colors.accent} />
+              <View
+                style={{
+                  backgroundColor: colors.accentSoft,
+                  borderRadius: 999,
+                  padding: 20,
+                  shadowColor: colors.accent,
+                  shadowOpacity: 0.18,
+                  shadowRadius: 18,
+                  shadowOffset: { width: 0, height: 10 },
+                  elevation: 6,
+                }}>
+                <Utensils size={32} color={colors.accentDark} />
               </View>
             </View>
 
@@ -118,7 +128,19 @@ export default function SignUp() {
 
             <Spacer size="xl" />
 
-            <View className="gap-lg">
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 24,
+                padding: 20,
+                shadowColor: '#000000',
+                shadowOpacity: 0.12,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 8 },
+              }}
+              className="gap-lg">
               <View>
                 <TextField
                   label="Email"

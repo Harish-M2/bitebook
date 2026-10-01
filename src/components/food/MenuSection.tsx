@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { View, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
-import { colors } from '@/constants/colors';
 import { BodyText, Caption } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
 import type { MenuItem } from '@/lib/db/menus';
+import { Image } from 'expo-image';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
 interface MenuSectionProps {
   items: MenuItem[];

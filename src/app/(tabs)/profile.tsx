@@ -1,21 +1,21 @@
-import { useState } from 'react';
-import { Alert, ScrollView, View, Pressable } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 
-import { queryKeys } from '@/lib/queryClient';
-import { useAuth } from '@/hooks/useAuth';
-import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
-import { readPhotoBytes, prepareAvatarPhoto, uploadAvatarPhoto } from '@/lib/db/photos';
-import { getUserReviews, deleteReview } from '@/lib/db/reviews';
-import { Screen, Divider, Spacer } from '@/components/ui/Screen';
-import { Avatar } from '@/components/ui/Avatar';
-import { Heading, BodyText, Caption, MetadataText } from '@/components/ui/Typography';
-import { Button } from '@/components/ui/Button';
-import { ProfileStats } from '@/components/profile/ProfileStats';
 import { CuisineBreakdown } from '@/components/profile/CuisineBreakdown';
-import { colors } from '@/constants/colors';
+import { ProfileStats } from '@/components/profile/ProfileStats';
+import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
+import { Divider, Screen, Spacer } from '@/components/ui/Screen';
+import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
+import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
+import { prepareAvatarPhoto, readPhotoBytes, uploadAvatarPhoto } from '@/lib/db/photos';
+import { deleteReview, getUserReviews } from '@/lib/db/reviews';
+import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
+import { queryKeys } from '@/lib/queryClient';
 import type { DiaryStats } from '@/types/models';
 
 const EMPTY_STATS: DiaryStats = {
@@ -27,9 +27,12 @@ const EMPTY_STATS: DiaryStats = {
 
 /** Profile tab — identity, lifetime stats, and cuisine breakdown. */
 export default function ProfileScreen() {
-  const { profile, user, signOut } = useAuth();
+  const { profile, user, signOut, refreshProfile } = useAuth();
+  const { colors: palette, themeName, toggleTheme } = useAppTheme();
+  const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const userId = user?.id ?? null;
 
   const stats = useQuery({
@@ -50,40 +53,83 @@ export default function ProfileScreen() {
     enabled: userId !== null,
   });
 
+  const performSignOut = async () => {
+    setSigningOut(true);
+    try {
+      const { error } = await signOut();
+      if (error) throw new Error(error);
+    } catch (error) {
+      setSigningOut(false);
+      const message = error instanceof Error ? error.message : 'Could not sign out';
+      if (Platform.OS === 'web') {
+        window.alert(`Could not sign out\n\n${message}`);
+      } else {
+        Alert.alert('Could not sign out', message);
+      }
+    }
+  };
+
   const handleSignOut = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Sign out? You will need to sign in again to log meals.')) {
+        void performSignOut();
+      }
+      return;
+    }
+
     Alert.alert('Sign out', 'You will need to sign in again to log meals.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
         style: 'destructive',
-        onPress: async () => {
-          setSigningOut(true);
-          const { error } = await signOut();
-          if (error) {
-            setSigningOut(false);
-            Alert.alert('Could not sign out', error);
-          }
-        },
+        onPress: () => void performSignOut(),
       },
     ]);
   };
 
-  const handleDeleteReview = async (reviewId: string, dishName?: string) => {
-    // Use native browser confirm for web compatibility
-    const confirmed = typeof window !== 'undefined' 
-      ? window.confirm(`Are you sure you want to delete your review of "${dishName}"? This cannot be undone.`)
-      : false;
-    
-    if (!confirmed) return;
-
+  const performDeleteReview = async (reviewId: string) => {
+    setDeletingReviewId(reviewId);
     try {
       await deleteReview(reviewId);
-      await reviews.refetch();
+      await Promise.all([
+        reviews.refetch(),
+        stats.refetch(),
+        breakdown.refetch(),
+        user ? queryClient.invalidateQueries({ queryKey: queryKeys.feed(user.id) }) : Promise.resolve(),
+      ]);
     } catch (error) {
-      if (typeof window !== 'undefined') {
-        window.alert('Failed to delete review: ' + String(error));
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error &&
+        typeof error.message === 'string'
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      if (Platform.OS === 'web') {
+        window.alert(`Could not delete review\n\n${message}`);
+      } else {
+        Alert.alert('Could not delete review', message);
       }
+    } finally {
+      setDeletingReviewId(null);
     }
+  };
+
+  const handleDeleteReview = (reviewId: string, dishName?: string) => {
+    const message = `Delete your review of "${dishName ?? 'this dish'}"? This cannot be undone.`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void performDeleteReview(reviewId);
+      return;
+    }
+
+    Alert.alert('Delete review', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => void performDeleteReview(reviewId),
+      },
+    ]);
   };
 
   const handleAvatarUpload = async () => {
@@ -105,11 +151,14 @@ export default function ProfileScreen() {
       const prepared = await prepareAvatarPhoto(asset.uri);
       const bytes = await readPhotoBytes(prepared.uri);
       await uploadAvatarPhoto(userId, bytes);
-
-      // Refetch profile to update avatar
-      stats.refetch();
+      await refreshProfile();
     } catch (error) {
-      Alert.alert('Upload failed', error instanceof Error ? error.message : 'Could not upload avatar');
+      const message = error instanceof Error ? error.message : 'Could not upload avatar';
+      if (Platform.OS === 'web') {
+        window.alert(`Upload failed\n\n${message}`);
+      } else {
+        Alert.alert('Upload failed', message);
+      }
     } finally {
       setUploadingAvatar(false);
     }
@@ -122,7 +171,20 @@ export default function ProfileScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         <View className="items-center gap-sm px-lg pt-md">
-          <Avatar uri={profile?.avatar_url ?? null} name={displayName} size="xl" />
+          <View
+            style={{
+              backgroundColor: palette.surface,
+              borderWidth: 1,
+              borderColor: palette.border,
+              borderRadius: 26,
+              padding: 18,
+              shadowColor: '#000000',
+              shadowOpacity: 0.1,
+              shadowRadius: 18,
+              shadowOffset: { width: 0, height: 8 },
+            }}>
+            <Avatar uri={profile?.avatar_url ?? null} name={displayName} size="xl" />
+          </View>
           <View className="items-center gap-xxs">
             <Heading level={2}>{displayName}</Heading>
             {profile?.username ? <Caption>@{profile.username}</Caption> : null}
@@ -138,6 +200,32 @@ export default function ProfileScreen() {
             loading={uploadingAvatar}
             onPress={handleAvatarUpload}
           />
+        </View>
+
+        <View className="px-lg pt-lg">
+          <View
+            style={{
+              backgroundColor: palette.surface,
+              borderWidth: 1,
+              borderColor: palette.border,
+              borderRadius: 18,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+            <View>
+              <BodyText medium>Appearance</BodyText>
+              <Caption>{themeName === 'dark' ? 'Dark mode' : 'Light mode'}</Caption>
+            </View>
+            <Switch
+              value={themeName === 'dark'}
+              onValueChange={toggleTheme}
+              trackColor={{ false: palette.surfaceMuted, true: palette.accent }}
+              thumbColor={palette.white}
+            />
+          </View>
         </View>
 
         <Spacer size="xl" />
@@ -184,7 +272,7 @@ export default function ProfileScreen() {
                   key={review.id}
                   style={{
                     borderWidth: 1,
-                    borderColor: colors.border,
+                    borderColor: palette.border,
                     borderRadius: 12,
                     padding: 12,
                     gap: 8,
@@ -202,8 +290,15 @@ export default function ProfileScreen() {
                     </View>
                     <Pressable
                       onPress={() => handleDeleteReview(review.id, review.dish?.name)}
-                      style={{ padding: 8 }}>
-                      <Trash2 size={18} color={colors.textSecondary} />
+                      disabled={deletingReviewId !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete review of ${review.dish?.name ?? 'dish'}`}
+                      style={{ padding: 8, opacity: deletingReviewId === review.id ? 0.5 : 1 }}>
+                      {deletingReviewId === review.id ? (
+                        <ActivityIndicator size="small" color={palette.textSecondary} />
+                      ) : (
+                        <Trash2 size={18} color={palette.textSecondary} />
+                      )}
                     </Pressable>
                   </View>
                 </View>

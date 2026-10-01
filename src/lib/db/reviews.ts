@@ -1,3 +1,4 @@
+import { signedImageUrls } from '@/lib/db/storage';
 import { supabase } from '@/lib/supabase';
 
 export interface Review {
@@ -23,6 +24,18 @@ export interface ReviewPhoto {
   created_at: string;
 }
 
+type RestaurantReviewRow = {
+  id: string;
+  user_id: string;
+  restaurant_id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  updated_at: string;
+  user?: { id: string; display_name: string | null; avatar_url: string | null } | null;
+  photos?: { id: string; storage_path: string; position: number | null }[];
+};
+
 /**
  * Get all reviews for a restaurant with optional user data
  */
@@ -33,57 +46,57 @@ export async function getRestaurantReviews(
     includePhotos?: boolean;
   }
 ) {
-  let query = (supabase
-    .from('reviews')
-    .select(
-      options?.includeUser
-        ? `
-          *,
-          user:profiles(id, full_name, avatar_url)
-        `
-        : '*'
-    )
-    .eq('restaurant_id', restaurantId)
-    .order('created_at', { ascending: false }) as any);
+  const fields = [
+    'id',
+    'user_id',
+    'restaurant_id',
+    'rating',
+    'review_text',
+    'created_at',
+    'updated_at',
+  ];
+  if (options?.includeUser) fields.push('user:profiles(id, display_name, avatar_url)');
+  if (options?.includePhotos) fields.push('photos:review_photos(id, storage_path, position)');
 
-  const { data, error } = await query;
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(fields.join(', '))
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('[Bitebook] Failed to fetch reviews:', error);
     throw error;
   }
 
-  // Fetch photos if requested
-  if (options?.includePhotos && data && data.length > 0) {
-    const reviewIds = data.map((r: any) => r.id);
-    const { data: photos, error: photoError } = await (supabase
-      .from('review_photos')
-      .select('*')
-      .in('review_id', reviewIds) as any);
+  const rows = (data ?? []) as unknown as RestaurantReviewRow[];
+  const photoPaths = options?.includePhotos
+    ? rows.flatMap((review) => (review.photos ?? []).map((photo) => photo.storage_path))
+    : [];
+  const signedPhotos = await signedImageUrls('review-photos', photoPaths);
 
-    if (photoError) {
-      console.error('[Bitebook] Failed to fetch review photos:', photoError);
-    } else if (photos) {
-      // Group photos by review_id
-      const photosByReview = photos.reduce(
-        (acc: any, photo: any) => {
-          if (!acc[photo.review_id]) {
-            acc[photo.review_id] = [];
-          }
-          acc[photo.review_id].push(photo);
-          return acc;
-        },
-        {} as Record<string, ReviewPhoto[]>
-      );
-
-      // Attach photos to reviews
-      data.forEach((review: any) => {
-        review.photos = photosByReview[review.id] || [];
-      });
-    }
-  }
-
-  return (data || []) as Review[];
+  return rows.map((review): Review => ({
+    id: review.id,
+    user_id: review.user_id,
+    restaurant_id: review.restaurant_id,
+    rating: review.rating,
+    text: review.review_text,
+    created_at: review.created_at,
+    updated_at: review.updated_at,
+    photos: (review.photos ?? []).map((photo) => ({
+      id: photo.id,
+      review_id: review.id,
+      photo_url: signedPhotos.get(photo.storage_path) ?? '',
+      created_at: review.created_at,
+    })),
+    user: review.user
+      ? {
+          id: review.user.id,
+          full_name: review.user.display_name ?? 'Anonymous',
+          avatar_url: review.user.avatar_url,
+        }
+      : undefined,
+  }));
 }
 
 /**
@@ -207,14 +220,20 @@ export async function submitReview(
  * Delete a review
  */
 export async function deleteReview(reviewId: string) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('reviews')
     .delete()
-    .eq('id', reviewId);
+    .eq('id', reviewId)
+    .select('id')
+    .maybeSingle();
 
   if (error) {
     console.error('[Bitebook] Failed to delete review:', error);
     throw error;
+  }
+
+  if (!data) {
+    throw new Error('Review was not found or you do not have permission to delete it.');
   }
 }
 
@@ -329,12 +348,12 @@ export async function getReviewComments(reviewId: string) {
     throw error;
   }
 
-  return (data || []) as Array<{
+  return (data || []) as {
     id: string;
     body: string;
     created_at: string;
     user: { id: string; display_name: string; avatar_url: string | null } | null;
-  }>;
+  }[];
 }
 
 /**
@@ -426,4 +445,37 @@ export async function getUserReviews(userId: string) {
   }));
 
   return result;
+}
+
+export interface VisibleProfileReview {
+  id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  dish: { id: string; name: string } | null;
+  restaurant: { name: string } | null;
+}
+
+/** Get one bounded page of reviews the current user may see on a profile. */
+export async function getVisibleProfileReviews(
+  userId: string,
+  limit = 20,
+  offset = 0,
+): Promise<VisibleProfileReview[]> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(`
+      id,
+      rating,
+      review_text,
+      created_at,
+      dish:dishes!reviews_dish_id_fkey(id, name),
+      restaurant:restaurants!reviews_restaurant_id_fkey(name)
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+  return (data ?? []) as unknown as VisibleProfileReview[];
 }

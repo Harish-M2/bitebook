@@ -2,6 +2,7 @@ import { UtensilsCrossed } from 'lucide-react-native';
 import { FlatList, RefreshControl, View } from 'react-native';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 
 import { colors } from '@/constants/colors';
 import { queryKeys } from '@/lib/queryClient';
@@ -18,6 +19,7 @@ import type { FeedActivity } from '@/types/models';
 
 /** Home tab — the following feed. */
 export default function HomeScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [commentsVisible, setCommentsVisible] = useState(false);
@@ -69,6 +71,9 @@ export default function HomeScreen() {
           <FeedItem
             activity={item}
             className="px-lg pb-lg"
+            onActorPress={() =>
+              router.push({ pathname: '/user/[userId]', params: { userId: item.actor.id } })
+            }
             onCommentPress={() => handleCommentPress(item.review_id ?? item.id)}
           />
         )}

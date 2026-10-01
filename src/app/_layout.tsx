@@ -1,21 +1,22 @@
-import { useEffect } from 'react';
+import {
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    useFonts,
+} from '@expo-google-fonts/inter';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClientProvider } from '@tanstack/react-query';
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
 
 import { colors } from '@/constants/colors';
-import { queryClient } from '@/lib/queryClient';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { ThemeProvider, useAppTheme } from '@/hooks/useTheme';
+import { queryClient } from '@/lib/queryClient';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -25,6 +26,11 @@ SplashScreen.preventAutoHideAsync();
  * the navigator. Bitebook is dark-only for the MVP (see spec section 6), so
  * the status bar is always forced to "light" regardless of system theme.
  */
+function ThemeStatusBar() {
+  const { isDark } = useAppTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -39,12 +45,14 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          {/* Mounted before the fonts gate so the session lookup starts immediately. */}
-          <AuthProvider>
-            <StatusBar style="light" />
-            <SplashScreenController fontsReady={fontsReady} />
-            {fontsReady ? <RootNavigator /> : null}
-          </AuthProvider>
+          <ThemeProvider>
+            {/* Mounted before the fonts gate so the session lookup starts immediately. */}
+            <AuthProvider>
+              <ThemeStatusBar />
+              <SplashScreenController fontsReady={fontsReady} />
+              {fontsReady ? <RootNavigator /> : null}
+            </AuthProvider>
+          </ThemeProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>

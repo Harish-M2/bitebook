@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabase';
 import { publicImageUrl } from '@/lib/db/storage';
+import { supabase } from '@/lib/supabase';
 
 /** Shape of the embedded `dish_photos` rows every dish query selects. */
 export interface DishPhotoRow {
@@ -47,6 +47,50 @@ export interface RestaurantDish {
   rating: number | null;
   ratingCount: number;
   imageUrl: string | null;
+}
+
+export interface DishDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  rating: number | null;
+  ratingCount: number;
+  imageUrl: string | null;
+  restaurant: { id: string; name: string; imageUrl: string | null };
+}
+
+export async function getDish(dishId: string): Promise<DishDetail> {
+  const { data, error } = await supabase
+    .from('dishes')
+    .select(`
+      id,
+      name,
+      description,
+      aggregate_rating,
+      rating_count,
+      image_url,
+      ${DISH_PHOTO_SELECT},
+      restaurant:restaurants(id, name, image_url)
+    `)
+    .eq('id', dishId)
+    .single();
+
+  if (error) throw error;
+  if (!data.restaurant) throw new Error('Dish restaurant not found.');
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    rating: data.aggregate_rating,
+    ratingCount: data.rating_count ?? 0,
+    imageUrl: dishCoverUrl(data.dish_photos, data.image_url),
+    restaurant: {
+      id: data.restaurant.id,
+      name: data.restaurant.name,
+      imageUrl: data.restaurant.image_url,
+    },
+  };
 }
 
 export async function listDishesForRestaurant(

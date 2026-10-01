@@ -1,11 +1,11 @@
-import { View } from 'react-native';
 import { Globe, Lock, Users } from 'lucide-react-native';
+import { View } from 'react-native';
 
-import { colors } from '@/constants/colors';
-import type { ReviewVisibility } from '@/types/database';
-import { TextField } from '@/components/ui/TextField';
 import { Chip } from '@/components/ui/Chip';
+import { TextField } from '@/components/ui/TextField';
 import { Caption } from '@/components/ui/Typography';
+import { useAppTheme } from '@/hooks/useTheme';
+import type { ReviewVisibility } from '@/types/database';
 
 type ReviewStepProps = {
   text: string;
@@ -36,6 +36,8 @@ export function ReviewStep({
   visibility,
   onChangeVisibility,
 }: ReviewStepProps) {
+  const { colors } = useAppTheme();
+
   return (
     <View className="gap-lg px-lg pt-lg">
       <TextField

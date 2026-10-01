@@ -5,8 +5,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as https from 'https';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -120,14 +118,20 @@ async function seedDummyData() {
     // For now, let's fetch existing restaurants
     const { data: restaurants } = await supabase.from('restaurants').select('*').limit(1);
 
-    if (!restaurants || restaurants.length === 0) {
+    const restaurantRows = restaurants ?? [];
+    if (restaurantRows.length === 0) {
       console.error('❌ No restaurants found. Please add restaurants first.');
       console.log('💡 Tip: Log a dish from the app first to create a restaurant.');
       process.exit(1);
     }
 
-    const restaurantId = restaurants[0].id;
-    console.log(`✅ Using restaurant: ${restaurants[0].name}\n`);
+    const restaurant = restaurantRows[0];
+    if (!restaurant) {
+      throw new Error('No restaurant was returned.');
+    }
+
+    const restaurantId = restaurant.id;
+    console.log(`✅ Using restaurant: ${restaurant.name}\n`);
 
     // Add reviews
     for (const review of dummyReviews) {

@@ -1,7 +1,8 @@
-import { Pressable, View } from 'react-native';
-import type { GestureResponderEvent } from 'react-native';
-import { BookOpen, Compass, House, Plus, User } from 'lucide-react-native';
 import { Tabs } from 'expo-router/js-tabs';
+import { BookOpen, Compass, House, Plus, User } from 'lucide-react-native';
+import type { GestureResponderEvent } from 'react-native';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/colors';
 
@@ -47,6 +48,10 @@ function LogTabButton({ onPress }: LogTabButtonProps) {
  * button (see Bitebook_Build_Instructions.md, section 6/9 navigation spec).
  */
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' && width <= 768 ? 24 : 0);
+
   return (
     <Tabs
       screenOptions={{
@@ -57,9 +62,9 @@ export default function TabsLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60,
+          height: 72 + bottomInset,
           paddingTop: 8,
-          paddingBottom: 8,
+          paddingBottom: 8 + bottomInset,
         },
         tabBarLabelStyle: {
           fontFamily: 'Inter_500Medium',

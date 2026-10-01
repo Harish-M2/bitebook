@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 
-import { cn } from '@/lib/cn';
 import { colors } from '@/constants/colors';
+import { cn } from '@/lib/cn';
+import { publicImageUrl } from '@/lib/db/storage';
 import { MetadataText } from './Typography';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -41,7 +42,9 @@ function getInitials(name: string): string {
 
 /** Circular user avatar with an initials fallback when no photo is available. */
 export function Avatar({ uri, name, size = 'md', className }: AvatarProps) {
-  if (!uri) {
+  const imageUri = uri && /^https?:\/\//i.test(uri) ? uri : publicImageUrl('avatars', uri ?? null);
+
+  if (!imageUri) {
     return (
       <View
         className={cn(
@@ -58,7 +61,7 @@ export function Avatar({ uri, name, size = 'md', className }: AvatarProps) {
 
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: imageUri }}
       accessibilityLabel={`${name}'s avatar`}
       transition={150}
       style={{ width: dimension, height: dimension, borderRadius: dimension / 2, backgroundColor: colors.surfaceElevated }}

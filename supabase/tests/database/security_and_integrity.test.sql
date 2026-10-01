@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(56);
+select plan(61);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -651,6 +651,26 @@ select throws_ok(
   null,
   'log_dish requires either an existing dish or a non-blank new dish name'
 );
+
+select lives_ok(
+  $$delete from public.reviews
+    where user_id = '11111111-1111-1111-1111-111111111111'
+      and review_text = 'Very good'$$,
+  'a user can delete their own logged review'
+);
+
+select is(
+  (select count(*)::int
+     from public.diary_entries de
+     join public.dishes d on d.id = de.dish_id
+    where de.user_id = '11111111-1111-1111-1111-111111111111'
+      and d.name = 'Logged Dish'
+        and de.review_id is null
+        and de.review_user_id is null
+        and de.review_dish_id is null),
+  1,
+      'deleting a review preserves its diary entry and clears its review shadow columns'
+);
 reset role;
 
 
@@ -827,6 +847,33 @@ select is(
   1,
   'a dish that already has a cuisine is left alone by propagation'
 );
+
+-- 59-61. Notification preferences are user-managed; notification records remain under
+-- the canonical system-created schema from 0015.
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select lives_ok(
+  $$insert into public.notification_preferences (user_id)
+    values ('11111111-1111-1111-1111-111111111111')$$,
+  'a user can create their own notification preferences'
+);
+select is(
+  (select count(*)::int from public.notification_preferences
+    where user_id = '11111111-1111-1111-1111-111111111111'),
+  1,
+  'a user can read their own notification preferences'
+);
+reset role;
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is(
+  (select count(*)::int from public.notification_preferences
+    where user_id = '11111111-1111-1111-1111-111111111111'),
+  0,
+  'a user cannot read another user''s notification preferences'
+);
+reset role;
 
 select * from finish();
 rollback;

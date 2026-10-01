@@ -1,9 +1,9 @@
+import { ChevronLeft } from 'lucide-react-native';
 import { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
 
-import { colors } from '@/constants/colors';
 import { Heading, MetadataText } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
 
 type LogStepHeaderProps = {
   title: string;
@@ -28,36 +28,38 @@ export function LogStepHeader({
   action,
 }: LogStepHeaderProps) {
   return (
-    <View className="gap-sm px-lg pt-xs">
-      <View className="flex-row items-center justify-between">
-        <Pressable
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          hitSlop={12}
-          className="-ml-xxs h-8 w-8 items-center justify-center">
-          <ChevronLeft size={26} color={colors.textPrimary} />
-        </Pressable>
+    <View className="px-lg pt-xs">
+      <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center', gap: 10 }}>
+        <View className="flex-row items-center justify-between">
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            hitSlop={12}
+            className="-ml-xxs h-8 w-8 items-center justify-center">
+            <ChevronLeft size={26} color={colors.textPrimary} />
+          </Pressable>
 
-        <MetadataText>
-          Step {stepIndex + 1} of {stepCount}
-        </MetadataText>
+          <MetadataText style={{ letterSpacing: 0.3 }}>
+            Step {stepIndex + 1} of {stepCount}
+          </MetadataText>
 
-        <View className="min-w-8 items-end">{action}</View>
-      </View>
+          <View className="min-w-8 items-end">{action}</View>
+        </View>
 
-      <Heading level={2}>{title}</Heading>
+        <Heading level={2} style={{ lineHeight: 30 }}>{title}</Heading>
 
-      <View className="h-[3px] flex-row gap-xxs">
-        {Array.from({ length: stepCount }).map((_, index) => (
-          <View
-            key={index}
-            className="flex-1 rounded-pill"
-            style={{
-              backgroundColor: index <= stepIndex ? colors.accent : colors.border,
-            }}
-          />
-        ))}
+        <View className="h-[2px] flex-row gap-xxs overflow-hidden rounded-full">
+          {Array.from({ length: stepCount }).map((_, index) => (
+            <View
+              key={index}
+              className="flex-1 rounded-full"
+              style={{
+                backgroundColor: index <= stepIndex ? colors.accent : colors.border,
+              }}
+            />
+          ))}
+        </View>
       </View>
     </View>
   );

@@ -1,22 +1,24 @@
+import { router } from 'expo-router';
+import { ChevronLeft, Mail, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { ChevronLeft, Mail, Send } from 'lucide-react-native';
-import { router } from 'expo-router';
 
 import {
-  BodyText,
-  Button,
-  Heading,
-  IconButton,
-  Screen,
-  Spacer,
-  TextField,
+    BodyText,
+    Button,
+    Heading,
+    IconButton,
+    Screen,
+    Spacer,
+    TextField,
 } from '@/components/ui';
 import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 
 export default function ForgotPassword() {
   const { resetPassword } = useAuth();
+  const { colors: palette } = useAppTheme();
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -58,15 +60,29 @@ export default function ForgotPassword() {
             </View>
 
             <View className="items-center justify-center mb-md">
-              <View className="bg-accent/10 p-lg rounded-full">
+              <View
+                style={{
+                  backgroundColor: palette.accentSoft,
+                  borderRadius: 999,
+                  padding: 20,
+                  shadowColor: palette.accent,
+                  shadowOpacity: 0.22,
+                  shadowRadius: 18,
+                  shadowOffset: { width: 0, height: 10 },
+                  elevation: 6,
+                }}>
                 {success ? (
-                  <Send size={32} color={colors.accent} />
+                  <Send size={32} color={palette.accentDark} />
                 ) : (
-                  <Mail size={32} color={colors.accent} />
+                  <Mail size={32} color={palette.accentDark} />
                 )}
               </View>
             </View>
 
+            <BodyText color="textSecondary" style={{ textAlign: 'center', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+              Bitebook
+            </BodyText>
+            <Spacer size="xs" />
             <Heading style={{ textAlign: 'center' }}>
               {success ? 'Check your email' : 'Reset your password'}
             </Heading>
@@ -80,7 +96,18 @@ export default function ForgotPassword() {
             <Spacer size="xl" />
 
             {!success && (
-              <>
+              <View
+                style={{
+                  backgroundColor: palette.surface,
+                  borderWidth: 1,
+                  borderColor: palette.border,
+                  borderRadius: 24,
+                  padding: 20,
+                  shadowColor: '#000000',
+                  shadowOpacity: 0.12,
+                  shadowRadius: 18,
+                  shadowOffset: { width: 0, height: 8 },
+                }}>
                 <TextField
                   label="Email"
                   value={email}
@@ -106,7 +133,7 @@ export default function ForgotPassword() {
                   disabled={!canSubmit}
                   onPress={handleSubmit}
                 />
-              </>
+              </View>
             )}
 
             {success && (

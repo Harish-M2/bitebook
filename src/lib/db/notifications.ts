@@ -1,86 +1,100 @@
 import { supabase } from '@/lib/supabase';
+import type { Database, Enums } from '@/types/database';
 
-const db = supabase as any;
+export type NotificationPreferences = Database['public']['Tables']['notification_preferences']['Row'];
+export type NotificationPreferenceKey =
+  | 'friend_reviews'
+  | 'friend_follows'
+  | 'restaurant_updates'
+  | 'app_announcements';
+export type NotificationPreferenceUpdate = Partial<
+  Pick<NotificationPreferences, NotificationPreferenceKey | 'push_token'>
+>;
 
-export interface NotificationPreferences {
+type NotificationRow = Database['public']['Tables']['notifications']['Row'];
+type NotificationProfile = Pick<Database['public']['Tables']['profiles']['Row'], 'display_name' | 'username'>;
+type NotificationWithActor = NotificationRow & { actor: NotificationProfile | null };
+
+export type Notification = {
   id: string;
   user_id: string;
-  push_token?: string;
-  friend_reviews: boolean;
-  friend_follows: boolean;
-  restaurant_updates: boolean;
-  app_announcements: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Notification {
-  id: string;
-  user_id: string;
-  type: string;
+  type: Enums<'notification_type'>;
   title: string;
   body: string;
-  actor_id?: string;
-  restaurant_id?: string;
-  review_id?: string;
   is_read: boolean;
-  sent_at: string;
-  read_at?: string;
+  read_at: string | null;
   created_at: string;
+};
+
+async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!data.user) throw new Error('Not authenticated');
+  return data.user.id;
 }
 
-/**
- * Get or create notification preferences for the current user
- */
-export async function getNotificationPreferences(): Promise<NotificationPreferences> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) throw new Error('Not authenticated');
+function toNotification(row: NotificationWithActor): Notification {
+  const actor = row.actor?.display_name ?? row.actor?.username ?? 'Someone';
+  const copy: Record<Enums<'notification_type'>, { title: string; body: string }> = {
+    follow: { title: 'New follower', body: `${actor} followed you.` },
+    like: { title: 'New like', body: `${actor} liked one of your reviews.` },
+    comment: { title: 'New comment', body: `${actor} commented on one of your reviews.` },
+    mention: { title: 'You were mentioned', body: `${actor} mentioned you.` },
+  };
+  const text = copy[row.type];
 
-  let { data, error } = await db
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: row.type,
+    title: text.title,
+    body: text.body,
+    is_read: row.read_at !== null,
+    read_at: row.read_at,
+    created_at: row.created_at,
+  };
+}
+
+async function readNotificationPreferences(userId: string): Promise<NotificationPreferences | null> {
+  const { data, error } = await supabase
     .from('notification_preferences')
     .select('*')
-    .eq('user_id', userData.user.id)
-    .single();
+    .eq('user_id', userId)
+    .maybeSingle();
 
-  // If preferences don't exist, create them with defaults
-  if (error && error.code === 'PGRST116') {
-    const { data: newPrefs, error: insertError } = await db
-      .from('notification_preferences')
-      .insert({
-        user_id: userData.user.id,
-        friend_reviews: true,
-        friend_follows: true,
-        restaurant_updates: false,
-        app_announcements: false,
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-    data = newPrefs;
-  } else if (error) {
-    throw error;
-  }
-
+  if (error) throw error;
   return data;
 }
 
-/**
- * Update notification preferences for the current user
- */
-export async function updateNotificationPreferences(
-  preferences: Partial<NotificationPreferences>
-): Promise<NotificationPreferences> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) throw new Error('Not authenticated');
+/** Get or create notification preferences for the signed-in user. */
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  const userId = await getCurrentUserId();
+  const existing = await readNotificationPreferences(userId);
+  if (existing) return existing;
 
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('notification_preferences')
-    .update({
-      ...preferences,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userData.user.id)
+    .insert({ user_id: userId })
+    .select()
+    .single();
+
+  if (!error) return data;
+  if (error.code === '23505') {
+    const concurrentInsert = await readNotificationPreferences(userId);
+    if (concurrentInsert) return concurrentInsert;
+  }
+  throw error;
+}
+
+/** Update delivery preferences for the signed-in user. */
+export async function updateNotificationPreferences(
+  preferences: NotificationPreferenceUpdate,
+): Promise<NotificationPreferences> {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .update(preferences)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -88,133 +102,90 @@ export async function updateNotificationPreferences(
   return data;
 }
 
-/**
- * Store push token for the current user
- */
+/** Store the push token for the signed-in user. */
 export async function storePushToken(token: string): Promise<void> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) throw new Error('Not authenticated');
-
-  const { error } = await db
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
     .from('notification_preferences')
     .update({ push_token: token })
-    .eq('user_id', userData.user.id);
+    .eq('user_id', userId);
 
   if (error) throw error;
 }
 
-/**
- * Get all unread notifications for the current user
- */
-export async function getUnreadNotifications(): Promise<Notification[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) return [];
+const NOTIFICATION_SELECT = `
+  id,
+  user_id,
+  type,
+  actor_id,
+  target_id,
+  read_at,
+  created_at,
+  actor:profiles!notifications_actor_id_fkey(display_name, username)
+`;
 
-  const { data, error } = await db
+/** Get unread notifications for the signed-in user. */
+export async function getUnreadNotifications(): Promise<Notification[]> {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
     .from('notifications')
-    .select('*')
-    .eq('user_id', userData.user.id)
-    .eq('is_read', false)
+    .select(NOTIFICATION_SELECT)
+    .eq('user_id', userId)
+    .is('read_at', null)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return ((data ?? []) as unknown as NotificationWithActor[]).map(toNotification);
 }
 
-/**
- * Get all notifications for the current user
- */
-export async function getAllNotifications(limit: number = 50, offset: number = 0): Promise<Notification[]> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) return [];
-
-  const { data, error } = await db
+/** Get a page of notifications for the signed-in user. */
+export async function getAllNotifications(limit = 50, offset = 0): Promise<Notification[]> {
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
     .from('notifications')
-    .select('*')
-    .eq('user_id', userData.user.id)
+    .select(NOTIFICATION_SELECT)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (error) throw error;
-  return data || [];
+  return ((data ?? []) as unknown as NotificationWithActor[]).map(toNotification);
 }
 
-/**
- * Mark a notification as read
- */
+/** Mark one notification as read. */
 export async function markNotificationAsRead(notificationId: string): Promise<void> {
-  const { error } = await db
+  const { error } = await supabase
     .from('notifications')
-    .update({ is_read: true, read_at: new Date().toISOString() })
+    .update({ read_at: new Date().toISOString() })
     .eq('id', notificationId);
 
   if (error) throw error;
 }
 
-/**
- * Mark all notifications as read for the current user
- */
+/** Mark all notifications as read for the signed-in user. */
 export async function markAllNotificationsAsRead(): Promise<void> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) throw new Error('Not authenticated');
-
-  const { error } = await db
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
     .from('notifications')
-    .update({ is_read: true, read_at: new Date().toISOString() })
-    .eq('user_id', userData.user.id)
-    .eq('is_read', false);
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('read_at', null);
 
   if (error) throw error;
 }
 
-/**
- * Get unread notification count
- */
+/** Get unread notification count for the signed-in user. */
 export async function getUnreadCount(): Promise<number> {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user?.id) return 0;
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!authData.user) return 0;
 
-  const { count, error } = await db
+  const { count, error } = await supabase
     .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userData.user.id)
-    .eq('is_read', false);
-
-  if (error) {
-    console.error('Error getting unread count:', error);
-    return 0;
-  }
-
-  return count || 0;
-}
-
-/**
- * Log a notification event (called by Edge Function or server)
- * Note: Only service_role can insert, not authenticated users
- */
-export async function logNotification(
-  userId: string,
-  type: string,
-  title: string,
-  body: string,
-  actorId?: string,
-  restaurantId?: string,
-  reviewId?: string
-): Promise<Notification> {
-  const { data, error } = await db
-    .from('notifications')
-    .insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      actor_id: actorId,
-      restaurant_id: restaurantId,
-      review_id: reviewId,
-    })
-    .select()
-    .single();
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', authData.user.id)
+    .is('read_at', null);
 
   if (error) throw error;
-  return data;
+  return count ?? 0;
 }

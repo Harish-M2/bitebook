@@ -33,21 +33,25 @@ function labelFor(value: number): string {
 /** Step 3 — the rating. The one genuinely required field in the flow. */
 export function RatingStep({ dishName, value, onChange }: RatingStepProps) {
   return (
-    <View className="flex-1 items-center justify-center gap-lg px-lg">
-      <BodyText color="textSecondary" style={{ textAlign: 'center' }}>
-        How was the {dishName}?
-      </BodyText>
+    <View className="flex-1 items-center justify-center px-lg py-lg">
+      <View style={{ width: '100%', maxWidth: 960, alignItems: 'center', gap: 18 }}>
+        <BodyText color="textSecondary" style={{ textAlign: 'center', fontSize: 18 }}>
+          How was the {dishName}?
+        </BodyText>
 
-      <RatingInput value={value} onChange={onChange} className="w-full" />
-
-      {value > 0 ? (
-        <View className="items-center gap-xxs">
-          <DisplayText>{value.toFixed(1)}</DisplayText>
-          <MetadataText>{labelFor(value)}</MetadataText>
+        <View style={{ width: '100%', maxWidth: 760 }}>
+          <RatingInput value={value} onChange={onChange} className="w-full" />
         </View>
-      ) : (
-        <MetadataText>Tap a star. Tap its left half for a half point.</MetadataText>
-      )}
+
+        {value > 0 ? (
+          <View className="items-center gap-xxs">
+            <DisplayText>{value.toFixed(1)}</DisplayText>
+            <MetadataText style={{ textAlign: 'center' }}>{labelFor(value)}</MetadataText>
+          </View>
+        ) : (
+          <MetadataText>Tap a star. Tap its left half for a half point.</MetadataText>
+        )}
+      </View>
     </View>
   );
 }

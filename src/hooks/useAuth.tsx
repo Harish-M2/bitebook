@@ -1,17 +1,17 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    type PropsWithChildren,
+} from 'react';
 import { Platform } from 'react-native';
 
-import { supabase } from '@/lib/supabase';
 import { getProfile, type Profile } from '@/lib/db/profiles';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type AuthResult = { error: string | null };
 
@@ -20,6 +20,16 @@ type AuthResult = { error: string | null };
  * project, so sign-up has to distinguish "signed in" from "go and check your inbox".
  */
 type SignUpResult = AuthResult & { needsEmailConfirmation: boolean };
+
+function getAuthRedirectUrl(path = ''): string {
+  if (Platform.OS === 'web') {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://bitebook-alpha.vercel.app';
+    return `${origin}${path}`;
+  }
+
+  const normalizedPath = path === '/' ? '' : path.replace(/^\//, '');
+  return normalizedPath ? `bitebook://${normalizedPath}` : 'bitebook://';
+}
 
 type AuthContextValue = {
   session: Session | null;
@@ -128,22 +138,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return { error: error?.message ?? null };
       },
       signUpWithPassword: async (email, password) => {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        return {
-          error: error?.message ?? null,
-          needsEmailConfirmation: !error && data.session === null,
-        };
+        if (!isSupabaseConfigured) {
+          return {
+            error: 'Supabase is not configured. Add the required EXPO_PUBLIC variables to .env and restart Expo.',
+            needsEmailConfirmation: false,
+          };
+        }
+
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: getAuthRedirectUrl() },
+          });
+          return {
+            error: error?.message ?? null,
+            needsEmailConfirmation: !error && data.session === null,
+          };
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : 'Could not reach Supabase. Check your network connection.',
+            needsEmailConfirmation: false,
+          };
+        }
       },
       signOut: async () => {
         const { error } = await supabase.auth.signOut();
         return { error: error?.message ?? null };
       },
       resetPassword: async (email) => {
-        const redirectUrl = Platform.OS === 'web' 
-          ? 'https://bitebook-alpha.vercel.app/reset-password'
-          : 'bitebook://auth/reset-password';
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl,
+          redirectTo: getAuthRedirectUrl('/reset-password'),
         });
         return { error: error?.message ?? null };
       },

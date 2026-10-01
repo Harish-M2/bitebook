@@ -393,7 +393,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<REDACTED>
 
 ## 10. Current Database State
 
-All 24 migrations currently in `supabase/migrations/`, in filename order:
+Original baseline migrations `0001`–`0024` (later migrations are covered in the verified state below):
 
 | File | Purpose |
 |---|---|
@@ -422,13 +422,28 @@ All 24 migrations currently in `supabase/migrations/`, in filename order:
 | `0023_seed_cuisines.sql` | Cuisine taxonomy seed data (real migration, not `seed.sql`) |
 | `0024_grants.sql` | Explicit table privileges: DML to `authenticated`, nothing to `anon` |
 
-Confirmed via `npx supabase migration list --linked` that **all 23 of these migrations
-are present on the linked remote "Bitebook" project**, i.e. the schema described above
-has actually been applied to a live database — this is new since the last written report
-(`Bitebook_Phase2_Correction_Pass_Report.md`), which stated migrations were not yet
-executed. **Treat that report's "NOT YET RUNTIME VERIFIED" section as partially
-outdated** — re-verify current state directly with the CLI rather than trusting that
-document blindly (see §13).
+**Production migration history was reconciled on 2026-10-01.** The final
+`npx supabase migration list --linked` shows every local migration `0001`–`0043` applied
+remotely, with no skipped filenames.
+
+- `0035`–`0038` were checked against the production catalog, then recorded as applied.
+- `0039_notifications.sql` was corrected to add only the missing owner-scoped
+  `notification_preferences` table; the canonical `notifications` table from `0015` was
+  preserved. The table, columns, and RLS policies were verified before recording `0039`.
+- `0040_reconcile_late_rls.sql` copied the three legacy saved restaurants into
+  `saved_dishes` while preserving `created_at`, found no legacy follow edges to copy,
+  removed the broad legacy policies, then dropped `saved_restaurants` and `following`.
+  The copied rows and resulting tables/policies were verified before recording `0040`.
+- The malformed `0036b_rating_stats_function.sql` was replaced by
+  `0043_rating_stats_function.sql`. Its function was compared with production, replaced
+  with a fixed `search_path`, verified, and then recorded as applied.
+- `0041_fix_review_delete_trigger.sql` and
+  `0042_restore_diary_review_delete_action.sql` were directly applied and verified before
+  being recorded as applied.
+
+Normal `npx supabase db push` is now safe for future migrations, provided the linked list
+is checked first and no new out-of-band schema changes have occurred. The pgTAP suite
+still needs a Docker-enabled environment; it was not run during this reconciliation.
 
 `supabase/seed.sql` (not a numbered migration) contains development/demo data only,
 clearly namespaced (`@demo.bitebook.local` emails, "Demo"-prefixed names) — never applied
@@ -609,10 +624,10 @@ it, and that test covers future ones without anyone adding a test for them.
 
 ### Root-level report `.md` files may be out of date
 - `Bitebook_Phase2_Correction_Pass_Report.md` states migrations were "NOT YET RUNTIME
-  VERIFIED" and no Supabase cloud project existed — **this has since changed**: a project
-  now exists and is linked, and all 23 migrations are confirmed applied to it (see §10).
-  Treat these historical report files as point-in-time snapshots, not current state —
-  always re-verify against the live repository/CLI rather than trusting them.
+  VERIFIED" and no Supabase cloud project existed — a project now exists and is linked.
+  An earlier note here said all 23 migrations were applied; that statement was superseded
+  by the 2026-10-01 catalog and ledger audit in §10. Treat historical reports as
+  point-in-time snapshots and use §10 for the current deployment state.
 
 ---
 
@@ -646,12 +661,10 @@ and the historical report `.md` files at the project root):
    `docs/database-architecture.md` accordingly. Documented in
    `Bitebook_Phase2_Correction_Pass_Report.md`. `tsc`/`lint`/`expo-doctor` all confirmed
    clean at that point.
-3. **Post-correction-pass (evidence found during this handover, not previously
-   documented in any report)**: a real Supabase cloud project ("Bitebook", West EU/
-   Ireland) was created and linked, and all 23 migrations were successfully applied to
-   it (`supabase migration list --linked` shows all present on Remote). This appears to
-   have happened after the correction-pass report was written, since that report still
-   describes "no Supabase cloud project" as the current state.
+3. **Post-correction-pass (historical)**: a real Supabase cloud project ("Bitebook", West
+  EU/Ireland) was created. An earlier CLI check reported all 23 migrations applied, but
+  the 2026-10-01 catalog and ledger audit found later schema objects with incomplete or
+  conflicting migration records. See §10; do not rely on the earlier all-applied claim.
 4. **This handover (commit `be0a40e`, "Prepare Bitebook for Mac Development")**:
    `expo-dev-client` + `eas.json` added for EAS development builds (documented in
    `Bitebook_Dev_Build_Setup.md`), plus this documentation pass.
@@ -814,8 +827,7 @@ Exact sequence for continuing development on the Mac:
    ```bash
    npx supabase migration list --linked
    ```
-   Confirm all 23 migrations show up in both Local and Remote columns (as verified on
-   Windows during this handover).
+  Confirm local and remote versions match; see §10 for the 2026-10-01 reconciliation.
 
 8. **Run migrations/tests**
    - If you want a fully local dev database (requires Docker):
@@ -998,7 +1010,8 @@ Use this on the Mac before resuming feature work:
 - [ ] `.env` created from `.env.example` with real (non-committed) values
 - [ ] `npx supabase login` completed
 - [ ] `npx supabase link --project-ref discsdmiuatiwtldmcoc` completed
-- [ ] `npx supabase migration list --linked` shows all 23 migrations present remotely
+- [ ] `npx supabase migration list --linked` reviewed against §10; do not assume every
+  local migration is safe to push
 - [ ] `npx tsc --noEmit` passes
 - [ ] `npx expo lint` passes
 - [ ] `npx expo-doctor` passes (re-verify — not re-run in this exact handover session)

@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
-import { View, ScrollView, Pressable, Modal, ActivityIndicator } from 'react-native';
-import { X } from 'lucide-react-native';
-import { Image } from 'expo-image';
-import { colors } from '@/constants/colors';
+import { ExternalLink } from '@/components/external-link';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
 import type { MenuItem } from '@/lib/db/menus';
+import { Image } from 'expo-image';
+import { X } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
 
 interface MenuModalProps {
   visible: boolean;
@@ -41,7 +42,11 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -59,10 +64,15 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
           </View>
         ) : items.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <BodyText style={styles.emptyText}>Menu not available</BodyText>
+            <BodyText style={styles.emptyText}>Menu not available here yet</BodyText>
             <Caption style={styles.emptyCaption}>
-              This restaurant doesn&apos;t have menu information available yet.
+              Our menu provider doesn&apos;t have a menu for this restaurant. You can search for it online.
             </Caption>
+            <ExternalLink
+              href={`https://www.google.com/search?q=${encodeURIComponent(`${title} restaurant menu`)}`}
+              className="mt-md">
+              <BodyText color="accent">Search for this menu online</BodyText>
+            </ExternalLink>
           </View>
         ) : (
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

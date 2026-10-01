@@ -1,20 +1,18 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  Text,
-  Pressable,
-  Modal,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
-import { ChevronDown, X } from 'lucide-react-native';
 import { colors } from '@/constants/colors';
-import { getPriceLevels, getRatingRange, getDistanceRange } from '@/lib/db/filters';
-import type { Restaurant } from '@/types/models';
 import type { RestaurantFilters } from '@/lib/db/filters';
+import { getPriceLevels } from '@/lib/db/filters';
+import type { Restaurant } from '@/types/models';
+import { ChevronDown, X } from 'lucide-react-native';
+import { useState } from 'react';
+import {
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface FilterBarProps {
   restaurants: Restaurant[];
@@ -22,7 +20,6 @@ interface FilterBarProps {
   onFiltersChange: (filters: RestaurantFilters) => void;
 }
 
-const PRICE_LEVELS = ['£', '££', '£££', '££££'];
 const RATING_OPTIONS = [0, 3.0, 3.5, 4.0, 4.5];
 const DISTANCE_OPTIONS = [1, 2, 5, 10, 20];
 
@@ -33,8 +30,6 @@ const DISTANCE_OPTIONS = [1, 2, 5, 10, 20];
 export function FilterBar({ restaurants, activeFilters, onFiltersChange }: FilterBarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const priceOptions = getPriceLevels(restaurants);
-  const ratingRange = getRatingRange(restaurants);
-  const distanceRange = getDistanceRange(restaurants);
 
   const handlePriceChange = (price: string) => {
     const newPrice = activeFilters.priceLevel === price ? undefined : price;

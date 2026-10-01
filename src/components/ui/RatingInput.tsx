@@ -1,10 +1,10 @@
+import * as Haptics from 'expo-haptics';
+import { Star } from 'lucide-react-native';
 import { useState } from 'react';
 import { LayoutChangeEvent, Pressable, View } from 'react-native';
-import { Star } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
 
-import { cn } from '@/lib/cn';
 import { colors } from '@/constants/colors';
+import { cn } from '@/lib/cn';
 
 type RatingInputProps = {
   value: number;
@@ -14,6 +14,7 @@ type RatingInputProps = {
 
 const STARS = [1, 2, 3, 4, 5];
 const GAP_PX = 10;
+const MAX_STAR_SIZE = 120;
 
 /**
  * Large interactive 0.5-step rating, 0.5 to 5.0 (spec §11).
@@ -29,7 +30,8 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
   // being pinned to a hardcoded icon size.
   function handleLayout(event: LayoutChangeEvent) {
     const width = event.nativeEvent.layout.width;
-    setStarSize(Math.floor((width - GAP_PX * (STARS.length - 1)) / STARS.length));
+    const computed = Math.floor((width - GAP_PX * (STARS.length - 1)) / STARS.length);
+    setStarSize(Math.min(computed, MAX_STAR_SIZE));
   }
 
   function select(next: number) {

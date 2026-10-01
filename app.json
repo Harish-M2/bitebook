@@ -48,7 +48,9 @@
           "photosPermission": "Bitebook needs access to your photos so you can add a picture of the dish you logged.",
           "cameraPermission": "Bitebook needs access to your camera so you can photograph the dish you logged."
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
