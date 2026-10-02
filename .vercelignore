@@ -1,0 +1,8 @@
+# Native projects are irrelevant to the web deploy and break Vercel's build
+ios
+android
+assets/expo.icon
+supabase
+scripts
+docs
+.expo

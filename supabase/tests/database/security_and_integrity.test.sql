@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(61);
+select plan(64);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -872,6 +872,34 @@ select is(
     where user_id = '11111111-1111-1111-1111-111111111111'),
   0,
   'a user cannot read another user''s notification preferences'
+);
+reset role;
+
+-- 62-64. Notification triggers (0044): a follow creates a notification for the
+-- followed user; the definer functions are not directly callable by clients.
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select lives_ok(
+  $$insert into public.follows (follower_id, following_id)
+    values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111')$$,
+  'a user can follow another user (precondition for the notification trigger)'
+);
+reset role;
+
+select is(
+  (select count(*)::int from public.notifications
+    where user_id = '11111111-1111-1111-1111-111111111111'
+      and type = 'follow'
+      and actor_id = '22222222-2222-2222-2222-222222222222'),
+  1,
+  'a new follow creates a follow notification for the followed user'
+);
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select throws_ok(
+  $$select public.notify_on_follow()$$,
+  'a client cannot call notify_on_follow directly'
 );
 reset role;
 

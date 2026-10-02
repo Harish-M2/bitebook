@@ -1,5 +1,5 @@
-import { UtensilsCrossed } from 'lucide-react-native';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { Bell, UtensilsCrossed } from 'lucide-react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -8,8 +8,9 @@ import { colors } from '@/constants/colors';
 import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { listFeed } from '@/lib/db/feed';
+import { getUnreadCount } from '@/lib/db/notifications';
 import { Screen } from '@/components/ui/Screen';
-import { Heading } from '@/components/ui/Typography';
+import { Heading, MetadataText } from '@/components/ui/Typography';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -29,6 +30,15 @@ export default function HomeScreen() {
     queryKey: queryKeys.feed(userId ?? ''),
     queryFn: () => listFeed(userId as string),
     enabled: userId !== null,
+  });
+
+  // Refetch on focus-driven remounts is enough here; a realtime subscription is
+  // deliberately out of scope until push notifications land.
+  const unread = useQuery({
+    queryKey: ['notifications-unread-count', userId],
+    queryFn: () => getUnreadCount(),
+    enabled: userId !== null,
+    refetchInterval: 60_000,
   });
 
   const handleCommentPress = (reviewId: string) => {
@@ -61,10 +71,29 @@ export default function HomeScreen() {
           />
         }
         ListHeaderComponent={
-          <View className="pb-md">
+          <View className="flex-row items-center justify-between pb-md pr-lg">
             <Heading level={2} className="px-lg pt-xs">
               Bitebook
             </Heading>
+            <Pressable
+              onPress={() => router.push('/notifications')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                unread.data ? `Notifications, ${unread.data} unread` : 'Notifications'
+              }
+              className="mt-xs h-10 w-10 items-center justify-center rounded-pill border border-border">
+              <Bell size={20} color={colors.textPrimary} />
+              {unread.data ? (
+                <View
+                  className="absolute -right-1 -top-1 min-w-[18px] items-center justify-center rounded-pill px-xxs"
+                  style={{ backgroundColor: colors.accent, height: 18 }}>
+                  <MetadataText style={{ color: colors.background, fontSize: 11 }}>
+                    {unread.data > 9 ? '9+' : unread.data}
+                  </MetadataText>
+                </View>
+              ) : null}
+            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
