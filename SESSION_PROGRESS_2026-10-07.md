@@ -128,7 +128,7 @@ local copy has no storage policies).
 7. Rebuild and redeploy the web app so it includes `b88c0d6` (deploy recipe below). The live site
    predates that merge. `expo-video` is a native module: iOS/Android need `pod install` or a
    dev-build rebuild.
-8. Audit `0036_reviews.sql` (`SELECT USING (true)`; trigger not SECURITY DEFINER).
+8. ~~Audit `0036_reviews.sql`~~ — done, see Useful facts. No change needed.
 9. ~~Review `Authenticated users can upload review photos`~~ — dropped by `0052` (applied to
    production, policy list re-checked). **Drift comparison done (read-only, production vs a
    local build of migrations 0001–0052):** RLS flags, functions (25), EXECUTE grants, triggers
@@ -310,5 +310,12 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   `deploy-migration.mjs` are ad-hoc database scripts outside the migration flow. `run-rls-fix.sql`
   is named in `0050` as the source of the `anon` grants. Review and remove or fold into
   migrations.
-- `0036_reviews.sql` was flagged for audit: `SELECT USING (true)` bypasses the visibility model,
-  and its trigger function is not `SECURITY DEFINER`. Not yet audited.
+- `0036_reviews.sql` audit (read-only, against production): both concerns are already resolved by
+  later migrations. `0040` drops its open `SELECT USING (true)` policies on `reviews` and
+  `review_photos`; production's only SELECT policies are the `can_view_review`-gated ones. `0041`
+  replaced the trigger function with a version that sets `search_path = public` and handles
+  DELETE. It is a plain (non-SECURITY DEFINER) trigger that only touches
+  `restaurants.updated_at`, which is correct: it needs no elevated rights. Remaining, accepted
+  as low risk: the `0036` write policies (`Users can create/update/delete own reviews`, role
+  `public`) are redundant duplicates of the canonical `users can ... their own reviews`
+  policies and enforce the same `auth.uid() = user_id` check, so they widen nothing. Left as is.

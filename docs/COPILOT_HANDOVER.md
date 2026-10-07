@@ -594,9 +594,11 @@ passes 6/6.
 What a future session needs to know:
 - **Do not assume the migrations describe production.** Compare against the hosted project
   (Management API `/v1/projects/{ref}/database/query`) before relying on a schema fact.
-- **Open items:** `0036_reviews.sql` has `SELECT USING (true)` and a non-definer trigger and
-  has not been audited; a fuller drift comparison (policies, grants, functions, triggers) has
-  not been done. The out-of-band storage policy `Authenticated users can upload review photos`
+- **Open items:** none from the 2026-10-07 audit. `0036_reviews.sql` was audited: its open SELECT
+  policies were dropped by `0040` and its trigger function was fixed by `0041`. A production vs
+  migrations drift comparison (policies, grants, functions, triggers, indexes, columns, enums,
+  buckets) found no remaining differences except an equivalent unique index vs constraint on
+  `reviews`. The out-of-band storage policy `Authenticated users can upload review photos`
   was dropped by `0052`.
 - **`0035_menu_items.sql` breaks `supabase db reset`** (`text` column referencing a `uuid`).
   Needs an owner decision: edit in place or add a corrective migration.
