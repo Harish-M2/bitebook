@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(73);
+select plan(74);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -1029,6 +1029,18 @@ select is(
   'another user cannot read a private visit or its attached media'
 );
 reset role;
+
+-- 74. Only the ownership-checked policy may allow storage uploads to review-photos
+-- (0052). Policies OR together, so one looser INSERT policy would override it.
+select is(
+  (select coalesce(string_agg(policyname, ', ' order by policyname), '')
+     from pg_policies
+    where schemaname = 'storage' and tablename = 'objects'
+      and cmd in ('INSERT', 'ALL')
+      and coalesce(with_check, '') like '%review-photos%'),
+  'users can upload media to their own reviews',
+  'review-photos uploads are governed by exactly one INSERT policy'
+);
 
 select * from finish();
 rollback;

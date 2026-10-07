@@ -290,12 +290,11 @@ after a dry run.
 | `0049` | `menu_budget` had no RLS | RLS enabled, authenticated read policy |
 | `0050` | `anon` held table privileges on 21 tables (source: ad-hoc `run-rls-fix.sql`); `authenticated` held wider-than-DML privileges on later tables | `anon` revoked; `authenticated` limited to the SELECT/INSERT/UPDATE/DELETE each table already had; default privileges tightened |
 | `0051` | storage policy `Anyone can view review photos` (SELECT, role `public`, only `bucket_id = 'review-photos'`) let anyone read every object in the private bucket, overriding the visibility-gated policy | dropped |
+| `0052` | storage policy `Authenticated users can upload review photos` (INSERT, only checked the first path folder) OR-ed with and bypassed the ownership-checked upload policy from `0045` | dropped |
 
 Verified after `0050` with `scripts/verify-remote-privileges.mjs`: 6 of 6 checks pass.
 
-Still present on production and defined in no migration: the storage policy
-`Authenticated users can upload review photos` (INSERT, own folder only). It is not
-known to be unsafe; it needs a decision on whether to keep it and fold it into a migration.
+After `0052`, production `review-photos` policies (read-only query): `review media is readable per parent visibility` (SELECT), `users can upload media to their own reviews` (INSERT), `users can delete photos on their own reviews` (DELETE). The drop is covered by pgTAP test 74 (passes locally, 74/74). Upload through the app after `0052`: owner reports a photo upload worked (not independently verified).
 
 **Not runtime-verified in the app:** sign-in/sign-up, `log_dish`, review-photo viewing and
 follow notifications have not been exercised against the changed production database. The

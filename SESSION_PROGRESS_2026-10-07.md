@@ -129,9 +129,9 @@ local copy has no storage policies).
    predates that merge. `expo-video` is a native module: iOS/Android need `pod install` or a
    dev-build rebuild.
 8. Audit `0036_reviews.sql` (`SELECT USING (true)`; trigger not SECURITY DEFINER).
-9. Review `Authenticated users can upload review photos` and other out-of-band objects; run a
-   fuller drift comparison (policies, grants, functions, triggers) of production against the
-   migrations, because several were found.
+9. ~~Review `Authenticated users can upload review photos`~~ — dropped by `0052` (applied to
+   production, policy list re-checked). Still to do: a fuller drift comparison (policies, grants, functions, triggers) of production against the
+   migrations, because several were found. Owner reports a photo upload worked after `0052`.
 10. Clean up root files `check-reviews.sql`, `debug-reviews.sql`, `run-rls-fix.sql`,
     `deploy-migration.mjs` (`run-rls-fix.sql` is the source of the `anon` grants).
 11. Check that the seed and upload scripts in `scripts/` still work after `0050`. They should use
@@ -273,6 +273,13 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
 
 ## Security notes
 
+- **Update 2026-10-07:** Google Places keys rotated by the owner. Restaurant search on production
+  (https://bitebook-alpha.vercel.app) was tested afterwards and works, per the owner's report
+  (not independently verified). Remaining: delete the old keys in Cloud Console and optionally
+  set a daily quota cap on Places API (New).
+- **Update 2026-10-07 (later):** Owner reports the old Google keys are deleted (not independently
+  verified). Google key rotation is complete.
+
 - Two Google Places API keys were pasted into the chat session. Both are restricted to Places API
   (New) with no application restriction, and neither was written to a file or committed (a scan
   of changed files found none). **Rotate them** (Cloud Console → Credentials → Regenerate) and
@@ -288,7 +295,9 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   `places-search`, `places-import`, `fix-rls`, `search-restaurant-menus` are deployed. The
   `places-*` functions were last deployed 2026-09-21 and were not changed.
 - Google Cloud has two projects both named `bitebook` (`aerial-tide-509314-g8` and
-  `bitebook-509314`), both on the "Firebase Payment" billing account.
+  `bitebook-509314`), both on the "Firebase Payment" billing account. The owner confirmed
+  `aerial-tide-509314-g8` is the one used for Google Places. Whether `bitebook-509314` holds any
+  key is UNKNOWN; check it and delete unused Places keys.
 - Repo-root `check-reviews.sql`, `debug-reviews.sql`, `run-rls-fix.sql` and
   `deploy-migration.mjs` are ad-hoc database scripts outside the migration flow. `run-rls-fix.sql`
   is named in `0050` as the source of the `anon` grants. Review and remove or fold into
