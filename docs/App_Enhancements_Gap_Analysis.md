@@ -57,3 +57,7 @@ Verified locally: `db reset` plus pgTAP 83/83 (tests 75-83). Not run against pro
 - `0054_restaurant_visits.sql`: private `restaurant_visits` and `restaurant_visit_dishes` (owner-only RLS, no anon, one visit row per user and restaurant).
 - `0055_restaurant_info.sql`: postcode, `opening_hours` (jsonb, shape UNKNOWN), seating capacity, outdoor seating, accessibility notes, booking URL, menu URL and verified-at on `restaurants`. Client writes remain blocked.
 Not yet built: any app UI or data-access code for these.
+
+## Update: app code built for 0053-0055 (migrations applied to production)
+- DONE (typecheck/lint only, not run on device): "Mark as visited" button and Visited list (`/visited`, linked from Profile); optional food/service/atmosphere/value ratings, seating, spend and party size in the log flow (`ReviewStep`, `ConfirmStep`, saved by a follow-up update in `log.ts`) and shown on the visit detail screen; restaurant phone, postcode, outdoor seating, capacity, accessibility, website, menu and booking links on the restaurant page.
+- Still missing: notes/date/dishes UI on a visited entry, filters for dietary and open now, anything that fills the new `restaurants` columns (nothing populates them yet), booking/sponsored/business features (product decisions).

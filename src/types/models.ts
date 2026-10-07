@@ -45,6 +45,13 @@ export type RestaurantVisit = {
   overallRating: number;
   recommendationTier: number;
   restaurantComment: string | null;
+  foodRating: number | null;
+  serviceRating: number | null;
+  atmosphereRating: number | null;
+  valueRating: number | null;
+  spendAmount: number | null;
+  partySize: number | null;
+  seatingType: string | null;
   actor: UserSummary;
   restaurant: {
     id: string;

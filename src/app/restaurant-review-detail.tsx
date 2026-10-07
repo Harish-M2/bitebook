@@ -142,6 +142,32 @@ export default function RestaurantReviewDetailScreen() {
                 ? `${recommendation.emoji} ${recommendation.label}`
                 : 'Recommendation unavailable'}
             </Caption>
+            {[
+              ['Food', data.foodRating],
+              ['Service', data.serviceRating],
+              ['Atmosphere', data.atmosphereRating],
+              ['Value', data.valueRating],
+            ].map(([label, value]) =>
+              typeof value === 'number' ? (
+                <View key={label} className="flex-row items-center justify-between">
+                  <Caption>{label}</Caption>
+                  <Rating value={value} size="sm" />
+                </View>
+              ) : null,
+            )}
+            {[
+              data.seatingType ? data.seatingType[0].toUpperCase() + data.seatingType.slice(1) : null,
+              data.partySize ? `Party of ${data.partySize}` : null,
+              data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
+            ].filter(Boolean).length > 0 ? (
+              <Caption color="textSecondary">
+                {[
+                  data.seatingType ? data.seatingType[0].toUpperCase() + data.seatingType.slice(1) : null,
+                  data.partySize ? `Party of ${data.partySize}` : null,
+                  data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
+                ].filter(Boolean).join(' · ')}
+              </Caption>
+            ) : null}
             {data.restaurantComment ? <BodyText>{data.restaurantComment}</BodyText> : null}
           </Surface>
 

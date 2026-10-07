@@ -147,6 +147,14 @@ export interface RestaurantDetail {
   address: string | null;
   price_level: number | null;
   image_url: string | null;
+  phone: string | null;
+  website_url: string | null;
+  postcode: string | null;
+  has_outdoor_seating: boolean | null;
+  seating_capacity: number | null;
+  accessibility_notes: string | null;
+  booking_url: string | null;
+  menu_url: string | null;
   restaurant_cuisines: {
     cuisine: { id: string; name: string; slug: string } | null;
   }[];
@@ -162,6 +170,14 @@ export async function getRestaurant(restaurantId: string): Promise<RestaurantDet
       address,
       price_level,
       image_url,
+      phone,
+      website_url,
+      postcode,
+      has_outdoor_seating,
+      seating_capacity,
+      accessibility_notes,
+      booking_url,
+      menu_url,
       restaurant_cuisines(
         cuisine:cuisines(id, name, slug)
       )

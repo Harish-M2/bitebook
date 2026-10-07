@@ -60,6 +60,19 @@ export interface RestaurantReviewMediaInput {
   fileName: string;
 }
 
+export type SeatingType = 'indoor' | 'outdoor' | 'bar' | 'takeaway';
+
+/** Optional extras on a visit (0053). Every field may be omitted. */
+export interface VisitDetailsInput {
+  foodRating?: number;
+  serviceRating?: number;
+  atmosphereRating?: number;
+  valueRating?: number;
+  spendAmount?: number;
+  partySize?: number;
+  seatingType?: SeatingType;
+}
+
 export interface LogRestaurantReviewInput {
   restaurantId: string;
   overallRating: number;
@@ -69,6 +82,7 @@ export interface LogRestaurantReviewInput {
   visitedAt?: string;
   dishes: RestaurantReviewDishInput[];
   media: RestaurantReviewMediaInput[];
+  details?: VisitDetailsInput;
 }
 
 export interface LogRestaurantReviewResult {
@@ -76,6 +90,8 @@ export interface LogRestaurantReviewResult {
   dishReviewIds: string[];
   diaryEntryIds: string[];
   mediaFailedCount: number;
+  /** True when the visit was logged but its optional details could not be saved. */
+  detailsFailed: boolean;
 }
 
 export async function logRestaurantReview(
@@ -104,6 +120,29 @@ export async function logRestaurantReview(
   if (!data?.length) throw new Error('The restaurant review could not be logged.');
 
   const restaurantReviewId = data[0].restaurant_review_id;
+
+  // Saved separately so the log RPC and its security model stay untouched. A failure here
+  // must not fail the log: the visit exists and retrying would create a duplicate.
+  let detailsFailed = false;
+  const d = input.details;
+  if (d && Object.values(d).some((value) => value !== undefined)) {
+    const { error: detailsError } = await supabase
+      .from('restaurant_reviews')
+      .update({
+        food_rating: d.foodRating ?? null,
+        service_rating: d.serviceRating ?? null,
+        atmosphere_rating: d.atmosphereRating ?? null,
+        value_rating: d.valueRating ?? null,
+        spend_amount: d.spendAmount ?? null,
+        party_size: d.partySize ?? null,
+        seating_type: d.seatingType ?? null,
+      })
+      .eq('id', restaurantReviewId);
+    if (detailsError) {
+      console.warn('[Bitebook] Visit details could not be saved:', detailsError);
+      detailsFailed = true;
+    }
+  }
   const uploadedPaths: string[] = [];
   const mediaRows: {
     restaurant_review_id: string;
@@ -156,6 +195,7 @@ export async function logRestaurantReview(
     dishReviewIds: data.map((row) => row.review_id),
     diaryEntryIds: data.map((row) => row.diary_entry_id),
     mediaFailedCount,
+    detailsFailed,
   };
 }
 

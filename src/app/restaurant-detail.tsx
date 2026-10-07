@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Share2 } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
 import { ReviewList } from '@/components/reviews';
@@ -70,6 +70,17 @@ export default function RestaurantDetailScreen() {
   const data = restaurant.data;
   const cuisine = data.restaurant_cuisines[0]?.cuisine?.name;
   const heroImage = photos.data?.[0] ?? data.image_url ?? undefined;
+  const infoLines = [
+    data.phone ? `Phone: ${data.phone}` : null,
+    data.has_outdoor_seating ? 'Outdoor seating available' : null,
+    data.seating_capacity ? `Seats about ${data.seating_capacity}` : null,
+    data.accessibility_notes ? `Accessibility: ${data.accessibility_notes}` : null,
+  ].filter((line): line is string => Boolean(line));
+  const links = [
+    data.website_url ? { label: 'Website', url: data.website_url } : null,
+    data.menu_url ? { label: 'View menu online', url: data.menu_url } : null,
+    data.booking_url ? { label: 'Book a table', url: data.booking_url } : null,
+  ].filter((link): link is { label: string; url: string } => link !== null);
 
   return (
     <Screen>
@@ -88,8 +99,31 @@ export default function RestaurantDetailScreen() {
                 <MapPin size={15} color={colors.textSecondary} />
                 <Caption>{[cuisine, formatPriceLevel(data.price_level), data.city].filter(Boolean).join(' · ')}</Caption>
               </View>
-              {data.address ? <Caption color="textSecondary">{data.address}</Caption> : null}
+              {data.address ? (
+                <Caption color="textSecondary">
+                  {[data.address, data.postcode].filter(Boolean).join(', ')}
+                </Caption>
+              ) : null}
             </View>
+
+            {infoLines.length > 0 || links.length > 0 ? (
+              <View className="gap-xs">
+                {infoLines.map((line) => (
+                  <Caption key={line} color="textSecondary">{line}</Caption>
+                ))}
+                <View className="flex-row flex-wrap gap-sm">
+                  {links.map((link) => (
+                    <Button
+                      key={link.label}
+                      label={link.label}
+                      variant="outline"
+                      size="sm"
+                      onPress={() => void Linking.openURL(link.url)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
 
             <View className="flex-row items-center gap-sm">
               <SaveButton restaurantId={data.id} showLabel />

@@ -11,6 +11,8 @@ import { colors } from '@/constants/colors';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
 import type { ReviewVisibility } from '@/types/database';
 
+import { SEATING_OPTIONS, type VisitDetailsDraft } from './visitDetails';
+
 type ConfirmStepProps = {
   restaurantName: string;
   city: string | null;
@@ -21,6 +23,7 @@ type ConfirmStepProps = {
   visitedAt: string;
   recommendationTier: number;
   visibility: ReviewVisibility;
+  details: VisitDetailsDraft;
 };
 
 const VISIBILITY_COPY: Record<ReviewVisibility, string> = {
@@ -56,8 +59,18 @@ export function ConfirmStep({
   visitedAt,
   recommendationTier,
   visibility,
+  details,
 }: ConfirmStepProps) {
   const VisibilityIcon = VISIBILITY_ICON[visibility];
+  const detailLines = [
+    details.foodRating >= 0.5 ? `Food ${details.foodRating}` : null,
+    details.serviceRating >= 0.5 ? `Service ${details.serviceRating}` : null,
+    details.atmosphereRating >= 0.5 ? `Atmosphere ${details.atmosphereRating}` : null,
+    details.valueRating >= 0.5 ? `Value ${details.valueRating}` : null,
+    details.seatingType ? SEATING_OPTIONS.find((o) => o.value === details.seatingType)?.label : null,
+    details.partySize.trim() ? `Party of ${details.partySize.trim()}` : null,
+    details.spend.trim() ? `Spend ${details.spend.trim()}` : null,
+  ].filter(Boolean) as string[];
   const recommendation = RESTAURANT_RECOMMENDATIONS.find((option) => option.tier === recommendationTier);
 
   return (
@@ -106,6 +119,8 @@ export function ConfirmStep({
           {recommendation ? (
             <BodyText>{recommendation.emoji} {recommendation.label}</BodyText>
           ) : null}
+
+          {detailLines.length > 0 ? <Caption>{detailLines.join(' · ')}</Caption> : null}
 
           {reviewText.trim().length > 0 ? (
             <BodyText color="textSecondary">{reviewText.trim()}</BodyText>

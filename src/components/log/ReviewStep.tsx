@@ -8,6 +8,7 @@ import { Caption, MetadataText } from '@/components/ui/Typography';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
 import { useAppTheme } from '@/hooks/useTheme';
 import type { ReviewVisibility } from '@/types/database';
+import { isValidPartySize, isValidSpend, SEATING_OPTIONS, type VisitDetailsDraft } from './visitDetails';
 
 type ReviewStepProps = {
   text: string;
@@ -20,6 +21,8 @@ type ReviewStepProps = {
   onChangeRecommendationTier: (tier: number) => void;
   visibility: ReviewVisibility;
   onChangeVisibility: (visibility: ReviewVisibility) => void;
+  details: VisitDetailsDraft;
+  onChangeDetails: (details: VisitDetailsDraft) => void;
 };
 
 const MAX_LENGTH = 2000;
@@ -48,8 +51,17 @@ export function ReviewStep({
   onChangeRecommendationTier,
   visibility,
   onChangeVisibility,
+  details,
+  onChangeDetails,
 }: ReviewStepProps) {
   const { colors } = useAppTheme();
+  const patch = (changes: Partial<VisitDetailsDraft>) => onChangeDetails({ ...details, ...changes });
+  const subRatings = [
+    { key: 'foodRating', label: 'Food' },
+    { key: 'serviceRating', label: 'Service' },
+    { key: 'atmosphereRating', label: 'Atmosphere' },
+    { key: 'valueRating', label: 'Value' },
+  ] as const;
 
   return (
     <View className="gap-md px-lg pt-md pb-sm">
@@ -79,6 +91,16 @@ export function ReviewStep({
         ) : null}
       </View>
 
+      <View className="gap-xs">
+        <Caption color="textSecondary">Rate the details (optional)</Caption>
+        {subRatings.map(({ key, label }) => (
+          <View key={key} className="flex-row items-center justify-between gap-sm">
+            <Caption>{label}</Caption>
+            <RatingInput value={details[key]} onChange={(value) => patch({ [key]: value })} />
+          </View>
+        ))}
+      </View>
+
       <TextField
         label="Visit date"
         value={visitedAt}
@@ -101,6 +123,43 @@ export function ReviewStep({
         hint={`${text.length}/${MAX_LENGTH}`}
         minHeight={88}
       />
+
+      <View className="gap-xs">
+        <Caption color="textSecondary">Seating (optional)</Caption>
+        <View className="flex-row flex-wrap gap-xs">
+          {SEATING_OPTIONS.map((option) => (
+            <Chip
+              key={option.value}
+              label={option.label}
+              selected={details.seatingType === option.value}
+              onPress={() =>
+                patch({ seatingType: details.seatingType === option.value ? null : option.value })
+              }
+            />
+          ))}
+        </View>
+      </View>
+
+      <View className="flex-row gap-sm">
+        <TextField
+          className="flex-1"
+          label="Spend (optional)"
+          value={details.spend}
+          onChangeText={(spend) => patch({ spend })}
+          keyboardType="decimal-pad"
+          maxLength={9}
+          error={isValidSpend(details.spend) ? null : 'Enter an amount like 42.50'}
+        />
+        <TextField
+          className="flex-1"
+          label="Party size (optional)"
+          value={details.partySize}
+          onChangeText={(partySize) => patch({ partySize })}
+          keyboardType="number-pad"
+          maxLength={3}
+          error={isValidPartySize(details.partySize) ? null : 'Enter 1 to 100'}
+        />
+      </View>
 
       <View className="gap-xxs">
         <Caption color="textSecondary">Who can see this visit</Caption>

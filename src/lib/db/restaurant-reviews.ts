@@ -2,6 +2,9 @@ import { signedImageUrls } from '@/lib/db/storage';
 import { supabase } from '@/lib/supabase';
 import type { RestaurantVisit } from '@/types/models';
 
+const VISIT_COLUMNS =
+  'id, user_id, restaurant_id, overall_rating, recommendation_tier, restaurant_comment, visited_at, created_at, food_rating, service_rating, atmosphere_rating, value_rating, spend_amount, party_size, seating_type' as const;
+
 type VisitParent = {
   id: string;
   user_id: string;
@@ -11,6 +14,13 @@ type VisitParent = {
   restaurant_comment: string | null;
   visited_at: string;
   created_at: string;
+  food_rating: number | null;
+  service_rating: number | null;
+  atmosphere_rating: number | null;
+  value_rating: number | null;
+  spend_amount: number | null;
+  party_size: number | null;
+  seating_type: string | null;
 };
 
 async function enrichVisitParents(parents: VisitParent[]): Promise<RestaurantVisit[]> {
@@ -100,6 +110,13 @@ async function enrichVisitParents(parents: VisitParent[]): Promise<RestaurantVis
       overallRating: parent.overall_rating,
       recommendationTier: parent.recommendation_tier,
       restaurantComment: parent.restaurant_comment,
+      foodRating: parent.food_rating,
+      serviceRating: parent.service_rating,
+      atmosphereRating: parent.atmosphere_rating,
+      valueRating: parent.value_rating,
+      spendAmount: parent.spend_amount,
+      partySize: parent.party_size,
+      seatingType: parent.seating_type,
       actor: {
         id: profile.id,
         username: profile.username ?? '',
@@ -128,7 +145,7 @@ export async function listRestaurantVisitSummaries(
 
   const { data, error } = await supabase
     .from('restaurant_reviews')
-    .select('id, user_id, restaurant_id, overall_rating, recommendation_tier, restaurant_comment, visited_at, created_at')
+    .select(VISIT_COLUMNS)
     .in('user_id', userIds)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -143,7 +160,7 @@ export async function listRestaurantVisitsForRestaurant(
 ): Promise<RestaurantVisit[]> {
   const { data, error } = await supabase
     .from('restaurant_reviews')
-    .select('id, user_id, restaurant_id, overall_rating, recommendation_tier, restaurant_comment, visited_at, created_at')
+    .select(VISIT_COLUMNS)
     .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -157,7 +174,7 @@ export async function getRestaurantVisitSummary(
 ): Promise<RestaurantVisit | null> {
   const { data, error } = await supabase
     .from('restaurant_reviews')
-    .select('id, user_id, restaurant_id, overall_rating, recommendation_tier, restaurant_comment, visited_at, created_at')
+    .select(VISIT_COLUMNS)
     .eq('id', restaurantReviewId)
     .maybeSingle();
 

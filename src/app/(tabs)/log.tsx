@@ -16,6 +16,13 @@ import { Screen } from '@/components/ui/Screen';
 import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { logRestaurantReview } from '@/lib/db/log';
+import {
+  EMPTY_VISIT_DETAILS,
+  isValidPartySize,
+  isValidSpend,
+  toVisitDetailsInput,
+  type VisitDetailsDraft,
+} from '@/components/log/visitDetails';
 import { localDateString } from '@/lib/format';
 import { queryKeys } from '@/lib/queryClient';
 import type { ReviewVisibility } from '@/types/database';
@@ -41,6 +48,7 @@ interface Draft {
   visitedAt: string;
   recommendationTier: number | null;
   visibility: ReviewVisibility;
+  details: VisitDetailsDraft;
 }
 
 function createEmptyDraft(): Draft {
@@ -53,6 +61,7 @@ function createEmptyDraft(): Draft {
     visitedAt: localDateString(),
     recommendationTier: null,
     visibility: 'public',
+    details: { ...EMPTY_VISIT_DETAILS },
   };
 }
 
@@ -117,6 +126,7 @@ export default function LogScreen() {
           dietaryTags: dish.dietaryTags,
         })),
         media: draft.media,
+        details: toVisitDetailsInput(draft.details),
       });
     },
     onSuccess: (result) => {
@@ -200,10 +210,16 @@ export default function LogScreen() {
       return draft.dishes.length > 0 && draft.dishes.every((dish) => dish.rating >= 0.5);
     }
     if (step === 'restaurantReview') {
-      return draft.overallRating >= 0.5 && draft.recommendationTier !== null && isValidVisitDate(draft.visitedAt);
+      return (
+        draft.overallRating >= 0.5 &&
+        draft.recommendationTier !== null &&
+        isValidVisitDate(draft.visitedAt) &&
+        isValidSpend(draft.details.spend) &&
+        isValidPartySize(draft.details.partySize)
+      );
     }
     return true;
-  }, [step, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt]);
+  }, [step, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt, draft.details.spend, draft.details.partySize]);
 
   const showFooter = step !== 'restaurant';
 
@@ -296,6 +312,8 @@ export default function LogScreen() {
                   onChangeVisibility={(visibility) =>
                     setDraft((current) => ({ ...current, visibility }))
                   }
+                  details={draft.details}
+                  onChangeDetails={(details) => setDraft((current) => ({ ...current, details }))}
                 />
               </ScrollView>
             )}
@@ -312,6 +330,7 @@ export default function LogScreen() {
                   visitedAt={draft.visitedAt}
                   recommendationTier={draft.recommendationTier}
                   visibility={draft.visibility}
+                  details={draft.details}
                 />
               </ScrollView>
             )}
