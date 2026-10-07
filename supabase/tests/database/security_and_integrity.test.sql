@@ -880,8 +880,10 @@ reset role;
 set local role authenticated;
 set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 select lives_ok(
+  -- on conflict: the same follow was already inserted earlier in this transaction.
   $$insert into public.follows (follower_id, following_id)
-    values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111')$$,
+    values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111')
+    on conflict do nothing$$,
   'a user can follow another user (precondition for the notification trigger)'
 );
 reset role;
@@ -899,6 +901,8 @@ set local role authenticated;
 set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 select throws_ok(
   $$select public.notify_on_follow()$$,
+  null,
+  null,
   'a client cannot call notify_on_follow directly'
 );
 reset role;

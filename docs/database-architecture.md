@@ -273,3 +273,42 @@ TypeScript check and review generated differences before committing.
 - No Google/Apple auth (by design — explicit Phase 2 requirement).
 - Restaurant/dish photo moderation, image resizing/compression, and admin tooling for
   `reports` are not implemented — deferred to a later phase.
+
+## 14. Production drift corrected (2026-10-07)
+
+A read-only audit of the hosted project (`discsdmiuatiwtldmcoc`) found objects that differ
+from what the migrations define. The hosted schema had been changed outside the migrations,
+so `supabase db dump --linked` is **not** guaranteed to equal what `supabase db reset`
+builds. Corrective migrations `0046`–`0051` were applied to production one at a time, each
+after a dry run.
+
+| Migration | Drift found on production | Result |
+|---|---|---|
+| `0046` | function `test_rpc()` existed in no migration and was executable by clients | dropped |
+| `0047` | `diary_entries_review_id_unique` (from `0011`) was missing; no duplicate `review_id` values existed | constraint restored |
+| `0048` | `log_dish` was a 7-argument `SECURITY DEFINER` overload with `p_visibility text` and no defaults | replaced by the `0031` definition: `SECURITY INVOKER`, `review_visibility` enum, `EXECUTE` for `authenticated`/`service_role` only |
+| `0049` | `menu_budget` had no RLS | RLS enabled, authenticated read policy |
+| `0050` | `anon` held table privileges on 21 tables (source: ad-hoc `run-rls-fix.sql`); `authenticated` held wider-than-DML privileges on later tables | `anon` revoked; `authenticated` limited to the SELECT/INSERT/UPDATE/DELETE each table already had; default privileges tightened |
+| `0051` | storage policy `Anyone can view review photos` (SELECT, role `public`, only `bucket_id = 'review-photos'`) let anyone read every object in the private bucket, overriding the visibility-gated policy | dropped |
+
+Verified after `0050` with `scripts/verify-remote-privileges.mjs`: 6 of 6 checks pass.
+
+Still present on production and defined in no migration: the storage policy
+`Authenticated users can upload review photos` (INSERT, own folder only). It is not
+known to be unsafe; it needs a decision on whether to keep it and fold it into a migration.
+
+**Not runtime-verified in the app:** sign-in/sign-up, `log_dish`, review-photo viewing and
+follow notifications have not been exercised against the changed production database. The
+`0051` storage change was not runtime-verified locally either (the local copy carries no
+storage policies).
+
+### Local test status
+
+`supabase db reset` fails at `0035_menu_items.sql`: `menu_items.restaurant_id` is `text`
+but references `restaurants(id)`, a `uuid`. Until that is fixed, the pgTAP suite can only
+be run against a loaded copy of the remote schema. Against such a copy (with `0023` seed
+data and `0046`–`0051` applied by hand) 68 of 73 tests pass; failures 21, 22, 23, 33 and 54
+are believed to be artifacts of the copy (storage policies and function grants are not
+carried by the dump) and were checked against production directly. They are **UNKNOWN**
+until the suite runs against a clean build.
+

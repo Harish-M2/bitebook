@@ -584,6 +584,31 @@ it, and that test covers future ones without anyone adding a test for them.
   environments match: `authenticated` may attempt any DML and RLS decides the rows; `anon`
   gets nothing.
 
+### Production schema drifted from the migrations — CORRECTED 2026-10-07
+
+The hosted project had objects that no migration defines (see `docs/database-architecture.md`
+§14 for the full table). Corrective migrations `0046`–`0051` are applied to production
+(`migration list --linked` shows all in sync) and `scripts/verify-remote-privileges.mjs`
+passes 6/6.
+
+What a future session needs to know:
+- **Do not assume the migrations describe production.** Compare against the hosted project
+  (Management API `/v1/projects/{ref}/database/query`) before relying on a schema fact.
+- **Open items:** the storage policy `Authenticated users can upload review photos` exists on
+  production only; `0036_reviews.sql` has `SELECT USING (true)` and a non-definer trigger and
+  has not been audited; a fuller drift comparison (policies, grants, functions, triggers) has
+  not been done.
+- **`0035_menu_items.sql` breaks `supabase db reset`** (`text` column referencing a `uuid`).
+  Needs an owner decision: edit in place or add a corrective migration.
+- **Not runtime-tested in the app** after these changes: sign-in/sign-up, logging a dish,
+  viewing a review photo, follow notifications. Likeliest regressions: `0050`, `0051`.
+- **pgTAP:** 68 of 73 pass against a loaded copy of the remote schema; 21, 22, 23, 33, 54 are
+  UNKNOWN until run against a clean build. Tests 62 and 64 were corrected (a duplicate follow
+  insert, and a description passed as the error code).
+- `0050` was edited by hand after it was first written; confirm the file in the repo is the
+  one that was applied.
+- Pushing `0051` before `0050` required `supabase db push --include-all` for `0050`.
+
 ### `.env` may exist but be empty
 - A `.env` file being present does **not** mean it is configured — the committed
   `.env.example` has the two keys with blank values, and copying it produces a file that
