@@ -307,7 +307,8 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   `aerial-tide-509314-g8` is the one used for Google Places. Whether `bitebook-509314` holds any
   key is UNKNOWN; check it and delete unused Places keys.
 - Repo-root `check-reviews.sql`, `debug-reviews.sql`, `run-rls-fix.sql` and
-  `deploy-migration.mjs` are ad-hoc database scripts outside the migration flow. `run-rls-fix.sql`
+  `deploy-migration.mjs` were ad-hoc database scripts outside the migration flow; they were
+  unreferenced and have been removed (recoverable from git history). `run-rls-fix.sql`
   is named in `0050` as the source of the `anon` grants. Review and remove or fold into
   migrations.
 - `0036_reviews.sql` audit (read-only, against production): both concerns are already resolved by
