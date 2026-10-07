@@ -335,3 +335,9 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   as low risk: the `0036` write policies (`Users can create/update/delete own reviews`, role
   `public`) are redundant duplicates of the canonical `users can ... their own reviews`
   policies and enforce the same `auth.uid() = user_id` check, so they widen nothing. Left as is.
+
+- **Expo patch bumps applied:** `expo` ~57.0.27, `expo-image-manipulator` ~57.0.21,
+  `expo-linking` ~57.0.12, `expo-router` ~57.0.25 (`package.json` and lockfile). After: `npx expo
+  install --check` reports up to date, `tsc` clean, `expo lint` clean, `expo-doctor` 21/21. Not
+  exercised: a web export or a device run on the new versions (UNKNOWN). Production web is still
+  the earlier build.
