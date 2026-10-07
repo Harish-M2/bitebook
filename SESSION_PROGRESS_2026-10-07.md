@@ -141,8 +141,23 @@ local copy has no storage policies).
    Not compared: column comments, sequences, `auth.*` and other non-public schemas.
    Owner reports a photo upload worked after `0052`.
 10. ~~Clean up root files~~ — done: all four removed (unreferenced).
-11. Check that the seed and upload scripts in `scripts/` still work after `0050`. They should use
-    the service-role key; not verified.
+11. ~~Check `scripts/` after `0050`~~ — done (static read plus local dry runs in rolled-back
+    transactions against a build of migrations 0001–0052; nothing run against production):
+    - `seed-clean.sql`, `add-clean-reviews.sql`, `add-photos.sql`: run cleanly (they run as the
+      database owner, so grants are irrelevant; they hard-code one user id, `bd698dd9-...`, which
+      must exist in `auth.users`).
+    - `seed-reviews.sql`: FAILS when run as owner (no JWT, so `auth.uid()` is null and `user_id`
+      is NOT NULL). Works only from the SQL editor while signed in as a user. Not related to `0050`.
+    - `seed-full-data.sql`: FAILS — inserts `restaurants.cuisine_types` and `place_id`, which do
+      not exist in the schema. Stale since before the schema reconciliation. Not related to `0050`.
+    - `seed-dummy-data.ts` and `upload-review-images.mjs` use the service-role key
+      (`SUPABASE_SERVICE_ROLE_KEY`); `service_role` still holds full privileges on
+      `reviews`, `review_photos`, `dishes`, `restaurants` after `0050`. Their inserts use columns
+      that exist (`name`, `restaurant_id`, `user_id`, `dish_id`, `rating`, `review_text`,
+      `visibility`). Not executed: UNKNOWN whether they run end to end.
+    - `SEED_DATA_INSTRUCTIONS.md` points at `seed-full-data.sql`, so its instructions are broken.
+      Decision needed: fix or delete `seed-full-data.sql`, `seed-reviews.sql` and the
+      instructions file; `supabase/seed.sql` is the maintained seed.
 12. Rotate both Google Places keys that were pasted in chat, then
     `npx supabase secrets set GOOGLE_PLACES_API_KEY=<key>` in your own terminal. Consider a daily
     quota cap.
