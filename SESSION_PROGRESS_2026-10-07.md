@@ -140,8 +140,7 @@ local copy has no storage policies).
    (same enforcement; `0042` creates the index; left as is).
    Not compared: column comments, sequences, `auth.*` and other non-public schemas.
    Owner reports a photo upload worked after `0052`.
-10. Clean up root files `check-reviews.sql`, `debug-reviews.sql`, `run-rls-fix.sql`,
-    `deploy-migration.mjs` (`run-rls-fix.sql` is the source of the `anon` grants).
+10. ~~Clean up root files~~ — done: all four removed (unreferenced).
 11. Check that the seed and upload scripts in `scripts/` still work after `0050`. They should use
     the service-role key; not verified.
 12. Rotate both Google Places keys that were pasted in chat, then
