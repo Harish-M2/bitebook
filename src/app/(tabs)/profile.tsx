@@ -237,6 +237,14 @@ export default function ProfileScreen() {
             <BodyText medium>{followCounts.data?.followingCount ?? 0}</BodyText>
             <MetadataText>Following</MetadataText>
           </Pressable>
+          <Pressable
+            onPress={() => router.push('/visited')}
+            accessibilityRole="button"
+            accessibilityLabel="View restaurants you have visited"
+            className="items-center gap-xxs">
+            <BodyText medium>Visited</BodyText>
+            <MetadataText>Restaurants</MetadataText>
+          </Pressable>
         </View>
 
         <View className="px-lg pt-lg">

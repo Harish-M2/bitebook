@@ -734,8 +734,94 @@ export type Database = {
           },
         ]
       }
+      restaurant_visit_dishes: {
+        Row: {
+          created_at: string
+          dish_id: string
+          visit_id: string
+        }
+        Insert: {
+          created_at?: string
+          dish_id: string
+          visit_id: string
+        }
+        Update: {
+          created_at?: string
+          dish_id?: string
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_visit_dishes_dish_id_fkey"
+            columns: ["dish_id"]
+            isOneToOne: false
+            referencedRelation: "dishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_visit_dishes_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      restaurant_visits: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          restaurant_id: string
+          updated_at: string
+          user_id: string
+          visited_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          restaurant_id: string
+          updated_at?: string
+          user_id: string
+          visited_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          restaurant_id?: string
+          updated_at?: string
+          user_id?: string
+          visited_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_visits_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_visits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       restaurants: {
         Row: {
+          accessibility_notes: string | null
+          booking_url: string | null
+          has_outdoor_seating: boolean | null
+          menu_url: string | null
+          menu_url_verified_at: string | null
+          opening_hours: Json | null
+          postcode: string | null
+          seating_capacity: number | null
           address: string | null
           city: string | null
           created_at: string
@@ -754,6 +840,14 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          accessibility_notes?: string | null
+          booking_url?: string | null
+          has_outdoor_seating?: boolean | null
+          menu_url?: string | null
+          menu_url_verified_at?: string | null
+          opening_hours?: Json | null
+          postcode?: string | null
+          seating_capacity?: number | null
           address?: string | null
           city?: string | null
           created_at?: string
@@ -772,6 +866,14 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          accessibility_notes?: string | null
+          booking_url?: string | null
+          has_outdoor_seating?: boolean | null
+          menu_url?: string | null
+          menu_url_verified_at?: string | null
+          opening_hours?: Json | null
+          postcode?: string | null
+          seating_capacity?: number | null
           address?: string | null
           city?: string | null
           created_at?: string
@@ -881,6 +983,13 @@ export type Database = {
       }
       restaurant_reviews: {
         Row: {
+          atmosphere_rating: number | null
+          food_rating: number | null
+          party_size: number | null
+          seating_type: string | null
+          service_rating: number | null
+          spend_amount: number | null
+          value_rating: number | null
           created_at: string
           id: string
           overall_rating: number
@@ -893,6 +1002,13 @@ export type Database = {
           visibility: Database["public"]["Enums"]["review_visibility"]
         }
         Insert: {
+          atmosphere_rating?: number | null
+          food_rating?: number | null
+          party_size?: number | null
+          seating_type?: string | null
+          service_rating?: number | null
+          spend_amount?: number | null
+          value_rating?: number | null
           created_at?: string
           id?: string
           overall_rating: number
@@ -905,6 +1021,13 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["review_visibility"]
         }
         Update: {
+          atmosphere_rating?: number | null
+          food_rating?: number | null
+          party_size?: number | null
+          seating_type?: string | null
+          service_rating?: number | null
+          spend_amount?: number | null
+          value_rating?: number | null
           created_at?: string
           id?: string
           overall_rating?: number

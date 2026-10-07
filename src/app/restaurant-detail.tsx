@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { FeedItem } from '@/components/feed/FeedItem';
 import { ReviewList } from '@/components/reviews';
 import { SaveButton } from '@/components/social/SaveButton';
+import { VisitedButton } from '@/components/social/VisitedButton';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
@@ -99,6 +100,9 @@ export default function RestaurantDetailScreen() {
                 <Share2 size={18} color={colors.textPrimary} />
               </Pressable>
               <Button label="Log a dish" onPress={() => router.push('/(tabs)/log')} />
+            </View>
+            <View className="flex-row">
+              <VisitedButton restaurantId={data.id} />
             </View>
 
             <View className="gap-md">
