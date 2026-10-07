@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { TextInput, View, type TextInputProps } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
+import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
 
 import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
@@ -37,6 +38,8 @@ export function TextField({
 }: TextFieldProps) {
   const { colors: palette } = useAppTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const isSecure = rest.secureTextEntry === true;
 
   return (
     <View className={cn('gap-xxs', className)}>
@@ -73,7 +76,21 @@ export function TextField({
               onBlur?.(event);
             }}
             {...rest}
+            secureTextEntry={isSecure && !revealed}
           />
+          {isSecure ? (
+            <Pressable
+              onPress={() => setRevealed((v) => !v)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={revealed ? 'Hide password' : 'Show password'}>
+              {revealed ? (
+                <EyeOff size={18} color={palette.textMuted} />
+              ) : (
+                <Eye size={18} color={palette.textMuted} />
+              )}
+            </Pressable>
+          ) : null}
         </View>
       </View>
 

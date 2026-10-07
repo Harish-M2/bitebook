@@ -21,7 +21,7 @@ type PhotoStepProps = {
   onChange: (media: ReviewMediaDraft[]) => void;
 };
 
-const MAX_MEDIA_ITEMS = 8;
+const MAX_MEDIA_ITEMS = 10;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-m4v'];
 
