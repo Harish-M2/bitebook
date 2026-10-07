@@ -341,3 +341,5 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   install --check` reports up to date, `tsc` clean, `expo lint` clean, `expo-doctor` 21/21. Not
   exercised: a web export or a device run on the new versions (UNKNOWN). Production web is still
   the earlier build.
+
+- **Live site check (2026-10-07):** owner reports the new screens (notifications, following, restaurant visit detail) work and `followers` is reachable on https://bitebook-alpha.vercel.app. Not independently verified.
