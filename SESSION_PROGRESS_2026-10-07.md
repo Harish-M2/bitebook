@@ -130,8 +130,16 @@ local copy has no storage policies).
    dev-build rebuild.
 8. Audit `0036_reviews.sql` (`SELECT USING (true)`; trigger not SECURITY DEFINER).
 9. ~~Review `Authenticated users can upload review photos`~~ — dropped by `0052` (applied to
-   production, policy list re-checked). Still to do: a fuller drift comparison (policies, grants, functions, triggers) of production against the
-   migrations, because several were found. Owner reports a photo upload worked after `0052`.
+   production, policy list re-checked). **Drift comparison done (read-only, production vs a
+   local build of migrations 0001–0052):** RLS flags, functions (25), EXECUTE grants, triggers
+   (24), table grants, indexes (90), enums, storage buckets, views and extensions all match.
+   Differences found: menu table `id` types and menu policies (fixed in place in `0035`, since
+   it is not applied to production again; a rebuilt local database now matches production on
+   policies, columns and every other compared object; pgTAP 74/74), and
+   `reviews_id_user_dish_unique` being a unique index on production but a constraint in `0009`
+   (same enforcement; `0042` creates the index; left as is).
+   Not compared: column comments, sequences, `auth.*` and other non-public schemas.
+   Owner reports a photo upload worked after `0052`.
 10. Clean up root files `check-reviews.sql`, `debug-reviews.sql`, `run-rls-fix.sql`,
     `deploy-migration.mjs` (`run-rls-fix.sql` is the source of the `anon` grants).
 11. Check that the seed and upload scripts in `scripts/` still work after `0050`. They should use

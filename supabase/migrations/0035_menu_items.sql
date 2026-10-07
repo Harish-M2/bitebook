@@ -2,7 +2,7 @@
 
 -- Table to store cached menu items from Spoonacular API
 CREATE TABLE IF NOT EXISTS menu_items (
-  id TEXT PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL,
   external_id TEXT,  -- Spoonacular restaurant ID
   name TEXT NOT NULL,
@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_external_id
 
 -- Table to track API costs and usage
 CREATE TABLE IF NOT EXISTS menu_fetch_log (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   restaurant_id UUID NOT NULL,
   restaurant_name TEXT,
   external_restaurant_id TEXT,
@@ -55,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_menu_fetch_log_success
 
 -- Table to track monthly budget and spending
 CREATE TABLE IF NOT EXISTS menu_budget (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   month TEXT NOT NULL,  -- Format: 'YYYY-MM'
   total_requests INT DEFAULT 0,
   total_cost DECIMAL(10, 2) DEFAULT 0,
@@ -83,16 +83,22 @@ ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view all menu items" ON menu_items
   FOR SELECT USING (true);
 
+CREATE POLICY "Authenticated users can select menu items" ON menu_items
+  FOR SELECT TO authenticated USING (true);
+
 CREATE POLICY "Service role can insert menu items" ON menu_items
-  FOR INSERT WITH CHECK (auth.role() = 'service_role');
+  FOR INSERT TO service_role WITH CHECK (true);
 
 ALTER TABLE menu_fetch_log ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view fetch logs" ON menu_fetch_log
   FOR SELECT USING (true);
 
+CREATE POLICY "Authenticated users can select logs" ON menu_fetch_log
+  FOR SELECT TO authenticated USING (true);
+
 CREATE POLICY "Service role can insert fetch logs" ON menu_fetch_log
-  FOR INSERT WITH CHECK (auth.role() = 'service_role');
+  FOR INSERT TO service_role WITH CHECK (true);
 
 -- Function to calculate monthly budget
 CREATE OR REPLACE FUNCTION update_menu_budget()
