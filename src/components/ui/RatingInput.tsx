@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Star } from 'lucide-react-native';
-import { useState } from 'react';
-import { LayoutChangeEvent, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { colors } from '@/constants/colors';
 import { cn } from '@/lib/cn';
@@ -13,27 +12,19 @@ type RatingInputProps = {
 };
 
 const STARS = [1, 2, 3, 4, 5];
-const GAP_PX = 10;
-const MAX_STAR_SIZE = 120;
+const TOUCH_SIZE = 44;
+const STAR_SIZE = 28;
+const STAR_INSET = (TOUCH_SIZE - STAR_SIZE) / 2;
+const RATING_ROW_WIDTH = 252;
 
 /**
- * Large interactive 0.5-step rating, 0.5 to 5.0 (spec §11).
+ * Compact interactive 0.5-step rating, 0.5 to 5.0 (spec §11).
  *
  * Each star is two half-width touch targets rather than one, which is what makes half steps
  * reachable without a slider. The database enforces the same 0.5 step, so a value this
  * control cannot produce is also a value that cannot be stored.
  */
 export function RatingInput({ value, onChange, className }: RatingInputProps) {
-  const [starSize, setStarSize] = useState(0);
-
-  // Sized from the available width so the row fills the screen on any device rather than
-  // being pinned to a hardcoded icon size.
-  function handleLayout(event: LayoutChangeEvent) {
-    const width = event.nativeEvent.layout.width;
-    const computed = Math.floor((width - GAP_PX * (STARS.length - 1)) / STARS.length);
-    setStarSize(Math.min(computed, MAX_STAR_SIZE));
-  }
-
   function select(next: number) {
     // Selecting the same value again is a no-op, so don't buzz for it.
     if (next !== value) {
@@ -43,10 +34,15 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
   }
 
   return (
-    <View className={cn(className)}>
+    <View className={cn('items-center', className)}>
       <View
-        onLayout={handleLayout}
-        className="flex-row items-center justify-between"
+        style={{
+          width: RATING_ROW_WIDTH,
+          maxWidth: '100%',
+          alignSelf: 'center',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+        }}
         accessibilityRole="adjustable"
         accessibilityLabel="Rating"
         accessibilityValue={{ min: 0.5, max: 5, now: value }}>
@@ -55,11 +51,12 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
           const half = !filled && value >= star - 0.5;
 
           return (
-            <View key={star} style={{ width: starSize, height: starSize }}>
+            <View key={star} style={{ width: TOUCH_SIZE, height: TOUCH_SIZE }}>
               <Star
-                size={starSize}
+                size={STAR_SIZE}
                 color={filled || half ? colors.rating : colors.border}
                 fill={filled ? colors.rating : 'transparent'}
+                style={{ position: 'absolute', left: STAR_INSET, top: STAR_INSET }}
               />
 
               {/* The left half of a star is drawn by clipping a second, filled copy to half
@@ -68,11 +65,13 @@ export function RatingInput({ value, onChange, className }: RatingInputProps) {
                 <View
                   style={{
                     position: 'absolute',
-                    width: starSize / 2,
-                    height: starSize,
+                    left: STAR_INSET,
+                    top: STAR_INSET,
+                    width: STAR_SIZE / 2,
+                    height: STAR_SIZE,
                     overflow: 'hidden',
                   }}>
-                  <Star size={starSize} color={colors.rating} fill={colors.rating} />
+                  <Star size={STAR_SIZE} color={colors.rating} fill={colors.rating} />
                 </View>
               ) : null}
 

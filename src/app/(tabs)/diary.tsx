@@ -1,19 +1,20 @@
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { BookOpen } from 'lucide-react-native';
 import { FlatList, RefreshControl, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
 
+import { FoodDiaryItem } from '@/components/food/FoodDiaryItem';
+import { ProfileStats } from '@/components/profile/ProfileStats';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Divider, Screen } from '@/components/ui/Screen';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { BodyText, Heading } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
-import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { listDiaryEntries } from '@/lib/db/diary';
 import { getDiaryStats } from '@/lib/db/stats';
-import { Screen, Divider } from '@/components/ui/Screen';
-import { Heading, BodyText } from '@/components/ui/Typography';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { ProfileStats } from '@/components/profile/ProfileStats';
-import { FoodDiaryItem } from '@/components/food/FoodDiaryItem';
+import { queryKeys } from '@/lib/queryClient';
 import type { DiaryEntry, DiaryStats } from '@/types/models';
 
 const EMPTY_STATS: DiaryStats = {
@@ -25,6 +26,7 @@ const EMPTY_STATS: DiaryStats = {
 
 /** Diary tab — personal chronological log of every dish tried, with summary stats. */
 export default function DiaryScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const userId = user?.id ?? null;
 
@@ -79,7 +81,22 @@ export default function DiaryScreen() {
             <Divider />
           </View>
         }
-        renderItem={({ item }) => <FoodDiaryItem entry={item} className="px-lg pb-lg" />}
+        renderItem={({ item }) => (
+          <FoodDiaryItem
+            entry={item}
+            className="px-lg pb-lg"
+            onPress={() => {
+              if (item.restaurantReviewId) {
+                router.push({
+                  pathname: '/restaurant-review-detail',
+                  params: { restaurantReviewId: item.restaurantReviewId },
+                });
+              } else {
+                router.push({ pathname: '/dish-detail', params: { dishId: item.dish.id } });
+              }
+            }}
+          />
+        )}
         ListEmptyComponent={
           entries.isPending ? (
             <DiarySkeleton />

@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 
+import { FeedItem } from '@/components/feed/FeedItem';
 import { CuisineBreakdown } from '@/components/profile/CuisineBreakdown';
 import { ProfileStats } from '@/components/profile/ProfileStats';
 import { Avatar } from '@/components/ui/Avatar';
@@ -13,7 +14,9 @@ import { Divider, Screen, Spacer } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
+import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
 import { prepareAvatarPhoto, readPhotoBytes, uploadAvatarPhoto } from '@/lib/db/photos';
+import { listRestaurantVisitSummaries } from '@/lib/db/restaurant-reviews';
 import { deleteReview, getUserReviews } from '@/lib/db/reviews';
 import { getUserFollowCounts } from '@/lib/db/social';
 import { getCuisineBreakdown, getDiaryStats } from '@/lib/db/stats';
@@ -52,6 +55,12 @@ export default function ProfileScreen() {
   const reviews = useQuery({
     queryKey: ['user-reviews', userId],
     queryFn: () => getUserReviews(userId as string),
+    enabled: userId !== null,
+  });
+
+  const restaurantVisits = useQuery({
+    queryKey: ['restaurant-visits', userId],
+    queryFn: () => listRestaurantVisitSummaries([userId as string], 20),
     enabled: userId !== null,
   });
 
@@ -278,6 +287,31 @@ export default function ProfileScreen() {
             <BodyText color="textSecondary">
               Log a few dishes and your most-eaten cuisines will appear here.
             </BodyText>
+          )}
+        </View>
+
+        <Spacer size="xl" />
+        <View className="px-lg gap-md">
+          <Heading level={3}>Restaurant visits</Heading>
+          {restaurantVisits.isPending ? (
+            <ActivityIndicator color={palette.accent} />
+          ) : restaurantVisits.isError ? (
+            <BodyText color="textSecondary">Could not load restaurant visits.</BodyText>
+          ) : restaurantVisits.data.length > 0 ? (
+            <View className="gap-md">
+              {restaurantVisits.data.map((visit) => (
+                <FeedItem
+                  key={visit.id}
+                  activity={toRestaurantVisitFeedActivity(visit)}
+                  onSubjectPress={() => router.push({
+                    pathname: '/restaurant-review-detail',
+                    params: { restaurantReviewId: visit.id },
+                  })}
+                />
+              ))}
+            </View>
+          ) : (
+            <BodyText color="textSecondary">Your grouped restaurant reviews will appear here.</BodyText>
           )}
         </View>
 

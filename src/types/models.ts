@@ -37,12 +37,46 @@ export type Dish = {
   imageUrl: string | null;
 };
 
+export type RestaurantVisit = {
+  id: string;
+  userId: string;
+  createdAt: string;
+  visitedAt: string;
+  overallRating: number;
+  recommendationTier: number;
+  restaurantComment: string | null;
+  actor: UserSummary;
+  restaurant: {
+    id: string;
+    name: string;
+    city: string | null;
+    priceLevel: number | null;
+    imageUrl: string | null;
+  };
+  dishes: {
+    id: string;
+    reviewId: string;
+    name: string;
+    rating: number;
+    reviewText: string | null;
+  }[];
+  media: {
+    id: string;
+    dishReviewId: string | null;
+    type: 'image' | 'video';
+    position: number;
+    url: string | null;
+  }[];
+  photoUrl: string | null;
+};
+
 export type FeedActivity = {
   id: string;
   actor: UserSummary;
-  kind: 'logged_dish' | 'reviewed_restaurant';
+  kind: 'logged_dish' | 'reviewed_restaurant' | 'restaurant_visit';
   dish?: Dish;
   restaurant?: Restaurant;
+  visit?: RestaurantVisit;
   reviewText?: string;
   photoUrl: string | null;
   /** Pre-formatted relative time, e.g. "2h". */
@@ -51,11 +85,13 @@ export type FeedActivity = {
   commentCount: number;
   review_id?: string;
   restaurant_id?: string;
+  createdAt?: string;
 };
 
 export type DiaryEntry = {
   id: string;
   dish: Dish;
+  restaurantReviewId?: string | null;
   /** Pre-formatted date label, e.g. "20 Aug". */
   dateLabel: string;
   rating: number;

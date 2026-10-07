@@ -17,15 +17,19 @@ type FeedItemProps = {
   className?: string;
   onCommentPress?: () => void;
   onActorPress?: () => void;
+  onSubjectPress?: () => void;
 };
 
 /** Single home-feed card: actor row, hero photo, dish/restaurant + rating, actions. */
-export function FeedItem({ activity, className, onCommentPress, onActorPress }: FeedItemProps) {
+export function FeedItem({ activity, className, onCommentPress, onActorPress, onSubjectPress }: FeedItemProps) {
   const isDish = activity.kind === 'logged_dish';
-  const actionLabel = isDish ? 'logged a dish' : 'reviewed a restaurant';
-  const subjectLine = isDish ? activity.dish?.restaurant.name : activity.restaurant?.name;
-  const title = isDish ? activity.dish?.name : activity.restaurant?.name;
-  const rating = isDish ? activity.dish?.rating : activity.restaurant?.rating;
+  const isVisit = activity.kind === 'restaurant_visit';
+  const actionLabel = isVisit
+    ? 'shared a restaurant visit'
+    : isDish ? 'logged a dish' : 'reviewed a restaurant';
+  const subjectLine = isDish ? activity.dish?.restaurant.name : activity.restaurant?.city || activity.restaurant?.name;
+  const title = isVisit ? activity.visit?.restaurant.name : isDish ? activity.dish?.name : activity.restaurant?.name;
+  const rating = isVisit ? activity.visit?.overallRating : isDish ? activity.dish?.rating : activity.restaurant?.rating;
 
   const [isLiking, setIsLiking] = useState(false);
   const [likeCount, setLikeCount] = useState(activity.likeCount ?? 0);
@@ -81,35 +85,48 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress }: 
       </View>
 
       {activity.photoUrl ? (
-        <View style={{ alignItems: 'center' }}>
+        <Pressable
+          onPress={onSubjectPress}
+          disabled={!onSubjectPress}
+          accessibilityRole={onSubjectPress ? 'button' : undefined}
+          accessibilityLabel={onSubjectPress ? `View ${title ?? 'review'}` : undefined}
+          style={{ alignItems: 'center' }}>
           <Image
             source={activity.photoUrl}
             transition={150}
             accessibilityLabel={title ?? 'Food photo'}
-            style={
-              {
-                width: '86%',
-                maxWidth: 420,
-                aspectRatio: 1.15,
-                borderRadius: 18,
-                backgroundColor: colors.surfaceElevated,
-                alignSelf: 'center',
-              } as const
-            }
+            style={{
+              width: '86%',
+              maxWidth: 420,
+              aspectRatio: 1.15,
+              borderRadius: 18,
+              backgroundColor: colors.surfaceElevated,
+              alignSelf: 'center',
+            }}
           />
-        </View>
+        </Pressable>
       ) : null}
 
-      <View className="gap-xxs">
-        <View className="flex-row items-center justify-between">
-          <BodyText medium>{title}</BodyText>
+      <Pressable
+        onPress={onSubjectPress}
+        disabled={!onSubjectPress}
+        accessibilityRole={onSubjectPress ? 'button' : undefined}
+        accessibilityLabel={onSubjectPress ? `Open ${title ?? 'review'}` : undefined}
+        className="gap-xxs">
+        <View className="flex-row items-center justify-between gap-sm">
+          <BodyText medium className="flex-1">{title}</BodyText>
           {typeof rating === 'number' ? <Rating value={rating} size="md" /> : null}
         </View>
         {activity.reviewText ? <Caption>&ldquo;{activity.reviewText}&rdquo;</Caption> : null}
-      </View>
+        {isVisit && activity.visit ? (
+          <Caption color="textSecondary">
+            {activity.visit.dishes.length} dishes · {activity.visit.dishes.slice(0, 3).map((dish) => dish.name).join(' · ')}
+          </Caption>
+        ) : null}
+      </Pressable>
 
       <View className="flex-row items-center gap-lg">
-        <Pressable
+        {activity.review_id ? <Pressable
           className="flex-row items-center gap-xxs"
           onPress={handleLike}
           disabled={isLiking}
@@ -117,15 +134,15 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress }: 
           accessibilityLabel="Like">
           <Heart size={18} color={colors.textSecondary} fill={isLiking ? colors.accent : undefined} />
           <MetadataText>{likeCount}</MetadataText>
-        </Pressable>
-        <Pressable
+        </Pressable> : null}
+        {activity.review_id ? <Pressable
           className="flex-row items-center gap-xxs"
           onPress={onCommentPress}
           accessibilityRole="button"
           accessibilityLabel="Comment">
           <MessageCircle size={18} color={colors.textSecondary} />
           <MetadataText>{activity.commentCount}</MetadataText>
-        </Pressable>
+        </Pressable> : null}
         <Pressable
           className="ml-auto"
           onPress={handleSave}

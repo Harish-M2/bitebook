@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Share2 } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
+import { FeedItem } from '@/components/feed/FeedItem';
 import { ReviewList } from '@/components/reviews';
 import { SaveButton } from '@/components/social/SaveButton';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +14,8 @@ import { Screen } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
 import { listDishesForRestaurant } from '@/lib/db/dishes';
+import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
+import { listRestaurantVisitsForRestaurant } from '@/lib/db/restaurant-reviews';
 import { getRestaurant, getRestaurantPhotos } from '@/lib/db/restaurants';
 import { formatPriceLevel } from '@/lib/format';
 
@@ -33,6 +36,11 @@ export default function RestaurantDetailScreen() {
   const photos = useQuery({
     queryKey: ['restaurant-photos', restaurantId],
     queryFn: () => getRestaurantPhotos(restaurantId!),
+    enabled: Boolean(restaurantId),
+  });
+  const visits = useQuery({
+    queryKey: ['restaurant-visits-by-restaurant', restaurantId],
+    queryFn: () => listRestaurantVisitsForRestaurant(restaurantId!),
     enabled: Boolean(restaurantId),
   });
 
@@ -116,7 +124,31 @@ export default function RestaurantDetailScreen() {
             </View>
 
             <View className="gap-md">
-              <Heading level={2}>Reviews</Heading>
+              <Heading level={2}>Recent visits</Heading>
+              {visits.isPending ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : visits.isError ? (
+                <Caption color="textSecondary">Could not load restaurant visits.</Caption>
+              ) : visits.data.length > 0 ? (
+                <View className="gap-md">
+                  {visits.data.map((visit) => (
+                    <FeedItem
+                      key={visit.id}
+                      activity={toRestaurantVisitFeedActivity(visit)}
+                      onSubjectPress={() => router.push({
+                        pathname: '/restaurant-review-detail',
+                        params: { restaurantReviewId: visit.id },
+                      })}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Caption>No restaurant visits have been shared yet.</Caption>
+              )}
+            </View>
+
+            <View className="gap-md">
+              <Heading level={2}>Dish reviews</Heading>
               <ReviewList restaurantId={data.id} />
             </View>
           </View>

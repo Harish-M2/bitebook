@@ -29,7 +29,7 @@ export function LogStepHeader({
 }: LogStepHeaderProps) {
   return (
     <View className="px-lg pt-xs">
-      <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center', gap: 10 }}>
+      <View style={{ width: '100%', maxWidth: 760, alignSelf: 'center', gap: 8 }}>
         <View className="flex-row items-center justify-between">
           <Pressable
             onPress={onBack}
@@ -37,7 +37,7 @@ export function LogStepHeader({
             accessibilityLabel="Back"
             hitSlop={12}
             className="-ml-xxs h-8 w-8 items-center justify-center">
-            <ChevronLeft size={26} color={colors.textPrimary} />
+            <ChevronLeft size={22} color={colors.textPrimary} />
           </Pressable>
 
           <MetadataText style={{ letterSpacing: 0.3 }}>
@@ -47,7 +47,7 @@ export function LogStepHeader({
           <View className="min-w-8 items-end">{action}</View>
         </View>
 
-        <Heading level={2} style={{ lineHeight: 30 }}>{title}</Heading>
+        <Heading level={3} style={{ lineHeight: 25 }}>{title}</Heading>
 
         <View className="h-[2px] flex-row gap-xxs overflow-hidden rounded-full">
           {Array.from({ length: stepCount }).map((_, index) => (

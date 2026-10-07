@@ -62,6 +62,7 @@ export async function getRestaurantReviews(
     .from('reviews')
     .select(fields.join(', '))
     .eq('restaurant_id', restaurantId)
+    .is('restaurant_review_id', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -410,6 +411,7 @@ export async function getUserReviews(userId: string) {
     .from('reviews')
     .select('id, rating, review_text, created_at, restaurant_id, dish_id')
     .eq('user_id', userId)
+    .is('restaurant_review_id', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -473,6 +475,7 @@ export async function getVisibleProfileReviews(
       restaurant:restaurants!reviews_restaurant_id_fkey(name)
     `)
     .eq('user_id', userId)
+    .is('restaurant_review_id', null)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 

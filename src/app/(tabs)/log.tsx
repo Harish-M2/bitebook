@@ -7,47 +7,59 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } fr
 import { ConfirmStep } from '@/components/log/ConfirmStep';
 import { DishStep, type ChosenDish } from '@/components/log/DishStep';
 import { LogStepHeader } from '@/components/log/LogStepHeader';
-import { PhotoStep } from '@/components/log/PhotoStep';
-import { RatingStep } from '@/components/log/RatingStep';
+import { PhotoStep, type ReviewMediaDraft } from '@/components/log/PhotoStep';
+import { RatingStep, type DishReviewDraft } from '@/components/log/RatingStep';
 import { RestaurantStep, type ChosenRestaurant } from '@/components/log/RestaurantStep';
 import { ReviewStep } from '@/components/log/ReviewStep';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
-import { logDish } from '@/lib/db/log';
+import { logRestaurantReview } from '@/lib/db/log';
+import { localDateString } from '@/lib/format';
 import { queryKeys } from '@/lib/queryClient';
 import type { ReviewVisibility } from '@/types/database';
 
-const STEPS = ['restaurant', 'dish', 'rating', 'photo', 'review', 'confirm'] as const;
+const STEPS = ['restaurant', 'dishes', 'dishReviews', 'media', 'restaurantReview', 'confirm'] as const;
 type Step = (typeof STEPS)[number];
 
 const TITLES: Record<Step, string> = {
   restaurant: 'Where did you eat?',
-  dish: 'What did you have?',
-  rating: 'How was it?',
-  photo: 'Add a photo',
-  review: 'Say a bit more',
+  dishes: 'What did you have?',
+  dishReviews: 'Rate each dish',
+  media: 'Add photos or video',
+  restaurantReview: 'Review the visit',
   confirm: 'Ready to log',
 };
 
 interface Draft {
   restaurant: ChosenRestaurant | null;
-  dish: ChosenDish | null;
-  rating: number;
-  photoUri: string | null;
-  reviewText: string;
+  dishes: DishReviewDraft[];
+  media: ReviewMediaDraft[];
+  overallRating: number;
+  restaurantComment: string;
+  visitedAt: string;
+  recommendationTier: number | null;
   visibility: ReviewVisibility;
 }
 
-const EMPTY_DRAFT: Draft = {
+function createEmptyDraft(): Draft {
+  return {
   restaurant: null,
-  dish: null,
-  rating: 0,
-  photoUri: null,
-  reviewText: '',
-  visibility: 'public',
-};
+    dishes: [],
+    media: [],
+    overallRating: 0,
+    restaurantComment: '',
+    visitedAt: localDateString(),
+    recommendationTier: null,
+    visibility: 'public',
+  };
+}
+
+function isValidVisitDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+}
 
 /**
  * Log tab — the app's core loop (spec §11).
@@ -65,12 +77,12 @@ export default function LogScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [step, setStep] = useState<Step>('restaurant');
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<Draft>(createEmptyDraft);
 
   const stepIndex = STEPS.indexOf(step);
 
   const reset = useCallback(() => {
-    setDraft(EMPTY_DRAFT);
+    setDraft(createEmptyDraft());
     setStep('restaurant');
   }, []);
 
@@ -86,16 +98,25 @@ export default function LogScreen() {
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('You need to be signed in to log a dish.');
-      if (!draft.restaurant || !draft.dish) throw new Error('The log is incomplete.');
+      if (!draft.restaurant || draft.dishes.length === 0) throw new Error('The visit is incomplete.');
+      if (draft.recommendationTier === null) throw new Error('Choose a recommendation for this restaurant.');
 
-      return logDish(user.id, {
+      return logRestaurantReview(user.id, {
         restaurantId: draft.restaurant.id,
-        dishId: draft.dish.id,
-        dishName: draft.dish.name,
-        rating: draft.rating,
-        reviewText: draft.reviewText,
+        overallRating: draft.overallRating,
+        restaurantComment: draft.restaurantComment,
+        recommendationTier: draft.recommendationTier,
         visibility: draft.visibility,
-        photoUri: draft.photoUri,
+        visitedAt: draft.visitedAt,
+        dishes: draft.dishes.map((dish) => ({
+          dishId: dish.id,
+          dishName: dish.name,
+          rating: dish.rating,
+          comment: dish.comment,
+          category: dish.category,
+          dietaryTags: dish.dietaryTags,
+        })),
+        media: draft.media,
       });
     },
     onSuccess: (result) => {
@@ -111,22 +132,22 @@ export default function LogScreen() {
       // The dish's aggregate rating and the restaurant's dish list both changed.
       void queryClient.invalidateQueries({ queryKey: queryKeys.restaurants() });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-dishes'] });
+      void queryClient.invalidateQueries({ queryKey: ['restaurant-visits', user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['restaurant-visits-by-restaurant', draft.restaurant?.id] });
 
       if (Platform.OS === 'web') {
         reset();
         router.replace('/(tabs)/diary');
-        window.alert(
-          result.photoFailed
-            ? 'Dish logged. Your dish is in your diary, but the photo did not upload.'
-            : 'Dish logged. Your review was saved to your diary.',
-        );
+        window.alert(result.mediaFailedCount > 0
+          ? `Visit logged. ${result.mediaFailedCount} media item${result.mediaFailedCount === 1 ? '' : 's'} could not be uploaded.`
+          : 'Visit logged. Your restaurant review and dishes are in your diary.');
         return;
       }
 
-      if (result.photoFailed) {
+      if (result.mediaFailedCount > 0) {
         Alert.alert(
-          'Logged, but the photo did not upload',
-          'Your dish is in your diary. You can add the photo again later.',
+          'Visit logged, but some media did not upload',
+          `Your visit and dishes are in your diary. ${result.mediaFailedCount} media item${result.mediaFailedCount === 1 ? '' : 's'} could not be uploaded.`,
           [
             {
               text: 'View diary',
@@ -138,7 +159,7 @@ export default function LogScreen() {
           ],
         );
       } else {
-        Alert.alert('Dish logged', 'Your review was saved to your diary.', [
+        Alert.alert('Visit logged', 'Your restaurant review and dishes are in your diary.', [
           {
             text: 'View diary',
             onPress: () => {
@@ -152,9 +173,9 @@ export default function LogScreen() {
     onError: (error: Error) => {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       if (Platform.OS === 'web') {
-        window.alert(`Could not log this dish\n\n${error.message}`);
+        window.alert(`Could not log this visit\n\n${error.message}`);
       } else {
-        Alert.alert('Could not log this dish', error.message);
+        Alert.alert('Could not log this visit', error.message);
       }
     },
   });
@@ -172,15 +193,19 @@ export default function LogScreen() {
   }
 
   const canAdvance = useMemo(() => {
-    if (step === 'rating') {
-      return draft.rating >= 0.5;
+    if (step === 'dishes') {
+      return draft.dishes.length > 0;
+    }
+    if (step === 'dishReviews') {
+      return draft.dishes.length > 0 && draft.dishes.every((dish) => dish.rating >= 0.5);
+    }
+    if (step === 'restaurantReview') {
+      return draft.overallRating >= 0.5 && draft.recommendationTier !== null && isValidVisitDate(draft.visitedAt);
     }
     return true;
-  }, [step, draft.rating]);
+  }, [step, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt]);
 
-  // The first two steps advance by choosing something from a list, so a Next button would be
-  // dead weight above the keyboard.
-  const showFooter = step !== 'restaurant' && step !== 'dish';
+  const showFooter = step !== 'restaurant';
 
   return (
     <Screen>
@@ -195,7 +220,7 @@ export default function LogScreen() {
               stepCount={STEPS.length}
               onBack={goBack}
               action={
-                step === 'photo' || step === 'review' ? (
+                step === 'media' ? (
                   <Pressable onPress={goNext} accessibilityRole="button" hitSlop={12}>
                     <MetadataText color="accent">Skip</MetadataText>
                   </Pressable>
@@ -206,42 +231,67 @@ export default function LogScreen() {
             {step === 'restaurant' && (
               <RestaurantStep
                 onSelect={(restaurant) => {
-                  setDraft((current) => ({ ...current, restaurant, dish: null }));
-                  setStep('dish');
+                  setDraft({ ...createEmptyDraft(), restaurant });
+                  setStep('dishes');
                 }}
               />
             )}
 
-            {step === 'dish' && draft.restaurant && (
+            {step === 'dishes' && draft.restaurant && (
               <DishStep
                 restaurantId={draft.restaurant.id}
-                onSelect={(dish) => {
-                  setDraft((current) => ({ ...current, dish }));
-                  setStep('rating');
+                selected={draft.dishes}
+                onToggle={(dish: ChosenDish) => {
+                  setDraft((current) => {
+                    const alreadySelected = current.dishes.some(
+                      (selected) => selected.id === dish.id && selected.name === dish.name,
+                    );
+                    const dishes = alreadySelected
+                      ? current.dishes.filter((selected) => !(selected.id === dish.id && selected.name === dish.name))
+                      : current.dishes.length < 20
+                        ? [...current.dishes, { ...dish, rating: 0, comment: '' }]
+                        : current.dishes;
+                    return { ...current, dishes };
+                  });
                 }}
               />
             )}
 
-            {step === 'rating' && draft.dish && (
+            {step === 'dishReviews' && (
               <RatingStep
-                dishName={draft.dish.name}
-                value={draft.rating}
-                onChange={(rating) => setDraft((current) => ({ ...current, rating }))}
+                dishes={draft.dishes}
+                onChange={(dishName, value, field) => {
+                  setDraft((current) => ({
+                    ...current,
+                    dishes: current.dishes.map((dish) => {
+                      if (dish.name !== dishName) return dish;
+                      if (field === 'rating' && typeof value === 'number') return { ...dish, rating: value };
+                      if (field === 'comment' && typeof value === 'string') return { ...dish, comment: value };
+                      return dish;
+                    }),
+                  }));
+                }}
               />
             )}
 
-            {step === 'photo' && (
+            {step === 'media' && (
               <PhotoStep
-                photoUri={draft.photoUri}
-                onChange={(photoUri) => setDraft((current) => ({ ...current, photoUri }))}
+                media={draft.media}
+                onChange={(media) => setDraft((current) => ({ ...current, media }))}
               />
             )}
 
-            {step === 'review' && (
+            {step === 'restaurantReview' && (
               <ScrollView keyboardShouldPersistTaps="handled">
                 <ReviewStep
-                  text={draft.reviewText}
-                  onChangeText={(reviewText) => setDraft((current) => ({ ...current, reviewText }))}
+                  text={draft.restaurantComment}
+                  onChangeText={(restaurantComment) => setDraft((current) => ({ ...current, restaurantComment }))}
+                  overallRating={draft.overallRating}
+                  onChangeOverallRating={(overallRating) => setDraft((current) => ({ ...current, overallRating }))}
+                  visitedAt={draft.visitedAt}
+                  onChangeVisitedAt={(visitedAt) => setDraft((current) => ({ ...current, visitedAt }))}
+                  recommendationTier={draft.recommendationTier}
+                  onChangeRecommendationTier={(recommendationTier) => setDraft((current) => ({ ...current, recommendationTier }))}
                   visibility={draft.visibility}
                   onChangeVisibility={(visibility) =>
                     setDraft((current) => ({ ...current, visibility }))
@@ -250,15 +300,17 @@ export default function LogScreen() {
               </ScrollView>
             )}
 
-            {step === 'confirm' && draft.restaurant && draft.dish && (
+            {step === 'confirm' && draft.restaurant && draft.dishes.length > 0 && draft.recommendationTier !== null && (
               <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                 <ConfirmStep
                   restaurantName={draft.restaurant.name}
                   city={draft.restaurant.city}
-                  dishName={draft.dish.name}
-                  rating={draft.rating}
-                  photoUri={draft.photoUri}
-                  reviewText={draft.reviewText}
+                  dishes={draft.dishes}
+                  media={draft.media}
+                  overallRating={draft.overallRating}
+                  reviewText={draft.restaurantComment}
+                  visitedAt={draft.visitedAt}
+                  recommendationTier={draft.recommendationTier}
                   visibility={draft.visibility}
                 />
               </ScrollView>

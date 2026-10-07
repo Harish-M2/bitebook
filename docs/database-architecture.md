@@ -11,7 +11,7 @@ Related documents:
 
 ---
 
-## 1. Table Overview (22 tables)
+## 1. Table Overview (25 application tables)
 
 | Table | Purpose |
 |---|---|
@@ -21,10 +21,12 @@ Related documents:
 | `restaurant_photos` | Restaurant photo references (Storage paths). |
 | `cuisines` | Fixed taxonomy of 19 cuisines. |
 | `restaurant_cuisines` | Restaurant ↔ cuisine tags. |
-| `dishes` | Dishes, scoped to a restaurant. |
+| `dishes` | Dishes, scoped to a restaurant, with category and dietary tags. |
 | `dish_photos` | Dish photo references. |
 | `dish_cuisines` | Dish ↔ cuisine tags. |
-| `reviews` | User reviews of a dish, with visibility (public/followers/private). |
+| `reviews` | User reviews of a dish, optionally linked to a grouped restaurant visit. |
+| `restaurant_reviews` | A restaurant visit's overall rating, recommendation, comment, date, and visibility. |
+| `restaurant_review_media` | Ordered image/video references attached to a grouped visit. |
 | `review_photos` | Review photo references (Storage paths, private bucket). |
 | `diary_entries` | A user's personal food log; always private to the owner. |
 | `saved_dishes` | "Want to Eat" / "Saved" bookmarks. |
@@ -53,6 +55,15 @@ relationships:
 - `saved_dishes` uses partial unique indexes on `(user_id, dish_id)` and
   `(user_id, restaurant_id)` (each `WHERE ... IS NOT NULL`) so "want to eat" and "saved"
   are mutually exclusive states per item, not per status.
+- `restaurant_reviews` is the parent visit for one or more dish reviews. The composite
+  foreign key on `reviews (restaurant_review_id, user_id, restaurant_id)` guarantees each
+  child review belongs to the same user and restaurant as its parent. Each child review
+  continues to link to exactly one private `diary_entries` row.
+- `restaurant_review_media` belongs to a parent visit and may optionally reference one of
+  its dish reviews. Its table and Storage reads inherit the parent review's visibility.
+- `log_restaurant_review(...)` writes the parent, all dish reviews, and diary entries in a
+  single `SECURITY INVOKER` transaction. Media objects are uploaded afterward because
+  Storage cannot participate in a database transaction.
 
 ## 3. RLS Model
 
@@ -69,7 +80,7 @@ RLS is enabled on every table (`0019_rls.sql`). Summary of the access model:
   a later phase. `dishes` retains a client INSERT policy (authenticated users may add a
   dish to an existing restaurant); `restaurant_sources`/photos/cuisine taxonomy have no
   client INSERT policy at all (Phase 3 will introduce server-side sync functions).
-- **reviews**: readable per `visibility` (`public` / `followers` / `private`) via the
+- **reviews / restaurant_reviews**: readable per `visibility` (`public` / `followers` / `private`) via the
   shared `can_view_review(owner_id, visibility)` SQL function; only the owner can
   insert/update/delete.
 - **review_photos / likes / comments**: all three **inherit the parent review's
@@ -77,6 +88,8 @@ RLS is enabled on every table (`0019_rls.sql`). Summary of the access model:
   `can_view_review()` against the parent review, so a private or followers-only review's
   photos, likes and comments are invisible to unauthorized users even though those child
   tables have no `visibility` column of their own.
+- **restaurant_review_media**: SELECT checks the parent restaurant review with
+  `can_view_review()`; only the parent owner can attach or delete media rows.
 - **diary_entries**: always private — only the owner can read/write, full stop (no
   visibility concept, per spec).
 - **saved_dishes / lists / list_items / user_cuisine_preferences**: owner-managed; lists
@@ -99,26 +112,36 @@ Buckets (`0020_storage.sql`):
 | `restaurant-photos` | Yes | **No client upload in Phase 2.** Public read only — restaurants are not client-writable (see §3), so restaurant photos are server/provider/claimed-owner functionality deferred to a later phase. |
 | `review-photos` | **No (private)** | See below. |
 
-`review-photos` is private by design (per the Stage A correction — visibility cannot rely
-on application-layer checks alone). Its SELECT policy performs a live join from the
-storage path back to `reviews.visibility`/`follows`, using the same `can_view_review()`
-function as the table-level RLS policies:
+`review-photos` is private by design (visibility cannot rely on application-layer checks
+alone). Its SELECT policy resolves the second path segment as either a dish review ID or a
+restaurant review ID, then checks the owning review's visibility with `can_view_review()`:
 
 ```sql
-create policy "review photos are readable if the parent review is visible"
+create policy "review media is readable per parent visibility"
 on storage.objects for select
 using (
   bucket_id = 'review-photos'
-  and exists (
-    select 1 from reviews r
-    where r.id = ((storage.foldername(name))[2])::uuid
-      and public.can_view_review(r.user_id, r.visibility)
+  and (
+    exists (
+      select 1 from public.reviews r
+      where r.id = ((storage.foldername(name))[2])::uuid
+        and public.can_view_review(r.user_id, r.visibility)
+    )
+    or exists (
+      select 1 from public.restaurant_reviews rr
+      where rr.id = ((storage.foldername(name))[2])::uuid
+        and public.can_view_review(rr.user_id, rr.visibility)
+    )
   )
 );
 ```
 
-Path convention: `review-photos/{user_id}/{review_id}/{uuid}.ext`. For any case needing a
-shareable/CDN-cacheable link to a *public* review's photo, use
+Path convention: `review-photos/{user_id}/{review_id}/{uuid}.ext`, where the ID is either a
+dish review or restaurant review. The bucket remains private and accepts JPEG, PNG, WebP,
+MP4, QuickTime, and M4V files up to 50 MiB each. Generate signed URLs only after the parent
+review has passed RLS; never make the bucket public.
+
+For any case needing a shareable/CDN-cacheable link to a *public* review's photo, use
 `supabase.storage.from('review-photos').createSignedUrl(...)` server-side rather than
 making the bucket public — this avoids a permanently public URL surviving a later
 visibility change from public → private.
@@ -218,38 +241,34 @@ npx supabase db reset      # applies all migrations + supabase/seed.sql from a c
 npx supabase gen types typescript --local > src/types/database.ts
 ```
 
-> **Known limitation**: this repository's types (`src/types/database.ts`) were
-> hand-authored to match the migrations exactly, because the environment they were
-> written in has no Docker/local Postgres and is not yet linked to a real Supabase
-> project. Regenerate them for real with the command above (or
-> `--project-id <id>` against a linked cloud project) as soon as either is available, and
-> after every future migration.
+`src/types/database.ts` includes the grouped-review tables, columns, and RPC from migration
+0045. Regenerate it from the linked database after future schema migrations, then run the
+TypeScript check and review generated differences before committing.
 
 ## 12. Security Assumptions
 
 - RLS is enabled on every table; no table relies solely on application-layer checks.
 - The service-role key is never used in client code — only the anon/publishable key
   (`src/lib/supabase.ts`).
-- Storage privacy (review photos) is enforced by Storage RLS policies with a live SQL
-  join to `reviews`, not by path obscurity or client-side checks alone.
+- Storage privacy (review media) is enforced by Storage RLS policies with live SQL joins to
+  the dish or restaurant review, not by path obscurity or client-side checks alone.
 - Denormalised counters are writable only by `SECURITY DEFINER` trigger functions.
 - `notifications` and `taste_preferences` have no client INSERT policy — system-only.
 - `reports` has no client SELECT/UPDATE/DELETE policy — moderation-only, service-role access.
 
 ## 13. Known Limitations (Phase 2 Stage B)
 
-- **This schema has undergone a static audit and a subsequent correction pass** (restaurant
-  client-write removal, PostGIS trigger rework, pgTAP test fixes) but **still has NOT been
-  executed against a live database** — every item below remains NOT YET RUNTIME VERIFIED.
-- **Migrations have not been executed against a live database in this environment** — no
-  Docker/local Postgres was available, and no Supabase cloud project was linked. The SQL
-  has been carefully reviewed for dependency ordering and constraint correctness, but
-  `supabase db reset` has not actually been run. This must be done (see §11) before
-  relying on this schema in any real environment.
-- Generated TypeScript types are hand-authored (see §11) rather than CLI-generated from a
-  live schema — must be regenerated once a database exists.
-- pgTAP tests (`supabase/tests/database/security_and_integrity.test.sql`) are written but
-  not yet executed for the same reason.
+## 13. Current Verification Status
+
+- Production migrations through `0045_grouped_restaurant_reviews.sql` have been applied
+  and verified on the linked Supabase project. The `log_restaurant_review` RPC is present,
+  `SECURITY INVOKER`, and pins an empty search path; grouped tables and policies exist.
+- The `review-photos` bucket remains private, with a 50 MiB per-object limit and the
+  approved image/video MIME types.
+- pgTAP coverage includes grouped visit creation, parent/child/diary relationships, dish
+  validation, and private parent/media visibility. The suite was not executable here
+  because local Postgres at `127.0.0.1:54322` was unavailable; run it with Docker-backed
+  Supabase before treating those assertions as runtime verified.
 - No restaurant provider is integrated (by design — explicit Phase 2 requirement).
 - No Google/Apple auth (by design — explicit Phase 2 requirement).
 - Restaurant/dish photo moderation, image resizing/compression, and admin tooling for

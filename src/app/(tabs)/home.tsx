@@ -1,21 +1,21 @@
-import { Bell, UtensilsCrossed } from 'lucide-react-native';
-import { FlatList, Pressable, RefreshControl, View } from 'react-native';
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Bell, UtensilsCrossed } from 'lucide-react-native';
+import { useState } from 'react';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
+import { FeedItem } from '@/components/feed/FeedItem';
+import { CommentsModal } from '@/components/ui/CommentsModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Screen } from '@/components/ui/Screen';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Heading, MetadataText } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
-import { queryKeys } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { listFeed } from '@/lib/db/feed';
 import { getUnreadCount } from '@/lib/db/notifications';
-import { Screen } from '@/components/ui/Screen';
-import { Heading, MetadataText } from '@/components/ui/Typography';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { FeedItem } from '@/components/feed/FeedItem';
-import { CommentsModal } from '@/components/ui/CommentsModal';
+import { queryKeys } from '@/lib/queryClient';
 import type { FeedActivity } from '@/types/models';
 
 /** Home tab — the following feed. */
@@ -100,10 +100,24 @@ export default function HomeScreen() {
           <FeedItem
             activity={item}
             className="px-lg pb-lg"
+            onSubjectPress={() => {
+              if (item.visit) {
+                router.push({
+                  pathname: '/restaurant-review-detail',
+                  params: { restaurantReviewId: item.visit.id },
+                });
+              } else if (item.dish?.id) {
+                router.push({ pathname: '/dish-detail', params: { dishId: item.dish.id } });
+              } else if (item.restaurant?.id) {
+                router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.restaurant.id } });
+              }
+            }}
             onActorPress={() =>
               router.push({ pathname: '/user/[userId]', params: { userId: item.actor.id } })
             }
-            onCommentPress={() => handleCommentPress(item.review_id ?? item.id)}
+            onCommentPress={() => {
+              if (item.review_id) handleCommentPress(item.review_id);
+            }}
           />
         )}
         ItemSeparatorComponent={() => <View className="mx-lg mb-lg h-[1px] bg-border" />}

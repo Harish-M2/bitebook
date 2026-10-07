@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(64);
+select plan(73);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -326,9 +326,9 @@ select ok(
   exists (
     select 1 from pg_policies
     where schemaname = 'storage' and tablename = 'objects'
-      and policyname = 'review photos are readable if the parent review is visible'
+        and policyname = 'review media is readable per parent visibility'
   ),
-  'Storage RLS policy gating review-photos reads by parent review visibility exists'
+      'Storage RLS policy gates review media by its parent review visibility'
 );
 
 -- 19-26. External place import (0025_places_import.sql).
@@ -900,6 +900,129 @@ set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222"
 select throws_ok(
   $$select public.notify_on_follow()$$,
   'a client cannot call notify_on_follow directly'
+);
+reset role;
+
+-- 65-73. Grouped restaurant visits (0045_grouped_restaurant_reviews.sql).
+-- A visit has one parent review and one linked dish review/diary entry per selected dish.
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select lives_ok(
+  $$select * from public.log_restaurant_review(
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      4.5, 'Grouped visit test', 5::smallint, 'public', date '2026-09-20',
+      jsonb_build_array(
+        jsonb_build_object(
+          'dish_id', (select id from public.dishes where name = 'Test Dish'),
+          'rating', 4.5, 'comment', 'Well seasoned'
+        ),
+        jsonb_build_object(
+          'dish_name', 'Grouped Test Dish', 'category', 'main',
+          'dietary_tags', jsonb_build_array('vegan'),
+          'rating', 5, 'comment', 'Excellent'
+        )
+      )
+    )$$,
+  'a restaurant visit can be logged with multiple dish reviews in one RPC call'
+);
+
+select is(
+  (select count(*)::int from public.restaurant_reviews
+    where restaurant_comment = 'Grouped visit test'
+      and user_id = '11111111-1111-1111-1111-111111111111'),
+  1,
+  'a grouped visit creates exactly one restaurant review parent'
+);
+
+select is(
+  (select count(*)::int from public.reviews r
+    join public.restaurant_reviews rr on rr.id = r.restaurant_review_id
+    where rr.restaurant_comment = 'Grouped visit test'),
+  2,
+  'each selected dish creates one review linked to the restaurant review'
+);
+
+select is(
+  (select count(*)::int from public.diary_entries de
+    join public.reviews r on r.id = de.review_id
+    join public.restaurant_reviews rr on rr.id = r.restaurant_review_id
+    where rr.restaurant_comment = 'Grouped visit test'
+      and de.eaten_at = date '2026-09-20'),
+  2,
+  'each grouped dish review has a diary entry with the visit date'
+);
+
+select is(
+  (select category from public.dishes where name = 'Grouped Test Dish'),
+  'main',
+  'a newly created grouped dish stores its category'
+);
+
+select is(
+  (select dietary_tags from public.dishes where name = 'Grouped Test Dish'),
+  array['vegan']::text[],
+  'a newly created grouped dish stores its dietary tags'
+);
+
+select throws_ok(
+  $$select * from public.log_restaurant_review(
+      (select id from public.restaurants where slug = 'test-tandoor-manchester'),
+      4, null, 3::smallint, 'public', current_date,
+      jsonb_build_array(jsonb_build_object(
+        'dish_id', (select id from public.dishes where name = 'Test Dish'),
+        'rating', 4
+      ))
+    )$$,
+  '23503',
+  null,
+  'a grouped visit rejects a dish belonging to a different restaurant'
+);
+
+select throws_ok(
+  $$select * from public.log_restaurant_review(
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      4, null, 3::smallint, 'public', current_date,
+      jsonb_build_array(
+        jsonb_build_object('dish_id', (select id from public.dishes where name = 'Test Dish'), 'rating', 4),
+        jsonb_build_object('dish_id', (select id from public.dishes where name = 'Test Dish'), 'rating', 5)
+      )
+    )$$,
+  '22023',
+  null,
+  'a grouped visit rejects selecting the same dish more than once'
+);
+
+select distinct restaurant_review_id as private_restaurant_review_id
+from public.log_restaurant_review(
+  (select id from public.restaurants where slug = 'test-restaurant'),
+  3, null, 2::smallint, 'private', current_date,
+  jsonb_build_array(jsonb_build_object(
+    'dish_id', (select id from public.dishes where name = 'Test Dish'),
+    'rating', 3
+  ))
+) \gset
+
+insert into public.restaurant_review_media (
+  restaurant_review_id, storage_path, media_type, content_type, position
+)
+values (
+  :'private_restaurant_review_id',
+  '11111111-1111-1111-1111-111111111111/' || :'private_restaurant_review_id' || '/test.jpg',
+  'image', 'image/jpeg', 0
+);
+reset role;
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is(
+  (select count(*)::int from public.restaurant_reviews
+    where id = :'private_restaurant_review_id')
+  + (select count(*)::int from public.restaurant_review_media
+    where restaurant_review_id = :'private_restaurant_review_id'),
+  0,
+  'another user cannot read a private visit or its attached media'
 );
 reset role;
 

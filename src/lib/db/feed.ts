@@ -1,8 +1,9 @@
-import { supabase } from '@/lib/supabase';
-import { formatPriceLevel, formatRelativeTime } from '@/lib/format';
-import { signedImageUrls } from '@/lib/db/storage';
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
-import type { FeedActivity } from '@/types/models';
+import { listRestaurantVisitSummaries } from '@/lib/db/restaurant-reviews';
+import { signedImageUrls } from '@/lib/db/storage';
+import { formatPriceLevel, formatRelativeTime } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
+import type { FeedActivity, RestaurantVisit } from '@/types/models';
 
 /**
  * Row visibility is enforced by RLS (`can_view_review()` in 0019_rls.sql), so this query
@@ -26,6 +27,40 @@ const FEED_SELECT = `
 
 const FEED_PAGE_SIZE = 30;
 
+export function toRestaurantVisitFeedActivity(visit: RestaurantVisit): FeedActivity {
+  return {
+    id: visit.id,
+    actor: visit.actor,
+    kind: 'restaurant_visit',
+    visit,
+    restaurant: {
+      id: visit.restaurant.id,
+      name: visit.restaurant.name,
+      cuisine: '',
+      priceLevel: formatPriceLevel(visit.restaurant.priceLevel),
+      city: visit.restaurant.city ?? '',
+      rating: visit.overallRating,
+      reviewCount: visit.dishes.length,
+      imageUrl: visit.restaurant.imageUrl,
+    },
+    reviewText: visit.restaurantComment ?? undefined,
+    photoUrl: visit.photoUrl,
+    postedAgo: formatRelativeTime(visit.createdAt),
+    createdAt: visit.createdAt,
+    likeCount: 0,
+    commentCount: 0,
+    restaurant_id: visit.restaurant.id,
+  };
+}
+
+export async function listRestaurantVisitFeedActivities(
+  userIds: string[],
+  limit = FEED_PAGE_SIZE,
+): Promise<FeedActivity[]> {
+  const visits = await listRestaurantVisitSummaries(userIds, limit);
+  return visits.map(toRestaurantVisitFeedActivity);
+}
+
 /**
  * The home feed: reviews written by the people this user follows.
  *
@@ -47,18 +82,20 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('reviews')
-    .select(FEED_SELECT)
-    .in('user_id', followeeIds)
-    .order('created_at', { ascending: false })
-    .limit(FEED_PAGE_SIZE);
+  const [reviewResult, visits] = await Promise.all([
+    supabase
+      .from('reviews')
+      .select(FEED_SELECT)
+      .in('user_id', followeeIds)
+      .is('restaurant_review_id', null)
+      .order('created_at', { ascending: false })
+      .limit(FEED_PAGE_SIZE),
+    listRestaurantVisitSummaries(followeeIds, FEED_PAGE_SIZE),
+  ]);
 
-  if (error) {
-    throw error;
-  }
+  if (reviewResult.error) throw reviewResult.error;
 
-  const rows = data ?? [];
+  const rows = reviewResult.data ?? [];
 
   // `review-photos` is a private bucket, so paths must be signed. Done in one batch for the
   // whole page rather than per row.
@@ -71,7 +108,7 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
   }
   const signed = await signedImageUrls('review-photos', [...firstPhotoPath.values()]);
 
-  return rows.flatMap((row) => {
+  const activities = rows.flatMap((row) => {
     // Every review belongs to an author; a null here means the profile was not visible, in
     // which case there is nothing meaningful to render.
     if (!row.author) {
@@ -125,9 +162,16 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
           row.restaurant?.image_url ??
           null,
         postedAgo: formatRelativeTime(row.created_at),
+        createdAt: row.created_at,
         likeCount: row.like_count ?? 0,
         commentCount: row.comment_count ?? 0,
       },
     ];
   });
+
+  const visitActivities = visits.map(toRestaurantVisitFeedActivity);
+
+  return [...activities, ...visitActivities]
+    .sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? ''))
+    .slice(0, FEED_PAGE_SIZE);
 }

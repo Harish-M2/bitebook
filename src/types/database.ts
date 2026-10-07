@@ -243,6 +243,7 @@ export type Database = {
           created_at: string
           created_by_profile_id: string | null
           description: string | null
+          dietary_tags: string[]
           id: string
           image_url: string | null
           name: string
@@ -257,6 +258,7 @@ export type Database = {
           created_at?: string
           created_by_profile_id?: string | null
           description?: string | null
+          dietary_tags?: string[]
           id?: string
           image_url?: string | null
           name: string
@@ -271,6 +273,7 @@ export type Database = {
           created_at?: string
           created_by_profile_id?: string | null
           description?: string | null
+          dietary_tags?: string[]
           id?: string
           image_url?: string | null
           name?: string
@@ -828,6 +831,108 @@ export type Database = {
           },
         ]
       }
+      restaurant_review_media: {
+        Row: {
+          content_type: string
+          created_at: string
+          dish_review_id: string | null
+          id: string
+          media_type: string
+          position: number
+          restaurant_review_id: string
+          storage_path: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          dish_review_id?: string | null
+          id?: string
+          media_type: string
+          position?: number
+          restaurant_review_id: string
+          storage_path: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          dish_review_id?: string | null
+          id?: string
+          media_type?: string
+          position?: number
+          restaurant_review_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_review_media_dish_review_fk"
+            columns: ["dish_review_id", "restaurant_review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id", "restaurant_review_id"]
+          },
+          {
+            foreignKeyName: "restaurant_review_media_restaurant_review_id_fkey"
+            columns: ["restaurant_review_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      restaurant_reviews: {
+        Row: {
+          created_at: string
+          id: string
+          overall_rating: number
+          recommendation_tier: number
+          restaurant_comment: string | null
+          restaurant_id: string
+          updated_at: string
+          user_id: string
+          visited_at: string
+          visibility: Database["public"]["Enums"]["review_visibility"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          overall_rating: number
+          recommendation_tier: number
+          restaurant_comment?: string | null
+          restaurant_id: string
+          updated_at?: string
+          user_id: string
+          visited_at?: string
+          visibility?: Database["public"]["Enums"]["review_visibility"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          overall_rating?: number
+          recommendation_tier?: number
+          restaurant_comment?: string | null
+          restaurant_id?: string
+          updated_at?: string
+          user_id?: string
+          visited_at?: string
+          visibility?: Database["public"]["Enums"]["review_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restaurant_reviews_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restaurant_reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           comment_count: number
@@ -837,6 +942,7 @@ export type Database = {
           like_count: number
           rating: number
           restaurant_id: string
+          restaurant_review_id: string | null
           review_text: string | null
           updated_at: string
           user_id: string
@@ -850,6 +956,7 @@ export type Database = {
           like_count?: number
           rating: number
           restaurant_id: string
+          restaurant_review_id?: string | null
           review_text?: string | null
           updated_at?: string
           user_id: string
@@ -863,12 +970,20 @@ export type Database = {
           like_count?: number
           rating?: number
           restaurant_id?: string
+          restaurant_review_id?: string | null
           review_text?: string | null
           updated_at?: string
           user_id?: string
           visibility?: Database["public"]["Enums"]["review_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "reviews_restaurant_review_fk"
+            columns: ["restaurant_review_id", "user_id", "restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurant_reviews"
+            referencedColumns: ["id", "user_id", "restaurant_id"]
+          },
           {
             foreignKeyName: "reviews_dish_id_fkey"
             columns: ["dish_id"]
@@ -1349,6 +1464,23 @@ export type Database = {
         Returns: {
           diary_entry_id: string
           dish_id: string
+          review_id: string
+        }[]
+      }
+      log_restaurant_review: {
+        Args: {
+          p_dishes: Json
+          p_overall_rating: number
+          p_recommendation_tier: number
+          p_restaurant_comment: string | null
+          p_restaurant_id: string
+          p_visited_at: string
+          p_visibility: Database["public"]["Enums"]["review_visibility"]
+        }
+        Returns: {
+          diary_entry_id: string
+          dish_id: string
+          restaurant_review_id: string
           review_id: string
         }[]
       }

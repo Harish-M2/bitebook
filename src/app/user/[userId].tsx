@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Star, Users } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
+import { FeedItem } from '@/components/feed/FeedItem';
 import { FollowButton } from '@/components/social/FollowButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -11,11 +12,13 @@ import { Screen } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
+import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
 import { getProfile } from '@/lib/db/profiles';
+import { listRestaurantVisitSummaries } from '@/lib/db/restaurant-reviews';
 import { getVisibleProfileReviews } from '@/lib/db/reviews';
 import { getUserFollowCounts } from '@/lib/db/social';
-import { queryKeys } from '@/lib/queryClient';
 import { formatRelativeTime } from '@/lib/format';
+import { queryKeys } from '@/lib/queryClient';
 
 const REVIEW_PAGE_SIZE = 20;
 
@@ -41,6 +44,12 @@ export default function UserProfileScreen() {
   const reviews = useQuery({
     queryKey: ['profile-reviews', userId, 0],
     queryFn: () => getVisibleProfileReviews(userId, REVIEW_PAGE_SIZE, 0),
+    enabled: Boolean(userId),
+  });
+
+  const restaurantVisits = useQuery({
+    queryKey: ['profile-restaurant-visits', userId],
+    queryFn: () => listRestaurantVisitSummaries([userId], 20),
     enabled: Boolean(userId),
   });
 
@@ -126,6 +135,36 @@ export default function UserProfileScreen() {
               }}
             />
           ) : null}
+
+          <View className="gap-md pt-sm">
+            <Heading level={3}>Restaurant visits</Heading>
+            {restaurantVisits.isPending ? (
+              <View className="items-center py-md">
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            ) : restaurantVisits.isError ? (
+              <ErrorState
+                title="Could not load restaurant visits"
+                description={restaurantVisits.error.message}
+                onRetry={() => void restaurantVisits.refetch()}
+              />
+            ) : restaurantVisits.data.length === 0 ? (
+              <Caption>No visible restaurant visits yet.</Caption>
+            ) : (
+              <View className="gap-md">
+                {restaurantVisits.data.map((visit) => (
+                  <FeedItem
+                    key={visit.id}
+                    activity={toRestaurantVisitFeedActivity(visit)}
+                    onSubjectPress={() => router.push({
+                      pathname: '/restaurant-review-detail',
+                      params: { restaurantReviewId: visit.id },
+                    })}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
 
           <View className="gap-md pt-sm">
             <Heading level={3}>Recent reviews</Heading>

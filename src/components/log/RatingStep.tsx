@@ -1,12 +1,18 @@
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
+import type { ChosenDish } from '@/components/log/DishStep';
 import { RatingInput } from '@/components/ui/RatingInput';
-import { BodyText, DisplayText, MetadataText } from '@/components/ui/Typography';
+import { TextField } from '@/components/ui/TextField';
+import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
+
+export type DishReviewDraft = ChosenDish & {
+  rating: number;
+  comment: string;
+};
 
 type RatingStepProps = {
-  dishName: string;
-  value: number;
-  onChange: (value: number) => void;
+  dishes: DishReviewDraft[];
+  onChange: (dishName: string, value: number | string, field: 'rating' | 'comment') => void;
 };
 
 /**
@@ -25,33 +31,69 @@ const LABELS: [number, string][] = [
   [1, 'Bad'],
   [0.5, 'Inedible'],
 ];
+const CATEGORY_LABELS = {
+  starter: 'Starter',
+  main: 'Main',
+  dessert: 'Dessert',
+  side: 'Side',
+  drink: 'Drink',
+} as const;
+const DIETARY_LABELS = {
+  vegetarian: 'Vegetarian',
+  non_vegetarian: 'Non-vegetarian',
+  vegan: 'Vegan',
+  halal: 'Halal',
+  gluten_free: 'Gluten-free',
+} as const;
 
 function labelFor(value: number): string {
   return LABELS.find(([threshold]) => value >= threshold)?.[1] ?? '';
 }
 
-/** Step 3 — the rating. The one genuinely required field in the flow. */
-export function RatingStep({ dishName, value, onChange }: RatingStepProps) {
+/** Step 3 — each dish keeps its own rating and note inside the restaurant visit. */
+export function RatingStep({ dishes, onChange }: RatingStepProps) {
   return (
-    <View className="flex-1 items-center justify-center px-lg py-lg">
-      <View style={{ width: '100%', maxWidth: 960, alignItems: 'center', gap: 18 }}>
-        <BodyText color="textSecondary" style={{ textAlign: 'center', fontSize: 18 }}>
-          How was the {dishName}?
-        </BodyText>
-
-        <View style={{ width: '100%', maxWidth: 760 }}>
-          <RatingInput value={value} onChange={onChange} className="w-full" />
-        </View>
-
-        {value > 0 ? (
-          <View className="items-center gap-xxs">
-            <DisplayText>{value.toFixed(1)}</DisplayText>
-            <MetadataText style={{ textAlign: 'center' }}>{labelFor(value)}</MetadataText>
+    <ScrollView contentContainerClassName="px-lg pt-xs pb-md" keyboardShouldPersistTaps="handled">
+      {dishes.map((dish, index) => (
+        <View key={`${dish.id ?? dish.name}-${index}`} className="gap-sm border-b border-border py-md">
+          <View className="gap-xxs">
+            <MetadataText color="accent">Dish {index + 1}</MetadataText>
+            <BodyText medium>{dish.name}</BodyText>
+            {dish.category || dish.dietaryTags?.length ? (
+              <Caption>
+                {[
+                  dish.category ? CATEGORY_LABELS[dish.category] : null,
+                  ...(dish.dietaryTags ?? []).map((tag) => DIETARY_LABELS[tag]),
+                ].filter(Boolean).join(' · ')}
+              </Caption>
+            ) : null}
           </View>
-        ) : (
-          <MetadataText>Tap a star. Tap its left half for a half point.</MetadataText>
-        )}
-      </View>
-    </View>
+
+          <View className="gap-xxs">
+            <RatingInput
+              value={dish.rating}
+              onChange={(rating) => onChange(dish.name, rating, 'rating')}
+              className="self-start"
+            />
+            {dish.rating > 0 ? (
+              <Caption color="textSecondary">{dish.rating.toFixed(1)} · {labelFor(dish.rating)}</Caption>
+            ) : (
+              <MetadataText>Tap a star to rate</MetadataText>
+            )}
+          </View>
+
+          <TextField
+            label="Dish notes (optional)"
+            placeholder="Texture, flavour, or what stood out"
+            value={dish.comment}
+            onChangeText={(comment) => onChange(dish.name, comment, 'comment')}
+            multiline
+            maxLength={1000}
+            textAlignVertical="top"
+            minHeight={56}
+          />
+        </View>
+      ))}
+    </ScrollView>
   );
 }

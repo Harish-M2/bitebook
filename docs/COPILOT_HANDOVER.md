@@ -218,12 +218,12 @@ This section summarizes `docs/database-architecture.md`, which is the authoritat
 more detailed description — read that file directly for full detail. It documents what
 the migrations **actually create**, not aspirational design.
 
-**22 application tables**, created across 24 migration files (`supabase/migrations/0001`
-through `0024`):
+**25 application tables**, with migrations through `0045` (`supabase/migrations/0001`
+through `0045`):
 
 `profiles`, `restaurants`, `restaurant_sources`, `restaurant_photos`, `cuisines`,
 `restaurant_cuisines`, `dishes`, `dish_photos`, `dish_cuisines`, `reviews`,
-`review_photos`, `diary_entries`, `saved_dishes`, `follows`, `likes`, `comments`,
+`restaurant_reviews`, `restaurant_review_media`, `review_photos`, `diary_entries`, `saved_dishes`, `follows`, `likes`, `comments`,
 `lists`, `list_items`, `notifications`, `taste_preferences`,
 `user_cuisine_preferences`, `reports`.
 
@@ -237,11 +237,16 @@ Key structural points (see `docs/database-architecture.md` for full detail):
   columns (this was deliberately changed during the Phase 2 correction pass; see §14/§15).
   Restaurants are **not client-writable** — no INSERT/UPDATE/DELETE RLS policy exists.
 - **`dishes`**: scoped to a restaurant, `normalized_name` generated column +
-  unique constraint prevents case/whitespace duplicate dish names per restaurant. Clients
-  *can* INSERT dishes (unlike restaurants).
+  unique constraint prevents case/whitespace duplicate dish names per restaurant. Migration
+  `0045` adds constrained category and dietary tags. Clients *can* INSERT dishes (unlike
+  restaurants).
 - **`reviews`**: has `visibility` enum (`public` / `followers` / `private`); a shared
   `can_view_review(owner_id, visibility)` SQL function gates read access, reused by
   `review_photos`, `likes`, and `comments` so they inherit the parent review's visibility.
+  A review may link to `restaurant_reviews` through a composite FK enforcing matching
+  owner and restaurant; one parent groups the dish reviews from a visit.
+- **`restaurant_review_media`**: ordered photo/video paths attached to the grouped parent;
+  table and Storage reads remain visibility-gated, and the `review-photos` bucket is private.
 - **`diary_entries`**: always private to the owner; `review_id` is backed by a
   **composite foreign key** `(review_id, review_user_id, review_dish_id) →
   reviews(id, user_id, dish_id)` with shadow columns auto-synced by a trigger, guaranteeing
@@ -423,7 +428,7 @@ Original baseline migrations `0001`–`0024` (later migrations are covered in th
 | `0024_grants.sql` | Explicit table privileges: DML to `authenticated`, nothing to `anon` |
 
 **Production migration history was reconciled on 2026-10-01.** The final
-`npx supabase migration list --linked` shows every local migration `0001`–`0043` applied
+`npx supabase migration list --linked` shows every local migration `0001`–`0045` applied
 remotely, with no skipped filenames.
 
 - `0035`–`0038` were checked against the production catalog, then recorded as applied.
@@ -440,6 +445,10 @@ remotely, with no skipped filenames.
 - `0041_fix_review_delete_trigger.sql` and
   `0042_restore_diary_review_delete_action.sql` were directly applied and verified before
   being recorded as applied.
+- `0045_grouped_restaurant_reviews.sql` adds the grouped visit parent, links dish reviews,
+  adds dietary tags and ordered media rows, expands the still-private review bucket, and
+  provides the transaction-safe `log_restaurant_review` RPC. Production catalog checks
+  confirmed the RPC, RLS policies, and bucket configuration.
 
 Normal `npx supabase db push` is now safe for future migrations, provided the linked list
 is checked first and no new out-of-band schema changes have occurred. The pgTAP suite
@@ -454,34 +463,14 @@ to production via `db push`.
 ## 11. Current TypeScript Database Types
 
 - **Location**: `src/types/database.ts`.
-- **Current state**: this file is **hand-authored** (408 lines), written by hand to match
-  the migrations exactly, because at the time it was written there was no live database to
-  generate from. It includes a header comment saying as much and instructing a future
-  developer to regenerate it once a real database exists.
-- **A real database now exists and is linked** (see §8/§10). Running:
+- **Current state**: this file contains the generated Supabase schema types, updated for
+  migration `0045`'s grouped-review tables, columns, relationships, and RPC.
+- **A real database exists and is linked** (see §8/§10). Running:
   ```
   npx supabase gen types typescript --linked
   ```
-  from the `bitebook/` directory **succeeds** and produces a real generated types file
-  (~2100 lines) that differs substantially in shape/verbosity from the current
-  hand-authored file (e.g. includes `__InternalSupabase.PostgrestVersion`, full
-  `Relationships` arrays, `graphql_public` schema, etc., none of which the hand-authored
-  version has).
-- **This handover verified that regeneration works, but did NOT replace
-  `src/types/database.ts` with the generated output** — that is a deliberate decision left
-  for the next development step, since swapping the types file is a real code change with
-  potential downstream type-error fallout that should be done deliberately, verified with
-  `tsc`, and committed as its own change — not silently folded into a documentation-only
-  handover.
-- **Current verification results** (re-run during this handover, using the *existing*
-  hand-authored `database.ts`):
-  - `npx tsc --noEmit` → **0 errors** (confirmed just now)
-  - `npx expo lint` → **0 errors/warnings** (confirmed just now)
-  - `npx expo-doctor` → **NEEDS RE-VERIFICATION on Mac** (previously reported 21/21 in an
-    earlier report; not re-run in this exact session — re-run before trusting it)
-- **Recommended next step (not performed here)**: run
-  `npx supabase gen types typescript --linked > src/types/database.ts`, then re-run `tsc`
-  and `expo lint`, fix any resulting type errors, and commit that as its own change.
+  from the repository directory succeeds. Regenerate after future schema migrations and
+  verify the resulting `tsc` diff before committing.
 
 ---
 
@@ -495,16 +484,12 @@ to production via `db push`.
   packages behind the SDK 57 recommended versions (`expo-router`, `react-native`,
   `expo-image`, `eslint-config-expo` and others). Not a blocker; run
   `npx expo install --check` to review and upgrade.
-- **Database/security tests (pgTAP)**: `supabase/tests/database/security_and_integrity.
-  test.sql` — 33 tests covering signup→profile creation, username case-insensitive
-  uniqueness, private-diary protection, review visibility (public/followers/private),
-  like/comment visibility inheritance, self-follow prevention, list ownership, saved/
-  want-to-eat mutual exclusivity, restaurant_sources uniqueness, dish-name deduplication,
-  diary↔review composite FK integrity, counter consistency, the external place import
-  (dedupe, slug collision, derived coordinates) and function-level privileges. **These
-  now pass, 33/33**,
-  reproducibly from a clean `supabase db reset`. Run them with `npx supabase test db`
-  against the local stack (requires Docker, now installed).
+- **Database/security tests (pgTAP)**: `supabase/tests/database/security_and_integrity.test.sql`
+  declares 72 assertions, including grouped visit creation, parent/child/diary links,
+  dish validation, and private parent/media visibility. The updated suite could not run in
+  this environment because local Postgres at `127.0.0.1:54322` refused the connection;
+  run `npx supabase test db` with the Docker-backed local stack before treating the new
+  assertions as passing.
   - Their first-ever execution surfaced three defects **in the test file**, since fixed:
     a `plan(18)` that understated the 21 assertions, and two tests whose INSERT sourced
     rows from an RLS-filtered SELECT — which returns zero rows, making the INSERT a silent
@@ -529,26 +514,20 @@ to production via `db push`.
 
 ## 13. Current Problems / Known Issues
 
-### Docker / local Supabase dev stack — RESOLVED
-- Docker Desktop is now installed on the Mac (4.90.0, engine 29.7.2) and the full local
-  stack runs: `supabase start`, `supabase db reset` and `supabase test db` all work.
-- The Supabase CLI is installed as a local **devDependency**, so `npx supabase` resolves
-  without a global install. Note the `docker` CLI lives inside the app bundle at
-  `/Applications/Docker.app/Contents/Resources/bin` and may not be on your `PATH`.
-- Historical note on why this mattered: even with `--linked`, `supabase test db` spins up a
-  local pg_prove container via Docker, so Docker was required regardless. That blocked the
-  pgTAP suite from ever running until now.
-- **Use the local stack for the pgTAP suite, not `--linked`** — `--linked` points the tests
-  at the live production database, which is not an appropriate target for a suite that
-  creates fixture users and rows (it is wrapped in `begin; … rollback;`, but there is no
-  reason to run it there).
+### Docker / local Supabase dev stack — unavailable in this environment
+- `npx supabase test db` currently cannot connect to local Postgres at
+  `127.0.0.1:54322`. Start Docker and the local Supabase stack before running pgTAP.
+- Use the local stack for pgTAP, not `--linked`; the test suite creates fixture users and
+  rows and should not target the live production database.
 
-### Type file staleness — RESOLVED
-- `src/types/database.ts` is now generated from the live database via
-  `supabase gen types typescript --linked` (~2,100 lines, replacing the 412-line
-  hand-authored stand-in). The five convenience enum aliases are retained but re-derived
-  through the generated `Enums<...>` helper so they can no longer drift from the schema.
-  `tsc --noEmit` and `expo lint` both pass against it.
+### Grouped restaurant review — implemented in migration and Log flow
+- Migration `0045` is live in production. The existing Log tab now groups multiple dish
+  ratings under one restaurant visit, supports multiple private photos/videos, and records
+  the visit-level rating, recommendation, date, comment, and visibility.
+- Starting Expo web regenerated the route declaration; `npx tsc --noEmit` now passes.
+- `npx expo export --platform web` succeeds. A headless browser smoke test showed a blank
+  screen because the existing root layout waits for fonts, while no font faces loaded in
+  that browser session. This was not changed as part of the grouped-review work.
 
 ### No sign-in/sign-up/onboarding UI — RESOLVED
 - The `(auth)` route group now exists: `welcome`, `sign-in`, `sign-up`, and a four-step

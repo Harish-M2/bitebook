@@ -1,7 +1,7 @@
-import { supabase } from '@/lib/supabase';
-import { formatDiaryDate } from '@/lib/format';
-import { signedImageUrls } from '@/lib/db/storage';
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
+import { signedImageUrls } from '@/lib/db/storage';
+import { formatDiaryDate } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
 import type { DiaryEntry } from '@/types/models';
 
 /**
@@ -14,7 +14,7 @@ const DIARY_SELECT = `
   eaten_at,
   dish:dishes(id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}),
   restaurant:restaurants(id, name),
-  review:reviews(rating, photos:review_photos(storage_path, position))
+  review:reviews(rating, restaurant_review_id, photos:review_photos(storage_path, position))
 `;
 
 export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
@@ -56,6 +56,7 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
         id: row.id,
         dateLabel: formatDiaryDate(row.eaten_at),
         rating: row.review?.rating ?? 0,
+        restaurantReviewId: row.review?.restaurant_review_id ?? null,
         dish: {
           id: row.dish.id,
           name: row.dish.name,

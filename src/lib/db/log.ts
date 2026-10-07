@@ -44,6 +44,121 @@ export interface LogDishResult {
   photoFailed: boolean;
 }
 
+export interface RestaurantReviewDishInput {
+  dishId: string | null;
+  dishName: string;
+  rating: number;
+  comment: string;
+  category?: string | null;
+  dietaryTags?: string[];
+}
+
+export interface RestaurantReviewMediaInput {
+  uri: string;
+  type: 'image' | 'video';
+  contentType: string;
+  fileName: string;
+}
+
+export interface LogRestaurantReviewInput {
+  restaurantId: string;
+  overallRating: number;
+  restaurantComment: string;
+  recommendationTier: number;
+  visibility: ReviewVisibility;
+  visitedAt?: string;
+  dishes: RestaurantReviewDishInput[];
+  media: RestaurantReviewMediaInput[];
+}
+
+export interface LogRestaurantReviewResult {
+  restaurantReviewId: string;
+  dishReviewIds: string[];
+  diaryEntryIds: string[];
+  mediaFailedCount: number;
+}
+
+export async function logRestaurantReview(
+  userId: string,
+  input: LogRestaurantReviewInput,
+): Promise<LogRestaurantReviewResult> {
+  const { data, error } = await supabase
+    .rpc('log_restaurant_review', {
+      p_restaurant_id: input.restaurantId,
+      p_overall_rating: input.overallRating,
+      p_restaurant_comment: input.restaurantComment.trim() || null,
+      p_recommendation_tier: input.recommendationTier,
+      p_visibility: input.visibility,
+      p_visited_at: input.visitedAt ?? localDateString(),
+      p_dishes: input.dishes.map((dish) => ({
+        dish_id: dish.dishId,
+        dish_name: dish.dishId ? null : dish.dishName,
+        category: dish.category ?? null,
+        dietary_tags: dish.dietaryTags ?? [],
+        rating: dish.rating,
+        comment: dish.comment.trim() || null,
+      })),
+    });
+
+  if (error) throw error;
+  if (!data?.length) throw new Error('The restaurant review could not be logged.');
+
+  const restaurantReviewId = data[0].restaurant_review_id;
+  const uploadedPaths: string[] = [];
+  const mediaRows: {
+    restaurant_review_id: string;
+    storage_path: string;
+    media_type: 'image' | 'video';
+    content_type: string;
+    position: number;
+  }[] = [];
+  let mediaFailedCount = 0;
+
+  for (const [position, media] of input.media.entries()) {
+    const extension = media.fileName.split('.').pop()?.toLowerCase() ||
+      (media.type === 'image' ? 'jpg' : 'mp4');
+    const storagePath = `${userId}/${restaurantReviewId}/${position}-${Date.now()}.${extension}`;
+
+    try {
+      const bytes = await readPhotoBytes(media.uri);
+      const { error: uploadError } = await supabase.storage
+        .from('review-photos')
+        .upload(storagePath, bytes, { contentType: media.contentType, upsert: false });
+      if (uploadError) throw uploadError;
+
+      uploadedPaths.push(storagePath);
+      mediaRows.push({
+        restaurant_review_id: restaurantReviewId,
+        storage_path: storagePath,
+        media_type: media.type,
+        content_type: media.contentType,
+        position,
+      });
+    } catch (uploadError) {
+      console.warn('[Bitebook] Review media upload failed:', uploadError);
+      mediaFailedCount += 1;
+    }
+  }
+
+  if (mediaRows.length > 0) {
+    const { error: insertError } = await supabase
+      .from('restaurant_review_media')
+      .insert(mediaRows);
+
+    if (insertError) {
+      await supabase.storage.from('review-photos').remove(uploadedPaths);
+      mediaFailedCount += mediaRows.length;
+    }
+  }
+
+  return {
+    restaurantReviewId,
+    dishReviewIds: data.map((row) => row.review_id),
+    diaryEntryIds: data.map((row) => row.diary_entry_id),
+    mediaFailedCount,
+  };
+}
+
 export async function logDish(
   userId: string,
   input: LogDishInput,
