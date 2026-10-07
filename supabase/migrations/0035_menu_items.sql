@@ -3,7 +3,7 @@
 -- Table to store cached menu items from Spoonacular API
 CREATE TABLE IF NOT EXISTS menu_items (
   id TEXT PRIMARY KEY,
-  restaurant_id TEXT NOT NULL,
+  restaurant_id UUID NOT NULL,
   external_id TEXT,  -- Spoonacular restaurant ID
   name TEXT NOT NULL,
   description TEXT,
@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_external_id
 -- Table to track API costs and usage
 CREATE TABLE IF NOT EXISTS menu_fetch_log (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  restaurant_id TEXT NOT NULL,
+  restaurant_id UUID NOT NULL,
   restaurant_name TEXT,
   external_restaurant_id TEXT,
   success BOOLEAN DEFAULT TRUE,
@@ -96,7 +96,7 @@ CREATE POLICY "Service role can insert fetch logs" ON menu_fetch_log
 
 -- Function to calculate monthly budget
 CREATE OR REPLACE FUNCTION update_menu_budget()
-RETURNS void AS $$
+RETURNS trigger AS $$
 DECLARE
   current_month TEXT;
   total_api_calls INT;
@@ -138,6 +138,8 @@ BEGIN
     cache_misses = total_cache_misses,
     average_cache_hit_rate = cache_rate,
     updated_at = NOW();
+  -- Statement-level AFTER trigger: the return value is ignored.
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 

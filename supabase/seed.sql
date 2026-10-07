@@ -61,15 +61,15 @@ begin
 
   -- Demo dishes.
   insert into public.dishes (restaurant_id, name, description, category, created_by_profile_id)
-  values (r_smokehouse, 'Smoked Lamb Shoulder', 'Demo data: 12-hour smoked lamb.', 'Main', demo_user_1)
+  values (r_smokehouse, 'Smoked Lamb Shoulder', 'Demo data: 12-hour smoked lamb.', 'main', demo_user_1)
   returning id into d_lamb;
 
   insert into public.dishes (restaurant_id, name, description, category, created_by_profile_id)
-  values (r_smokehouse, 'Smash Burger', 'Demo data: double smash patty.', 'Main', demo_user_1)
+  values (r_smokehouse, 'Smash Burger', 'Demo data: double smash patty.', 'main', demo_user_1)
   returning id into d_burger;
 
   insert into public.dishes (restaurant_id, name, description, category, created_by_profile_id)
-  values (r_pasta_bar, 'Pappardelle', 'Demo data: pappardelle with slow-cooked ragu.', 'Main', demo_user_1)
+  values (r_pasta_bar, 'Pappardelle', 'Demo data: pappardelle with slow-cooked ragu.', 'main', demo_user_1)
   returning id into d_pappardelle;
 
   -- Demo cuisine tags.

@@ -7,6 +7,48 @@ Date: 2026-10-07
 This section supersedes "Written but NOT applied", "Next steps" and parts of "State to be aware of"
 below. Those sections are kept as history.
 
+## Status at VS Code restart
+
+- Commit `372b8b1` was pushed to GitHub (`origin/main`).
+- `0035_menu_items.sql` fixed in place (not yet committed). Two bugs, both matching production,
+  which the owner/hand edits had already corrected there: `restaurant_id` is now `UUID` in
+  `menu_items` and `menu_fetch_log` (production confirmed `uuid` by read-only query), and
+  `update_menu_budget()` now `RETURNS trigger` with `RETURN NULL` (production confirmed `trigger`).
+- `supabase db reset --local` now applies all migrations `0001`–`0051`. **pgTAP on that clean
+  build: 73/73 pass**, so tests 21/22/23/33/54 were local-copy artifacts after all.
+- **Web redeployed** (includes `b88c0d6`): deployment `bitebook-kolz8w3xg-ten-fold-group`, aliased to
+  https://bitebook-alpha.vercel.app, status Ready. Because the export wipes `dist/.vercel`, the
+  deploy needed `VERCEL_ORG_ID=team_ZtDHiykzMFB5Qe3YS0bGCnGY VERCEL_PROJECT_ID=prj_A5lZchyVhP4oQzKRRovXQlKm0dwR`
+  (IDs from `.vercel/repo.json`; not secrets) in front of `vercel deploy --prod --yes`.
+  Not browser-checked by the assistant (Deployment Protection is on).
+- **Fixed:** `supabase/seed.sql` used `'Main'`; the `0045` constraint `dishes_category_allowed` only
+  allows lowercase `'main'`. Changed in 3 places. `supabase db reset --local` now completes
+  (migrations + seed) and pgTAP is 73/73 after it.
+- (Superseded) previous open issue: `supabase db reset` failed at the seed step: `supabase/seed.sql` violates
+  `dishes_category_allowed`. The seed data needs fixing (not looked into yet).
+ `package-lock.json` change was reverted by the owner.
+- pgTAP on the local Docker DB: 68/73 pass. Tests 21, 22, 23, 33, 54 are UNKNOWN (believed
+  local-copy artifacts) until run on a clean build. `supabase db reset` fails at `0035`.
+- Nobody has smoke-tested the live app since `0050`/`0051`.
+
+### Update after restart
+
+- Terminal works again. `npx tsc --noEmit` clean; `npx expo lint` printed no warnings or errors.
+- `npx expo-doctor`: 20/21. The one failure is patch-level drift on `expo`, `expo-constants`,
+  `expo-image-manipulator`, `expo-linking`, `expo-router` (review with `npx expo install --check`).
+- **Smoke test of the live app: reported OK by the owner** (not independently verified by the
+  assistant). The exact flows covered were not itemised. Treat `0050`/`0051` as working in the app.
+
+### Next steps, in order
+
+1. ~~Terminal check~~ done.
+2. ~~Smoke-test the live app~~ done (owner-reported).
+3. Ask the owner, then `git push origin main`.
+4. ~~Lint~~ done. Decide whether to fix the `expo-doctor` patch drift.
+5. Decide how to fix `0035_menu_items.sql` (edit in place vs corrective migration), then re-run pgTAP.
+6. Rebuild and redeploy web (includes `b88c0d6`); native needs `pod install` / dev-build rebuild.
+7. Rotate the two Google Places keys pasted in chat, then `npx supabase secrets set GOOGLE_PLACES_API_KEY=<key>`.
+
 ## Terminal tool status
 
 The assistant's terminal tool stopped returning output again after the `0050` push (even `echo ok`
