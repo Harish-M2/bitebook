@@ -343,3 +343,5 @@ cd dist && npm_config_cache=/tmp/npm-cache npx -y vercel deploy --prod --yes
   the earlier build.
 
 - **Live site check (2026-10-07):** owner reports the new screens (notifications, following, restaurant visit detail) work and `followers` is reachable on https://bitebook-alpha.vercel.app. Not independently verified.
+
+- **Web redeployed (2026-10-07):** built from the working tree at `0ee6c5f` plus the owner's uncommitted `src/app/notifications.tsx` edits, so this deployment is NOT reproducible from git alone. Deployment `bitebook-8eiuz3tgb-ten-fold-group.vercel.app`, aliased to https://bitebook-alpha.vercel.app, status Ready. Includes the Expo patch bumps. Not browser-checked by me.
