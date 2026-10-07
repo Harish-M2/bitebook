@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(74);
+select plan(83);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -1040,6 +1040,76 @@ select is(
       and coalesce(with_check, '') like '%review-photos%'),
   'users can upload media to their own reviews',
   'review-photos uploads are governed by exactly one INSERT policy'
+);
+
+-- 75-83. Visit details, private visited list, restaurant info constraints (0053-0055).
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select lives_ok(
+  $$update public.restaurant_reviews
+      set food_rating = 4.5, service_rating = 3, atmosphere_rating = 4, value_rating = 5,
+          spend_amount = 42.50, party_size = 2, seating_type = 'indoor'
+    where restaurant_comment = 'Grouped visit test'$$,
+  'the owner can add supporting ratings and visit context to a visit'
+);
+
+select throws_ok(
+  $$update public.restaurant_reviews set food_rating = 4.2
+    where restaurant_comment = 'Grouped visit test'$$,
+  '23514', null,
+  'supporting ratings must be half-star steps'
+);
+
+select throws_ok(
+  $$update public.restaurant_reviews set spend_amount = -1
+    where restaurant_comment = 'Grouped visit test'$$,
+  '23514', null,
+  'spend cannot be negative'
+);
+
+select lives_ok(
+  $$insert into public.restaurant_visits (user_id, restaurant_id, notes)
+    select '11111111-1111-1111-1111-111111111111', id, 'Visited without reviewing'
+    from public.restaurants where slug = 'test-restaurant'$$,
+  'a user can mark a restaurant as visited'
+);
+
+select throws_ok(
+  $$insert into public.restaurant_visits (user_id, restaurant_id)
+    select '11111111-1111-1111-1111-111111111111', id
+    from public.restaurants where slug = 'test-restaurant'$$,
+  '23505', null,
+  'a restaurant can be marked visited only once per user'
+);
+reset role;
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is(
+  (select count(*)::int from public.restaurant_visits),
+  0,
+  'another user cannot read someone else''s visited list'
+);
+
+select throws_ok(
+  $$insert into public.restaurant_visits (user_id, restaurant_id)
+    select '11111111-1111-1111-1111-111111111111', id
+    from public.restaurants where slug = 'test-restaurant'$$,
+  '42501', null,
+  'a user cannot create a visit on behalf of another user'
+);
+reset role;
+
+select throws_ok(
+  $$update public.restaurants set menu_url = 'javascript:alert(1)' where slug = 'test-restaurant'$$,
+  '23514', null,
+  'menu_url must be an http(s) URL'
+);
+
+select ok(
+  not has_table_privilege('anon', 'public.restaurant_visits', 'SELECT'),
+  'anon has no access to restaurant_visits'
 );
 
 select * from finish();

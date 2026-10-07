@@ -50,3 +50,10 @@ This is a first pass: the log-step components and discover/restaurant screens we
 
 ## Cheap non-schema items to verify/build first
 Show/hide password toggle, media limit of 10 + reorder, dietary filter, summary edit links.
+
+## Draft migrations (local only, NOT applied to production)
+Verified locally: `db reset` plus pgTAP 83/83 (tests 75-83). Not run against production.
+- `0053_restaurant_review_details.sql`: optional food/service/atmosphere/value ratings, spend, party size, seating type on `restaurant_reviews`. The `seating_type` values (indoor/outdoor/bar/takeaway) are a proposal; the spec doesn't list them (UNKNOWN).
+- `0054_restaurant_visits.sql`: private `restaurant_visits` and `restaurant_visit_dishes` (owner-only RLS, no anon, one visit row per user and restaurant).
+- `0055_restaurant_info.sql`: postcode, `opening_hours` (jsonb, shape UNKNOWN), seating capacity, outdoor seating, accessibility notes, booking URL, menu URL and verified-at on `restaurants`. Client writes remain blocked.
+Not yet built: any app UI or data-access code for these.
