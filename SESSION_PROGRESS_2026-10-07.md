@@ -155,9 +155,10 @@ local copy has no storage policies).
       `reviews`, `review_photos`, `dishes`, `restaurants` after `0050`. Their inserts use columns
       that exist (`name`, `restaurant_id`, `user_id`, `dish_id`, `rating`, `review_text`,
       `visibility`). Not executed: UNKNOWN whether they run end to end.
-    - `SEED_DATA_INSTRUCTIONS.md` points at `seed-full-data.sql`, so its instructions are broken.
-      Decision needed: fix or delete `seed-full-data.sql`, `seed-reviews.sql` and the
-      instructions file; `supabase/seed.sql` is the maintained seed.
+    - `SEED_DATA_INSTRUCTIONS.md` pointed at `seed-full-data.sql`, so its instructions were
+      broken. Owner decided to delete: `seed-full-data.sql`, `seed-reviews.sql` and
+      `SEED_DATA_INSTRUCTIONS.md` were removed (unreferenced elsewhere; recoverable from git).
+      `supabase/seed.sql` is the maintained seed.
 12. Rotate both Google Places keys that were pasted in chat, then
     `npx supabase secrets set GOOGLE_PLACES_API_KEY=<key>` in your own terminal. Consider a daily
     quota cap.
