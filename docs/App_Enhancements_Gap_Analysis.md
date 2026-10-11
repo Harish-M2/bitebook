@@ -61,3 +61,12 @@ Not yet built: any app UI or data-access code for these.
 ## Update: app code built for 0053-0055 (migrations applied to production)
 - DONE (typecheck/lint only, not run on device): "Mark as visited" button and Visited list (`/visited`, linked from Profile); optional food/service/atmosphere/value ratings, seating, spend and party size in the log flow (`ReviewStep`, `ConfirmStep`, saved by a follow-up update in `log.ts`) and shown on the visit detail screen; restaurant phone, postcode, outdoor seating, capacity, accessibility, website, menu and booking links on the restaurant page.
 - Still missing: notes/date/dishes UI on a visited entry, filters for dietary and open now, anything that fills the new `restaurants` columns (nothing populates them yet), booking/sponsored/business features (product decisions).
+
+## Update: remaining no-schema items (typecheck, lint and local pgTAP only; not run on device)
+- Summary edit links (`ConfirmStep` jumps back to dishes / ratings / media / review with the draft kept).
+- Media can be tagged with a dish (`PhotoStep` -> `dish_review_id` in `log.ts`); tags reset if the dish list changes.
+- Visited entries: `/visit-edit` for private notes, date and remembered dishes; the visited list has search and All / Visited only / Reviewed filters.
+- Dietary filter on Discover (restaurants with at least one dish carrying the tag).
+- "Recently reviewed" rail on Discover (RLS-gated, so private visits do not surface).
+- Popular dishes on the restaurant page already ranks by rating count.
+- Still open: Places-backed fields (hours, postcode, menu URL, Open now), menu URL verification, friends' recommendations (needs a definition), commercial and booking features (product decisions).

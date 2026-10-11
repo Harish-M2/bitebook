@@ -267,7 +267,8 @@ export default function LogScreen() {
                       : current.dishes.length < 20
                         ? [...current.dishes, { ...dish, rating: 0, comment: '' }]
                         : current.dishes;
-                    return { ...current, dishes };
+                    const media = current.media.map((item) => ({ ...item, dishIndex: null }));
+                    return { ...current, dishes, media };
                   });
                 }}
               />
@@ -292,6 +293,7 @@ export default function LogScreen() {
 
             {step === 'media' && (
               <PhotoStep
+                dishNames={draft.dishes.map((dish) => dish.name)}
                 media={draft.media}
                 onChange={(media) => setDraft((current) => ({ ...current, media }))}
               />
@@ -331,6 +333,7 @@ export default function LogScreen() {
                   recommendationTier={draft.recommendationTier}
                   visibility={draft.visibility}
                   details={draft.details}
+                  onEdit={setStep}
                 />
               </ScrollView>
             )}

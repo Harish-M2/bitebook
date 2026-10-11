@@ -26,6 +26,8 @@ export type Restaurant = {
   rating: number;
   reviewCount: number;
   imageUrl: string | null;
+  /** Dietary tags carried by at least one dish logged at this restaurant. */
+  dietaryTags?: string[];
 };
 
 export type Dish = {

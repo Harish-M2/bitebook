@@ -59,3 +59,49 @@ export async function listVisited(): Promise<VisitedRestaurant[]> {
   if (error) throw error;
   return data ?? [];
 }
+
+/** Dish ids the user remembers having on a visit (no rating or review involved). */
+export async function listVisitDishIds(visitId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('restaurant_visit_dishes')
+    .select('dish_id')
+    .eq('visit_id', visitId);
+  if (error) throw error;
+  return (data ?? []).map((row) => row.dish_id);
+}
+
+export async function addVisitDish(visitId: string, dishId: string): Promise<void> {
+  const { error } = await supabase
+    .from('restaurant_visit_dishes')
+    .upsert({ visit_id: visitId, dish_id: dishId }, { onConflict: 'visit_id,dish_id', ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export async function removeVisitDish(visitId: string, dishId: string): Promise<void> {
+  const { error } = await supabase
+    .from('restaurant_visit_dishes')
+    .delete()
+    .eq('visit_id', visitId)
+    .eq('dish_id', dishId);
+  if (error) throw error;
+}
+
+export async function getVisitById(visitId: string): Promise<VisitedRestaurant | null> {
+  const { data, error } = await supabase
+    .from('restaurant_visits')
+    .select('*, restaurant:restaurants(id, name, city, image_url)')
+    .eq('id', visitId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Restaurant ids the user has publicly or privately reviewed, to show review state. */
+export async function listReviewedRestaurantIds(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('restaurant_reviews')
+    .select('restaurant_id')
+    .eq('user_id', userId);
+  if (error) throw error;
+  return [...new Set((data ?? []).map((row) => row.restaurant_id))];
+}

@@ -19,6 +19,8 @@ export type ReviewMediaDraft = RestaurantReviewMediaInput & {
 type PhotoStepProps = {
   media: ReviewMediaDraft[];
   onChange: (media: ReviewMediaDraft[]) => void;
+  /** Dish names for this visit, in order; enables tagging each item with a dish. */
+  dishNames?: string[];
 };
 
 const MAX_MEDIA_ITEMS = 10;
@@ -62,7 +64,7 @@ function VideoPreview({ uri }: { uri: string }) {
 }
 
 /** Step 4 — attach a small, ordered set of private visit photos and videos. */
-export function PhotoStep({ media, onChange }: PhotoStepProps) {
+export function PhotoStep({ media, onChange, dishNames = [] }: PhotoStepProps) {
   const [isPreparing, setIsPreparing] = useState(false);
   const remaining = MAX_MEDIA_ITEMS - media.length;
 
@@ -201,6 +203,25 @@ export function PhotoStep({ media, onChange }: PhotoStepProps) {
                   <ArrowRight size={14} color="#FFFFFF" />
                 </Pressable>
               </View>
+              {dishNames.length > 0 ? (
+                <Pressable
+                  onPress={() => {
+                    // Cycles: no dish -> dish 1 -> dish 2 ... -> no dish.
+                    const current = item.dishIndex ?? -1;
+                    const next = current + 1 >= dishNames.length ? null : current + 1;
+                    onChange(media.map((m, i) => (i === index ? { ...m, dishIndex: next } : m)));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tag media ${index + 1} with a dish`}
+                  className="mt-xxs rounded-md border border-border px-xs py-xxs"
+                  style={{ width: 96 }}>
+                  <MetadataText numberOfLines={1}>
+                    {item.dishIndex !== null && item.dishIndex !== undefined
+                      ? (dishNames[item.dishIndex] ?? 'Tag a dish')
+                      : 'Tag a dish'}
+                  </MetadataText>
+                </Pressable>
+              ) : null}
             </View>
           ))}
           {remaining > 0 ? (

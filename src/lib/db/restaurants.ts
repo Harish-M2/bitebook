@@ -10,7 +10,8 @@ const RESTAURANT_SELECT = `
   city,
   price_level,
   image_url,
-  restaurant_cuisines(cuisine:cuisines(name, slug))
+  restaurant_cuisines(cuisine:cuisines(name, slug)),
+  dishes(dietary_tags)
 `;
 
 /**
@@ -23,7 +24,8 @@ const RESTAURANT_SELECT_BY_CUISINE = `
   city,
   price_level,
   image_url,
-  restaurant_cuisines!inner(cuisine:cuisines!inner(name, slug))
+  restaurant_cuisines!inner(cuisine:cuisines!inner(name, slug)),
+  dishes(dietary_tags)
 `;
 
 const PAGE_SIZE = 30;
@@ -35,6 +37,7 @@ type RestaurantRowShape = {
   price_level: number | null;
   image_url: string | null;
   restaurant_cuisines: { cuisine: { name: string; slug: string } | null }[];
+  dishes?: { dietary_tags: string[] | null }[] | null;
 };
 
 function toRestaurant(row: RestaurantRowShape): Restaurant {
@@ -49,6 +52,7 @@ function toRestaurant(row: RestaurantRowShape): Restaurant {
     rating: 0,
     reviewCount: 0,
     imageUrl: row.image_url,
+    dietaryTags: [...new Set((row.dishes ?? []).flatMap((dish) => dish.dietary_tags ?? []))],
   };
 }
 

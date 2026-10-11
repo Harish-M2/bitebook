@@ -26,6 +26,7 @@ import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
 import type { MenuItem } from '@/lib/db/menus';
 import { getRestaurantMenu } from '@/lib/db/menus';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
+import { listRecentlyReviewedRestaurants } from '@/lib/db/restaurant-reviews';
 import { listRestaurants, listTrendingDishes } from '@/lib/db/restaurants';
 import { saveRestaurant } from '@/lib/db/saved';
 import { searchPeople } from '@/lib/db/social';
@@ -81,6 +82,10 @@ export default function DiscoverScreen() {
   });
 
   const trending = useQuery({ queryKey: ['trending-dishes'], queryFn: listTrendingDishes });
+  const recentlyReviewed = useQuery({
+    queryKey: ['recently-reviewed-restaurants'],
+    queryFn: () => listRecentlyReviewedRestaurants(),
+  });
 
   const places = useQuery({
     queryKey: queryKeys.placeSearch(debouncedQuery),
@@ -259,6 +264,34 @@ export default function DiscoverScreen() {
           ) : null}
         </>
       )}
+
+      {!isSearching && searchMode === 'places' && (recentlyReviewed.data ?? []).length > 0 ? (
+        <View className="gap-sm">
+          <Heading level={3} className="px-lg">
+            Recently reviewed
+          </Heading>
+          <FlatList
+            horizontal
+            data={recentlyReviewed.data}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.name}`}
+                onPress={() =>
+                  router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.id } })
+                }
+                className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
+                style={{ minWidth: 150, maxWidth: 220 }}>
+                <BodyText medium numberOfLines={1}>{item.name}</BodyText>
+                {item.city ? <Caption numberOfLines={1}>{item.city}</Caption> : null}
+              </Pressable>
+            )}
+          />
+        </View>
+      ) : null}
 
       <Heading level={3} className="px-lg">
         {searchMode === 'people' ? 'People' : isSearching ? 'Add a restaurant' : 'Restaurants'}

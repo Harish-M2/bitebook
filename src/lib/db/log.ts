@@ -58,6 +58,8 @@ export interface RestaurantReviewMediaInput {
   type: 'image' | 'video';
   contentType: string;
   fileName: string;
+  /** Index into the visit's `dishes` array, when the media shows one specific dish. */
+  dishIndex?: number | null;
 }
 
 export type SeatingType = 'indoor' | 'outdoor' | 'bar' | 'takeaway';
@@ -150,6 +152,7 @@ export async function logRestaurantReview(
     media_type: 'image' | 'video';
     content_type: string;
     position: number;
+    dish_review_id: string | null;
   }[] = [];
   let mediaFailedCount = 0;
 
@@ -172,6 +175,11 @@ export async function logRestaurantReview(
         media_type: media.type,
         content_type: media.contentType,
         position,
+        // The RPC returns one row per dish in input order, so the index maps straight across.
+        dish_review_id:
+          media.dishIndex !== null && media.dishIndex !== undefined
+            ? (data[media.dishIndex]?.review_id ?? null)
+            : null,
       });
     } catch (uploadError) {
       console.warn('[Bitebook] Review media upload failed:', uploadError);

@@ -4,6 +4,8 @@ export interface RestaurantFilters {
   minRating?: number;
   maxDistance?: number;
   priceLevel?: string; // £, ££, £££, ££££
+  /** Keep restaurants with at least one dish carrying this dietary tag. */
+  dietaryTag?: string;
 }
 
 /**
@@ -20,6 +22,10 @@ export function filterRestaurants(
       if (restaurant.rating < filters.minRating) {
         return false;
       }
+    }
+
+    if (filters.dietaryTag && !(restaurant.dietaryTags ?? []).includes(filters.dietaryTag)) {
+      return false;
     }
 
     // Filter by price level

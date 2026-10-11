@@ -184,3 +184,45 @@ export async function getRestaurantVisitSummary(
   const [visit] = await enrichVisitParents([data]);
   return visit ?? null;
 }
+
+export type RecentlyReviewedRestaurant = {
+  id: string;
+  name: string;
+  city: string | null;
+  imageUrl: string | null;
+  lastReviewedAt: string;
+};
+
+/**
+ * Restaurants ordered by their most recent visible review. Reads through
+ * `restaurant_reviews`, so RLS (`can_view_review`) decides what counts: a private visit
+ * never surfaces its restaurant here for anyone but its author.
+ */
+export async function listRecentlyReviewedRestaurants(
+  limit = 10,
+): Promise<RecentlyReviewedRestaurant[]> {
+  const { data, error } = await supabase
+    .from('restaurant_reviews')
+    .select('created_at, restaurant:restaurants(id, name, city, image_url)')
+    .order('created_at', { ascending: false })
+    .limit(limit * 4);
+
+  if (error) throw error;
+
+  const seen = new Set<string>();
+  const result: RecentlyReviewedRestaurant[] = [];
+  for (const row of data ?? []) {
+    const restaurant = row.restaurant;
+    if (!restaurant || seen.has(restaurant.id)) continue;
+    seen.add(restaurant.id);
+    result.push({
+      id: restaurant.id,
+      name: restaurant.name,
+      city: restaurant.city,
+      imageUrl: restaurant.image_url,
+      lastReviewedAt: row.created_at,
+    });
+    if (result.length === limit) break;
+  }
+  return result;
+}

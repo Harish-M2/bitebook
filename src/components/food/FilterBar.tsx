@@ -22,6 +22,12 @@ interface FilterBarProps {
 
 const RATING_OPTIONS = [0, 3.0, 3.5, 4.0, 4.5];
 const DISTANCE_OPTIONS = [1, 2, 5, 10, 20];
+const DIETARY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'halal', label: 'Halal' },
+  { value: 'gluten_free', label: 'Gluten-free' },
+];
 
 /**
  * Filter bar component with expandable filter options
@@ -44,6 +50,10 @@ export function FilterBar({ restaurants, activeFilters, onFiltersChange }: Filte
   const handleDistanceChange = (distance: number) => {
     const newDistance = activeFilters.maxDistance === distance ? undefined : distance;
     onFiltersChange({ ...activeFilters, maxDistance: newDistance });
+  };
+
+  const handleDietaryChange = (tag: string) => {
+    onFiltersChange({ ...activeFilters, dietaryTag: activeFilters.dietaryTag === tag ? undefined : tag });
   };
 
   const handleReset = () => {
@@ -119,6 +129,32 @@ export function FilterBar({ restaurants, activeFilters, onFiltersChange }: Filte
                   </View>
                 </View>
               )}
+
+              {/* Dietary Filter */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Dietary (serves a matching dish)</Text>
+                <View style={styles.filterChips}>
+                  {DIETARY_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.chip,
+                        activeFilters.dietaryTag === option.value && styles.chipActive,
+                      ]}
+                      onPress={() => handleDietaryChange(option.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          activeFilters.dietaryTag === option.value && styles.chipTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
 
               {/* Rating Filter */}
               <View style={styles.filterSection}>

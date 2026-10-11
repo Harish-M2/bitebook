@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Film, Globe, Lock, MapPin, Users, UtensilsCrossed } from 'lucide-react-native';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import type { ReviewMediaDraft } from '@/components/log/PhotoStep';
 import type { DishReviewDraft } from '@/components/log/RatingStep';
@@ -24,6 +24,8 @@ type ConfirmStepProps = {
   recommendationTier: number;
   visibility: ReviewVisibility;
   details: VisitDetailsDraft;
+  /** Jump back to a step to change it; the draft is kept. */
+  onEdit: (step: 'dishes' | 'dishReviews' | 'media' | 'restaurantReview') => void;
 };
 
 const VISIBILITY_COPY: Record<ReviewVisibility, string> = {
@@ -60,6 +62,7 @@ export function ConfirmStep({
   recommendationTier,
   visibility,
   details,
+  onEdit,
 }: ConfirmStepProps) {
   const VisibilityIcon = VISIBILITY_ICON[visibility];
   const detailLines = [
@@ -81,6 +84,25 @@ export function ConfirmStep({
           <View className="rounded-full border border-border bg-surface-muted px-sm py-xxs">
             <MetadataText>{visitedAt}</MetadataText>
           </View>
+        </View>
+
+        <View className="mb-xs flex-row flex-wrap gap-xs">
+          {([
+            ['dishes', 'Edit dishes'],
+            ['dishReviews', 'Edit dish ratings'],
+            ['media', 'Edit media'],
+            ['restaurantReview', 'Edit review'],
+          ] as const).map(([target, label]) => (
+            <Pressable
+              key={target}
+              onPress={() => onEdit(target)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              hitSlop={6}
+              className="rounded-full border border-border px-sm py-xxs">
+              <MetadataText color="accent">{label}</MetadataText>
+            </Pressable>
+          ))}
         </View>
 
         {media.length > 0 ? (
