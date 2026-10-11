@@ -3,14 +3,14 @@ import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
-import { Avatar } from '@/components/ui/Avatar';
+import { PersonRow } from '@/components/social/PersonRow';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
-import { BodyText, Caption, Heading } from '@/components/ui/Typography';
+import { Caption, Heading } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
-import { getFollowerProfiles } from '@/lib/db/social';
+import { getFollowerProfiles, getSocialContext } from '@/lib/db/social';
 
 /** List of profiles following the signed-in user, reached from the profile tab. */
 export default function FollowersScreen() {
@@ -22,6 +22,13 @@ export default function FollowersScreen() {
     queryKey: ['follower-profiles', userId],
     queryFn: () => getFollowerProfiles(userId as string),
     enabled: userId !== null,
+  });
+
+  const ids = (followers.data ?? []).map((person) => person.id);
+  const context = useQuery({
+    queryKey: ['social-context', userId, ids],
+    queryFn: () => getSocialContext(userId as string, ids),
+    enabled: userId !== null && ids.length > 0,
   });
 
   return (
@@ -36,7 +43,10 @@ export default function FollowersScreen() {
             className="h-10 w-10 items-center justify-center rounded-pill border border-border">
             <ArrowLeft size={20} color={colors.textPrimary} />
           </Pressable>
-          <Heading level={2}>Followers</Heading>
+          <View className="gap-xxs">
+            <Heading level={2}>Followers</Heading>
+            {followers.data ? <Caption>{followers.data.length} {followers.data.length === 1 ? 'person' : 'people'}</Caption> : null}
+          </View>
         </View>
 
         {followers.isPending ? (
@@ -60,22 +70,15 @@ export default function FollowersScreen() {
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 32 }}
-            renderItem={({ item }) => {
-              const name = item.display_name || item.username || 'Bitebook user';
-              return (
-                <Pressable
-                  onPress={() => router.push(`/user/${item.id}`)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${name}'s profile`}
-                  className="flex-row items-center gap-md py-sm">
-                  <Avatar uri={item.avatar_url} name={name} size="md" />
-                  <View className="flex-1">
-                    <BodyText medium>{name}</BodyText>
-                    {item.username ? <Caption>@{item.username}</Caption> : null}
-                  </View>
-                </Pressable>
-              );
-            }}
+            ItemSeparatorComponent={() => <View className="h-sm" />}
+            renderItem={({ item }) => (
+              <PersonRow
+                profile={item}
+                isSelf={item.id === userId}
+                followsYou={context.data?.followsMe.has(item.id) ?? false}
+                mutualNames={context.data?.mutualNames.get(item.id) ?? []}
+              />
+            )}
           />
         )}
       </View>

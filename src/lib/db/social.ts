@@ -141,7 +141,7 @@ export async function getUserFollowCounts(userId: string) {
 export async function getFollowingProfiles(userId: string) {
   const { data, error } = await supabase
     .from('follows')
-    .select('following:profiles!follows_following_id_fkey(id, username, display_name, avatar_url)')
+    .select('following:profiles!follows_following_id_fkey(id, username, display_name, avatar_url, bio, dishes_logged_count, restaurants_visited_count, average_rating)')
     .eq('follower_id', userId);
 
   if (error) throw error;
@@ -152,9 +152,52 @@ export async function getFollowingProfiles(userId: string) {
 export async function getFollowerProfiles(userId: string) {
   const { data, error } = await supabase
     .from('follows')
-    .select('follower:profiles!follows_follower_id_fkey(id, username, display_name, avatar_url)')
+    .select('follower:profiles!follows_follower_id_fkey(id, username, display_name, avatar_url, bio, dishes_logged_count, restaurants_visited_count, average_rating)')
     .eq('following_id', userId);
 
   if (error) throw error;
   return (data ?? []).flatMap((follow) => (follow.follower ? [follow.follower] : []));
+}
+
+export type SocialContext = {
+  /** Profile ids (from the given list) that follow the current user. */
+  followsMe: Set<string>;
+  /** For each profile id, names of people the current user follows who also follow them. */
+  mutualNames: Map<string, string[]>;
+};
+
+/** Batched "follows you" and mutual-follower lookup for a list of profiles. */
+export async function getSocialContext(
+  currentUserId: string,
+  profileIds: string[],
+): Promise<SocialContext> {
+  const context: SocialContext = { followsMe: new Set(), mutualNames: new Map() };
+  if (profileIds.length === 0) return context;
+
+  const [followsMeResult, myFollowing] = await Promise.all([
+    supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', currentUserId)
+      .in('follower_id', profileIds),
+    getFollowing(currentUserId),
+  ]);
+  if (followsMeResult.error) throw followsMeResult.error;
+  for (const row of followsMeResult.data ?? []) context.followsMe.add(row.follower_id);
+
+  if (myFollowing.length === 0) return context;
+  const { data, error } = await supabase
+    .from('follows')
+    .select('following_id, follower:profiles!follows_follower_id_fkey(display_name, username)')
+    .in('following_id', profileIds)
+    .in('follower_id', myFollowing);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    const name = row.follower?.display_name || row.follower?.username;
+    if (!name || row.following_id === currentUserId) continue;
+    const names = context.mutualNames.get(row.following_id) ?? [];
+    names.push(name);
+    context.mutualNames.set(row.following_id, names);
+  }
+  return context;
 }

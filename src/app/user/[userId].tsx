@@ -100,8 +100,29 @@ export default function UserProfileScreen() {
             <ArrowLeft size={20} color={colors.textPrimary} />
           </Pressable>
 
-          <View className="items-center gap-sm py-lg">
-            <Avatar uri={profileData.avatar_url} name={displayName} size="xl" />
+          <View
+            className="items-center gap-sm overflow-hidden rounded-xl border border-border bg-surface px-lg pb-xl pt-[72px]"
+            style={{
+              shadowColor: '#000000',
+              shadowOpacity: 0.14,
+              shadowRadius: 18,
+              shadowOffset: { width: 0, height: 8 },
+            }}>
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 96,
+                backgroundColor: colors.accent,
+                opacity: 0.18,
+              }}
+            />
+            <View style={{ borderRadius: 999, borderWidth: 2, borderColor: colors.accent, padding: 4 }}>
+              <Avatar uri={profileData.avatar_url} name={displayName} size="xl" />
+            </View>
             <View className="items-center gap-xxs">
               <Heading level={2} style={{ textAlign: 'center' }}>{displayName}</Heading>
               {profileData.username ? <Caption>@{profileData.username}</Caption> : null}
@@ -113,13 +134,14 @@ export default function UserProfileScreen() {
             ) : null}
           </View>
 
-          <View className="flex-row items-center justify-center gap-xxl border-y border-border py-md">
+          <View className="flex-row items-center justify-around rounded-xl border border-border bg-surface py-md">
             <View className="items-center gap-xxs">
-              <BodyText medium>{followCounts.data?.followerCount ?? 0}</BodyText>
+              <Heading level={3}>{followCounts.data?.followerCount ?? 0}</Heading>
               <MetadataText>Followers</MetadataText>
             </View>
+            <View className="h-8 w-px bg-border" />
             <View className="items-center gap-xxs">
-              <BodyText medium>{followCounts.data?.followingCount ?? 0}</BodyText>
+              <Heading level={3}>{followCounts.data?.followingCount ?? 0}</Heading>
               <MetadataText>Following</MetadataText>
             </View>
           </View>
