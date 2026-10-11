@@ -44,6 +44,8 @@ export default function DiscoverScreen() {
   const [activeCuisine, setActiveCuisine] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'places' | 'people'>('places');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [railTab, setRailTab] = useState<'trending' | 'recent'>('trending');
   const [activeFilters, setActiveFilters] = useState<RestaurantFilters>({});
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -167,8 +169,19 @@ export default function DiscoverScreen() {
   // Apply filters to restaurants
   const filteredRestaurants = filterRestaurants(restaurants.data ?? [], activeFilters);
 
+  // The mode switch only appears while the user is actually searching, so the resting page
+  // is just search + filters + content.
+  const showModeToggle = searchFocused || query.length > 0 || searchMode === 'people';
+  const hasActiveFilters =
+    activeCuisine !== null || Object.values(activeFilters).some((value) => value !== undefined);
+  // Rails are for browsing; once the user narrows or searches, show only results.
+  const showRails = searchMode === 'places' && !isSearching && !hasActiveFilters;
+  const hasTrending = trendingDishes.length > 0;
+  const hasRecent = (recentlyReviewed.data ?? []).length > 0;
+  const activeRail = hasTrending && (railTab === 'trending' || !hasRecent) ? 'trending' : 'recent';
+
   const header = (
-    <View className="gap-lg pb-md">
+    <View className="gap-xl pb-md">
       <View className="gap-md px-lg pt-xs">
         <View className="flex-row items-center justify-between">
           <Heading level={2}>Discover</Heading>
@@ -180,6 +193,7 @@ export default function DiscoverScreen() {
           </Pressable>
         </View>
         <View style={{ width: '100%', maxWidth: 920, alignSelf: 'center' }}>
+          {showModeToggle ? (
           <View
             className="mb-sm flex-row rounded-pill p-xxs"
             style={{ backgroundColor: palette.surfaceMuted }}>
@@ -204,132 +218,127 @@ export default function DiscoverScreen() {
               </BodyText>
             </Pressable>
           </View>
-          <SearchBar
+          ) : null}
+          <View className="flex-row items-center gap-sm">
+            <View style={{ flex: 1 }}>
+            <SearchBar
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}
             returnKeyType="search"
             clearButtonMode="while-editing"
+            onFocus={() => setSearchFocused(true)}
+            // Delayed so a tap on the mode switch is not lost to the blur that precedes it.
+            onBlur={() => setTimeout(() => setSearchFocused(false), 250)}
             placeholder={
               searchMode === 'people'
                 ? 'Search by name or username...'
                 : 'Search for dishes, restaurants, cuisines...'
             }
           />
+            </View>
+            {searchMode === 'places' && !isSearching ? (
+              <FilterBar
+                compact
+                restaurants={restaurants.data ?? []}
+                activeFilters={activeFilters}
+                onFiltersChange={setActiveFilters}
+                cuisines={cuisines.data ?? []}
+                activeCuisine={activeCuisine}
+                onCuisineChange={setActiveCuisine}
+              />
+            ) : null}
+          </View>
         </View>
       </View>
 
-      {searchMode !== 'places' || isSearching ? null : (
+      {showRails ? (
         <>
-          <FlatList
-            horizontal
-            data={cuisines.data ?? []}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <Chip
-                label={item.name}
-                selected={activeCuisine === item.slug}
-                // Tapping the active chip clears the filter rather than leaving the user
-                // with no way back to "everything".
-                onPress={() => setActiveCuisine(activeCuisine === item.slug ? null : item.slug)}
-              />
-            )}
-          />
-
-          {/* Filter Bar */}
-          {(restaurants.data ?? []).length > 0 && (
-            <FilterBar
-              restaurants={restaurants.data ?? []}
-              activeFilters={activeFilters}
-              onFiltersChange={setActiveFilters}
-            />
-          )}
-
-          {trendingDishes.length > 0 ? (
+          {(friendRecs.data ?? []).length > 0 ? (
             <View className="gap-sm">
-              <Heading level={3} className="px-lg">
-                Trending dishes
-              </Heading>
+              <Caption color="textSecondary" className="px-lg">
+                From people you follow
+              </Caption>
               <FlatList
                 horizontal
-                data={trendingDishes}
-                keyExtractor={(item) => item.id}
+                data={(friendRecs.data ?? []).slice(0, 8)}
+                keyExtractor={(item) => item.restaurantId}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
                 renderItem={({ item }) => (
-                  <DishCard
-                    dish={item}
-                    onPress={() => router.push({ pathname: '/dish-detail', params: { dishId: item.id } })}
-                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${item.name}`}
+                    onPress={() =>
+                      router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.restaurantId } })
+                    }
+                    className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
+                    style={{ minWidth: 170, maxWidth: 240 }}>
+                    <BodyText medium numberOfLines={1}>{item.name}</BodyText>
+                    <Caption numberOfLines={1}>
+                      {item.topTier === 5 ? '🤤 Must try' : '😋 Worth a visit'}
+                    </Caption>
+                    <Caption color="textSecondary" numberOfLines={1}>
+                      {item.friendNames.slice(0, 2).join(', ')}
+                      {item.friendNames.length > 2 ? ` +${item.friendNames.length - 2}` : ''}
+                    </Caption>
+                  </Pressable>
                 )}
               />
             </View>
           ) : null}
+
+          {hasTrending || hasRecent ? (
+            <View className="gap-sm">
+              {hasTrending && hasRecent ? (
+                <View className="flex-row gap-xs px-lg">
+                  <Chip label="Trending dishes" selected={activeRail === 'trending'} onPress={() => setRailTab('trending')} />
+                  <Chip label="Recently reviewed" selected={activeRail === 'recent'} onPress={() => setRailTab('recent')} />
+                </View>
+              ) : (
+                <Caption color="textSecondary" className="px-lg">
+                  {hasTrending ? 'Trending dishes' : 'Recently reviewed'}
+                </Caption>
+              )}
+              {activeRail === 'trending' ? (
+                <FlatList
+                  horizontal
+                  data={trendingDishes}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
+                  renderItem={({ item }) => (
+                    <DishCard
+                      dish={item}
+                      onPress={() => router.push({ pathname: '/dish-detail', params: { dishId: item.id } })}
+                    />
+                  )}
+                />
+              ) : (
+                <FlatList
+                  horizontal
+                  data={recentlyReviewed.data ?? []}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${item.name}`}
+                      onPress={() =>
+                        router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.id } })
+                      }
+                      className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
+                      style={{ minWidth: 150, maxWidth: 220 }}>
+                      <BodyText medium numberOfLines={1}>{item.name}</BodyText>
+                      {item.city ? <Caption numberOfLines={1}>{item.city}</Caption> : null}
+                    </Pressable>
+                  )}
+                />
+              )}
+            </View>
+          ) : null}
         </>
-      )}
-
-      {!isSearching && searchMode === 'places' && (friendRecs.data ?? []).length > 0 ? (
-        <View className="gap-sm">
-          <Heading level={3} className="px-lg">
-            Recommended by people you follow
-          </Heading>
-          <FlatList
-            horizontal
-            data={friendRecs.data}
-            keyExtractor={(item) => item.restaurantId}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${item.name}`}
-                onPress={() =>
-                  router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.restaurantId } })
-                }
-                className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
-                style={{ minWidth: 170, maxWidth: 240 }}>
-                <BodyText medium numberOfLines={1}>{item.name}</BodyText>
-                <Caption numberOfLines={1}>
-                  {item.topTier === 5 ? '🤤 Must try' : '😋 Worth a visit'}
-                </Caption>
-                <Caption color="textSecondary" numberOfLines={1}>
-                  {item.friendNames.slice(0, 2).join(', ')}
-                  {item.friendNames.length > 2 ? ` +${item.friendNames.length - 2}` : ''}
-                </Caption>
-              </Pressable>
-            )}
-          />
-        </View>
-      ) : null}
-
-      {!isSearching && searchMode === 'places' && (recentlyReviewed.data ?? []).length > 0 ? (
-        <View className="gap-sm">
-          <Heading level={3} className="px-lg">
-            Recently reviewed
-          </Heading>
-          <FlatList
-            horizontal
-            data={recentlyReviewed.data}
-            keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
-            renderItem={({ item }) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${item.name}`}
-                onPress={() =>
-                  router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.id } })
-                }
-                className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
-                style={{ minWidth: 150, maxWidth: 220 }}>
-                <BodyText medium numberOfLines={1}>{item.name}</BodyText>
-                {item.city ? <Caption numberOfLines={1}>{item.city}</Caption> : null}
-              </Pressable>
-            )}
-          />
-        </View>
       ) : null}
 
       <Heading level={3} className="px-lg">

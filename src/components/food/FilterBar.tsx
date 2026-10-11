@@ -18,6 +18,12 @@ interface FilterBarProps {
   restaurants: Restaurant[];
   activeFilters: RestaurantFilters;
   onFiltersChange: (filters: RestaurantFilters) => void;
+  /** Cuisine chips are offered inside the sheet so the page itself stays clean. */
+  cuisines?: { id: string; name: string; slug: string }[];
+  activeCuisine?: string | null;
+  onCuisineChange?: (slug: string | null) => void;
+  /** Drops the outer padding so the button can sit beside the search bar. */
+  compact?: boolean;
 }
 
 const RATING_OPTIONS = [0, 3.0, 3.5, 4.0, 4.5];
@@ -33,7 +39,15 @@ const DIETARY_OPTIONS: { value: string; label: string }[] = [
  * Filter bar component with expandable filter options
  * Shows price, rating, and distance filters
  */
-export function FilterBar({ restaurants, activeFilters, onFiltersChange }: FilterBarProps) {
+export function FilterBar({
+  restaurants,
+  activeFilters,
+  onFiltersChange,
+  cuisines = [],
+  activeCuisine = null,
+  onCuisineChange,
+  compact = false,
+}: FilterBarProps) {
   const [showFilters, setShowFilters] = useState(false);
   const priceOptions = getPriceLevels(restaurants);
 
@@ -58,12 +72,14 @@ export function FilterBar({ restaurants, activeFilters, onFiltersChange }: Filte
 
   const handleReset = () => {
     onFiltersChange({});
+    onCuisineChange?.(null);
   };
 
-  const activeFilterCount = Object.values(activeFilters).filter((v) => v !== undefined).length;
+  const activeFilterCount =
+    Object.values(activeFilters).filter((v) => v !== undefined).length + (activeCuisine ? 1 : 0);
 
   return (
-    <View style={styles.container}>
+    <View style={compact ? undefined : styles.container}>
       <Pressable
         style={[
           styles.filterButton,
@@ -88,7 +104,7 @@ export function FilterBar({ restaurants, activeFilters, onFiltersChange }: Filte
           <View style={styles.modalContent}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Restaurants</Text>
+              <Text style={styles.modalTitle}>Filters</Text>
               <Pressable
                 onPress={() => setShowFilters(false)}
                 hitSlop={8}
@@ -102,6 +118,33 @@ export function FilterBar({ restaurants, activeFilters, onFiltersChange }: Filte
               contentContainerStyle={styles.filterContent}
               showsVerticalScrollIndicator={false}
             >
+              {/* Cuisine Filter */}
+              {cuisines.length > 0 && onCuisineChange ? (
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterLabel}>Cuisine</Text>
+                  <View style={styles.filterChips}>
+                    {cuisines.map((cuisine) => (
+                      <Pressable
+                        key={cuisine.id}
+                        style={[styles.chip, activeCuisine === cuisine.slug && styles.chipActive]}
+                        onPress={() =>
+                          onCuisineChange(activeCuisine === cuisine.slug ? null : cuisine.slug)
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            activeCuisine === cuisine.slug && styles.chipTextActive,
+                          ]}
+                        >
+                          {cuisine.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
               {/* Price Level Filter */}
               {priceOptions.length > 0 && (
                 <View style={styles.filterSection}>
