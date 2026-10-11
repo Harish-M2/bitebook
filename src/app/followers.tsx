@@ -77,6 +77,7 @@ export default function FollowersScreen() {
                 isSelf={item.id === userId}
                 followsYou={context.data?.followsMe.has(item.id) ?? false}
                 mutualNames={context.data?.mutualNames.get(item.id) ?? []}
+                cuisines={context.data?.topCuisines.get(item.id) ?? []}
               />
             )}
           />

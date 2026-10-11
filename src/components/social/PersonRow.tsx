@@ -24,11 +24,13 @@ export function PersonRow({
   isSelf = false,
   followsYou = false,
   mutualNames = [],
+  cuisines = [],
 }: {
   profile: PersonRowProfile;
   isSelf?: boolean;
   followsYou?: boolean;
   mutualNames?: string[];
+  cuisines?: string[];
 }) {
   const name = profile.display_name || profile.username || 'Bitebook user';
   const statParts = [
@@ -84,6 +86,17 @@ export function PersonRow({
         </View>
         {profile.bio ? (
           <MetadataText numberOfLines={1}>{profile.bio}</MetadataText>
+        ) : null}
+        {cuisines.length > 0 ? (
+          <View className="flex-row flex-wrap gap-xxs pt-xxs">
+            {cuisines.map((cuisine) => (
+              <View
+                key={cuisine}
+                className="rounded-pill border border-border bg-surface-elevated px-sm py-xxs">
+                <MetadataText>{cuisine}</MetadataText>
+              </View>
+            ))}
+          </View>
         ) : null}
         {stats ? <MetadataText numberOfLines={1}>{stats}</MetadataText> : null}
         {mutualText ? <MetadataText numberOfLines={1}>{mutualText}</MetadataText> : null}

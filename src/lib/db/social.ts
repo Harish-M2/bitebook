@@ -164,6 +164,8 @@ export type SocialContext = {
   followsMe: Set<string>;
   /** For each profile id, names of people the current user follows who also follow them. */
   mutualNames: Map<string, string[]>;
+  /** Up to three most-reviewed cuisines per profile, from reviews visible to the viewer. */
+  topCuisines: Map<string, string[]>;
 };
 
 /** Batched "follows you" and mutual-follower lookup for a list of profiles. */
@@ -171,7 +173,11 @@ export async function getSocialContext(
   currentUserId: string,
   profileIds: string[],
 ): Promise<SocialContext> {
-  const context: SocialContext = { followsMe: new Set(), mutualNames: new Map() };
+  const context: SocialContext = {
+    followsMe: new Set(),
+    mutualNames: new Map(),
+    topCuisines: new Map(),
+  };
   if (profileIds.length === 0) return context;
 
   const [followsMeResult, myFollowing] = await Promise.all([
@@ -184,6 +190,31 @@ export async function getSocialContext(
   ]);
   if (followsMeResult.error) throw followsMeResult.error;
   for (const row of followsMeResult.data ?? []) context.followsMe.add(row.follower_id);
+
+  // Derived from reviews so it respects review visibility (RLS); no extra table is exposed.
+  const cuisineResult = await supabase
+    .from('reviews')
+    .select('user_id, dish:dishes!reviews_dish_id_fkey(dish_cuisines(cuisine:cuisines(name)))')
+    .in('user_id', profileIds)
+    .is('restaurant_review_id', null)
+    .limit(500);
+  if (cuisineResult.error) throw cuisineResult.error;
+  const tallies = new Map<string, Map<string, number>>();
+  for (const row of cuisineResult.data ?? []) {
+    for (const link of row.dish?.dish_cuisines ?? []) {
+      const cuisine = link.cuisine?.name;
+      if (!cuisine) continue;
+      const tally = tallies.get(row.user_id) ?? new Map<string, number>();
+      tally.set(cuisine, (tally.get(cuisine) ?? 0) + 1);
+      tallies.set(row.user_id, tally);
+    }
+  }
+  for (const [id, tally] of tallies) {
+    context.topCuisines.set(
+      id,
+      [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name]) => name),
+    );
+  }
 
   if (myFollowing.length === 0) return context;
   const { data, error } = await supabase
