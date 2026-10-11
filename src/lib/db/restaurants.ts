@@ -30,6 +30,12 @@ const RESTAURANT_SELECT_BY_CUISINE = `
 `;
 
 const PAGE_SIZE = 30;
+/**
+ * Discover ranks and pages the catalogue on the client, so the fetch is capped. Newest first
+ * keeps the cap from hiding recent additions. Raise this, or move ranking server-side, once
+ * the catalogue outgrows it.
+ */
+const CATALOGUE_CAP = 200;
 
 type RestaurantRowShape = {
   id: string;
@@ -70,8 +76,13 @@ export async function listRestaurants(cuisineSlug?: string | null): Promise<Rest
         .from('restaurants')
         .select(RESTAURANT_SELECT_BY_CUISINE)
         .eq('restaurant_cuisines.cuisine.slug', cuisineSlug)
-        .limit(PAGE_SIZE)
-    : await supabase.from('restaurants').select(RESTAURANT_SELECT).limit(PAGE_SIZE);
+        .order('created_at', { ascending: false })
+        .limit(CATALOGUE_CAP)
+    : await supabase
+        .from('restaurants')
+        .select(RESTAURANT_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(CATALOGUE_CAP);
 
   if (error) {
     throw error;

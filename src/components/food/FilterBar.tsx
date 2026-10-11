@@ -1,6 +1,6 @@
 import { colors } from '@/constants/colors';
 import type { RestaurantFilters } from '@/lib/db/filters';
-import { getPriceLevels } from '@/lib/db/filters';
+import { getPriceLevels, SORT_OPTIONS } from '@/lib/db/filters';
 import type { Restaurant } from '@/types/models';
 import { ChevronDown, X } from 'lucide-react-native';
 import { useState } from 'react';
@@ -70,6 +70,11 @@ export function FilterBar({
     onFiltersChange({ ...activeFilters, dietaryTag: activeFilters.dietaryTag === tag ? undefined : tag });
   };
 
+  const handleSortChange = (sort: NonNullable<RestaurantFilters['sort']>) => {
+    // 'recommended' is the default, so selecting it clears the field instead of counting as a filter.
+    onFiltersChange({ ...activeFilters, sort: sort === 'recommended' ? undefined : sort });
+  };
+
   const handleReset = () => {
     onFiltersChange({});
     onCuisineChange?.(null);
@@ -118,6 +123,47 @@ export function FilterBar({
               contentContainerStyle={styles.filterContent}
               showsVerticalScrollIndicator={false}
             >
+              {/* Sort */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Sort by</Text>
+                <View style={styles.filterChips}>
+                  {SORT_OPTIONS.map((option) => {
+                    const selected = (activeFilters.sort ?? 'recommended') === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        style={[styles.chip, selected && styles.chipActive]}
+                        onPress={() => handleSortChange(option.value)}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Hide visited */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Visited</Text>
+                <View style={styles.filterChips}>
+                  <Pressable
+                    style={[styles.chip, activeFilters.hideVisited && styles.chipActive]}
+                    onPress={() =>
+                      onFiltersChange({
+                        ...activeFilters,
+                        hideVisited: activeFilters.hideVisited ? undefined : true,
+                      })
+                    }
+                  >
+                    <Text style={[styles.chipText, activeFilters.hideVisited && styles.chipTextActive]}>
+                      Hide places I have visited
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
               {/* Cuisine Filter */}
               {cuisines.length > 0 && onCuisineChange ? (
                 <View style={styles.filterSection}>

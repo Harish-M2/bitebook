@@ -280,3 +280,28 @@ export async function listFriendRecommendations(
   }
   return [...byRestaurant.values()].slice(0, limit);
 }
+
+export type RestaurantRatingStat = { average: number; count: number };
+
+/**
+ * Average overall rating and review count per restaurant, from the reviews the viewer can
+ * see (RLS). Restaurants carry no stored aggregate, so Discover ranks from this.
+ */
+export async function listRestaurantRatingStats(): Promise<Map<string, RestaurantRatingStat>> {
+  const { data, error } = await supabase
+    .from('restaurant_reviews')
+    .select('restaurant_id, overall_rating')
+    .limit(2000);
+  if (error) throw error;
+
+  const totals = new Map<string, { sum: number; count: number }>();
+  for (const row of data ?? []) {
+    const entry = totals.get(row.restaurant_id) ?? { sum: 0, count: 0 };
+    entry.sum += Number(row.overall_rating);
+    entry.count += 1;
+    totals.set(row.restaurant_id, entry);
+  }
+  const stats = new Map<string, RestaurantRatingStat>();
+  for (const [id, { sum, count }] of totals) stats.set(id, { average: sum / count, count });
+  return stats;
+}

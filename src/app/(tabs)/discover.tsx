@@ -22,16 +22,25 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useAppTheme } from '@/hooks/useTheme';
 import { listCuisines } from '@/lib/db/cuisines';
-import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
+import { filterRestaurants, rankRestaurants, type RestaurantFilters } from '@/lib/db/filters';
 import type { MenuItem } from '@/lib/db/menus';
 import { getRestaurantMenu } from '@/lib/db/menus';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
-import { listFriendRecommendations, listRecentlyReviewedRestaurants } from '@/lib/db/restaurant-reviews';
+import {
+  listFriendRecommendations,
+  listRecentlyReviewedRestaurants,
+  listRestaurantRatingStats,
+} from '@/lib/db/restaurant-reviews';
+import { getCuisinePreferences } from '@/lib/db/preferences';
+import { listVisited } from '@/lib/db/visited';
 import { listRestaurants, listTrendingDishes } from '@/lib/db/restaurants';
 import { saveRestaurant } from '@/lib/db/saved';
 import { getFollowing, searchPeople } from '@/lib/db/social';
 import { queryKeys } from '@/lib/queryClient';
 import type { Restaurant } from '@/types/models';
+
+/** Restaurants rendered per page of the ranked list. */
+const LIST_PAGE_SIZE = 20;
 
 /** Below this the provider rejects the query anyway; matches the Edge Function's guard. */
 const MIN_QUERY_LENGTH = 2;
@@ -45,6 +54,7 @@ export default function DiscoverScreen() {
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'places' | 'people'>('places');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [paging, setPaging] = useState<{ key: string; count: number }>({ key: '', count: 20 });
   const [railTab, setRailTab] = useState<'trending' | 'recent'>('trending');
   const [activeFilters, setActiveFilters] = useState<RestaurantFilters>({});
   const [menuVisible, setMenuVisible] = useState(false);
@@ -87,6 +97,20 @@ export default function DiscoverScreen() {
   const friendRecs = useQuery({
     queryKey: ['friend-recommendations', user?.id ?? null],
     queryFn: async () => listFriendRecommendations(await getFollowing(user!.id)),
+    enabled: Boolean(user),
+  });
+  const ratingStats = useQuery({
+    queryKey: ['restaurant-rating-stats'],
+    queryFn: listRestaurantRatingStats,
+  });
+  const visited = useQuery({
+    queryKey: ['visited-list', user?.id ?? null],
+    queryFn: listVisited,
+    enabled: Boolean(user),
+  });
+  const favouriteCuisineIds = useQuery({
+    queryKey: ['cuisine-preferences', user?.id ?? null],
+    queryFn: () => getCuisinePreferences(user!.id),
     enabled: Boolean(user),
   });
   const recentlyReviewed = useQuery({
@@ -167,7 +191,30 @@ export default function DiscoverScreen() {
   const trendingDishes = trending.data ?? [];
 
   // Apply filters to restaurants
-  const filteredRestaurants = filterRestaurants(restaurants.data ?? [], activeFilters);
+  const withRatings = (restaurants.data ?? []).map((restaurant) => {
+    const stat = ratingStats.data?.get(restaurant.id);
+    return stat ? { ...restaurant, rating: stat.average, reviewCount: stat.count } : restaurant;
+  });
+  const visitedIds = new Set((visited.data ?? []).map((visit) => visit.restaurant_id));
+  const favouriteNames = new Set(
+    (cuisines.data ?? [])
+      .filter((cuisine) => (favouriteCuisineIds.data ?? []).includes(cuisine.id))
+      .map((cuisine) => cuisine.name),
+  );
+  const ranked = rankRestaurants(
+    filterRestaurants(withRatings, activeFilters).filter(
+      (restaurant) => !(activeFilters.hideVisited && visitedIds.has(restaurant.id)),
+    ),
+    activeFilters.sort ?? 'recommended',
+    {
+      friendRestaurantIds: new Set((friendRecs.data ?? []).map((rec) => rec.restaurantId)),
+      favouriteCuisines: favouriteNames,
+    },
+  );
+  // The visible count resets whenever the cuisine or filters change, without an effect.
+  const listKey = JSON.stringify([activeCuisine, activeFilters]);
+  const visibleCount = paging.key === listKey ? paging.count : LIST_PAGE_SIZE;
+  const filteredRestaurants = ranked.slice(0, visibleCount);
 
   // The mode switch only appears while the user is actually searching, so the resting page
   // is just search + filters + content.
@@ -466,6 +513,10 @@ export default function DiscoverScreen() {
         data={filteredRestaurants}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        onEndReachedThreshold={0.6}
+        onEndReached={() => {
+          if (visibleCount < ranked.length) setPaging({ key: listKey, count: visibleCount + LIST_PAGE_SIZE });
+        }}
         ListHeaderComponent={header}
         renderItem={({ item }) => (
           <RestaurantRow

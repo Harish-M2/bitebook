@@ -6,6 +6,57 @@ export interface RestaurantFilters {
   priceLevel?: string; // £, ££, £££, ££££
   /** Keep restaurants with at least one dish carrying this dietary tag. */
   dietaryTag?: string;
+  /** Defaults to 'recommended' when unset. Applied by rankRestaurants, not filterRestaurants. */
+  sort?: RestaurantSort;
+  /** Hide restaurants the user has marked as visited. */
+  hideVisited?: boolean;
+}
+
+export type RestaurantSort = 'recommended' | 'top_rated' | 'most_reviewed' | 'newest' | 'name';
+
+export const SORT_OPTIONS: { value: RestaurantSort; label: string }[] = [
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'top_rated', label: 'Top rated' },
+  { value: 'most_reviewed', label: 'Most reviewed' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'name', label: 'A–Z' },
+];
+
+export type RankContext = {
+  /** Restaurants people the user follows recommend. */
+  friendRestaurantIds: Set<string>;
+  /** Cuisine names the user picked as favourites. */
+  favouriteCuisines: Set<string>;
+};
+
+/**
+ * Orders restaurants. Input order is newest-first, and Array#sort is stable, so ties keep
+ * that order. "Recommended" favours friends' picks, then the user's cuisines, then quality.
+ */
+export function rankRestaurants(
+  restaurants: Restaurant[],
+  sort: RestaurantSort,
+  context: RankContext,
+): Restaurant[] {
+  const copy = [...restaurants];
+  switch (sort) {
+    case 'newest':
+      return copy;
+    case 'name':
+      return copy.sort((a, b) => a.name.localeCompare(b.name));
+    case 'top_rated':
+      return copy.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount);
+    case 'most_reviewed':
+      return copy.sort((a, b) => b.reviewCount - a.reviewCount || b.rating - a.rating);
+    default: {
+      const score = (r: Restaurant) =>
+        (context.friendRestaurantIds.has(r.id) ? 1000 : 0) +
+        (context.favouriteCuisines.has(r.cuisine) ? 100 : 0) +
+        r.rating * 10 +
+        Math.min(r.reviewCount, 20);
+      return copy.sort((a, b) => score(b) - score(a));
+    }
+  }
 }
 
 /**
