@@ -46,7 +46,7 @@ interface SearchResponse {
  * The Functions client reports a failed invocation through `error`, but the useful message
  * is in the response body, which it does not read. Pull it out so the UI can show why.
  */
-async function readInvokeError(error: unknown, fallback: string): Promise<Error> {
+export async function readInvokeError(error: unknown, fallback: string): Promise<Error> {
   const context = (error as { context?: Response })?.context;
 
   if (context && typeof context.json === 'function') {

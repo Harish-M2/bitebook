@@ -1,4 +1,5 @@
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
+import { readInvokeError } from '@/lib/db/places';
 import { publicImageUrl } from '@/lib/db/storage';
 import { formatPriceLevel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -219,3 +220,16 @@ export async function getRestaurantPhotos(restaurantId: string): Promise<string[
     .filter((url): url is string => url !== null);
 }
 
+
+/**
+ * Asks the server to store a menu link for a restaurant. The server accepts it only if it is
+ * on the restaurant's own website domain; `restaurants` has no client write policy.
+ */
+export async function submitMenuUrl(restaurantId: string, menuUrl: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{ menuUrl: string }>('submit-menu-url', {
+    body: { restaurantId, menuUrl },
+  });
+  if (error) throw await readInvokeError(error, 'Could not save the menu link');
+  if (!data?.menuUrl) throw new Error('Could not save the menu link');
+  return data.menuUrl;
+}

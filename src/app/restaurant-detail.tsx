@@ -7,6 +7,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-n
 import { FeedItem } from '@/components/feed/FeedItem';
 import { ReviewList } from '@/components/reviews';
 import { SaveButton } from '@/components/social/SaveButton';
+import { MenuLinkForm } from '@/components/food/MenuLinkForm';
 import { VisitedButton } from '@/components/social/VisitedButton';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -122,6 +123,7 @@ export default function RestaurantDetailScreen() {
                     />
                   ))}
                 </View>
+                {data.website_url && !data.menu_url ? <MenuLinkForm restaurantId={data.id} /> : null}
               </View>
             ) : null}
 

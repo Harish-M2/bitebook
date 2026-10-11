@@ -226,3 +226,57 @@ export async function listRecentlyReviewedRestaurants(
   }
   return result;
 }
+
+export type FriendRecommendation = {
+  restaurantId: string;
+  name: string;
+  city: string | null;
+  /** Highest recommendation tier any followed person gave (1-5). */
+  topTier: number;
+  friendNames: string[];
+};
+
+/**
+ * Restaurants that people the user follows rated 4 ("Worth a visit") or 5 ("Must try").
+ * "Friends" is the follow graph for now: there is no mutual-friend concept in the schema.
+ * Visibility is enforced by RLS on `restaurant_reviews`, not here.
+ */
+export async function listFriendRecommendations(
+  followingIds: string[],
+  limit = 10,
+): Promise<FriendRecommendation[]> {
+  if (followingIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('restaurant_reviews')
+    .select(
+      'recommendation_tier, created_at, restaurant:restaurants(id, name, city), author:profiles!restaurant_reviews_user_id_fkey(display_name, username)',
+    )
+    .in('user_id', followingIds)
+    .gte('recommendation_tier', 4)
+    .order('created_at', { ascending: false })
+    .limit(limit * 5);
+
+  if (error) throw error;
+
+  const byRestaurant = new Map<string, FriendRecommendation>();
+  for (const row of data ?? []) {
+    const restaurant = row.restaurant;
+    if (!restaurant) continue;
+    const who = row.author?.display_name ?? row.author?.username ?? 'Someone you follow';
+    const existing = byRestaurant.get(restaurant.id);
+    if (existing) {
+      existing.topTier = Math.max(existing.topTier, row.recommendation_tier);
+      if (!existing.friendNames.includes(who)) existing.friendNames.push(who);
+    } else {
+      byRestaurant.set(restaurant.id, {
+        restaurantId: restaurant.id,
+        name: restaurant.name,
+        city: restaurant.city,
+        topTier: row.recommendation_tier,
+        friendNames: [who],
+      });
+    }
+  }
+  return [...byRestaurant.values()].slice(0, limit);
+}

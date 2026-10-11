@@ -26,10 +26,10 @@ import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
 import type { MenuItem } from '@/lib/db/menus';
 import { getRestaurantMenu } from '@/lib/db/menus';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
-import { listRecentlyReviewedRestaurants } from '@/lib/db/restaurant-reviews';
+import { listFriendRecommendations, listRecentlyReviewedRestaurants } from '@/lib/db/restaurant-reviews';
 import { listRestaurants, listTrendingDishes } from '@/lib/db/restaurants';
 import { saveRestaurant } from '@/lib/db/saved';
-import { searchPeople } from '@/lib/db/social';
+import { getFollowing, searchPeople } from '@/lib/db/social';
 import { queryKeys } from '@/lib/queryClient';
 import type { Restaurant } from '@/types/models';
 
@@ -82,6 +82,11 @@ export default function DiscoverScreen() {
   });
 
   const trending = useQuery({ queryKey: ['trending-dishes'], queryFn: listTrendingDishes });
+  const friendRecs = useQuery({
+    queryKey: ['friend-recommendations', user?.id ?? null],
+    queryFn: async () => listFriendRecommendations(await getFollowing(user!.id)),
+    enabled: Boolean(user),
+  });
   const recentlyReviewed = useQuery({
     queryKey: ['recently-reviewed-restaurants'],
     queryFn: () => listRecentlyReviewedRestaurants(),
@@ -264,6 +269,40 @@ export default function DiscoverScreen() {
           ) : null}
         </>
       )}
+
+      {!isSearching && searchMode === 'places' && (friendRecs.data ?? []).length > 0 ? (
+        <View className="gap-sm">
+          <Heading level={3} className="px-lg">
+            Recommended by people you follow
+          </Heading>
+          <FlatList
+            horizontal
+            data={friendRecs.data}
+            keyExtractor={(item) => item.restaurantId}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingHorizontal: 20 }}
+            renderItem={({ item }) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.name}`}
+                onPress={() =>
+                  router.push({ pathname: '/restaurant-detail', params: { restaurantId: item.restaurantId } })
+                }
+                className="gap-xxs rounded-lg border border-border bg-surface px-md py-sm"
+                style={{ minWidth: 170, maxWidth: 240 }}>
+                <BodyText medium numberOfLines={1}>{item.name}</BodyText>
+                <Caption numberOfLines={1}>
+                  {item.topTier === 5 ? '🤤 Must try' : '😋 Worth a visit'}
+                </Caption>
+                <Caption color="textSecondary" numberOfLines={1}>
+                  {item.friendNames.slice(0, 2).join(', ')}
+                  {item.friendNames.length > 2 ? ` +${item.friendNames.length - 2}` : ''}
+                </Caption>
+              </Pressable>
+            )}
+          />
+        </View>
+      ) : null}
 
       {!isSearching && searchMode === 'places' && (recentlyReviewed.data ?? []).length > 0 ? (
         <View className="gap-sm">
