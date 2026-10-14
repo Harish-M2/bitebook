@@ -10,6 +10,27 @@ GitHub pushes remain outside that authorization. The Git safety statements and d
 commands below describe the original, uncommitted review snapshot; do not use those
 discard commands on merged `main`. Deployment success must be verified separately.
 
+## Production Release
+
+- Release commit: `144b3e580dabef3fb078a39633113cfe997d0681`.
+- The feature branch was fast-forward merged into local `main`; no GitHub push was made.
+- Vercel project: `ten-fold-group/bitebook`.
+- Production: https://bitebook-alpha.vercel.app
+- Deployment: https://bitebook-gwswy53e4-ten-fold-group.vercel.app
+- Deployment ID: `dpl_J82sRLcYMXXAv5mRSsUYAbVMqCNm`; Vercel reports Ready.
+- Source was uploaded from an isolated checkout of the release commit with the
+  committed lockfile, excluding all original uncommitted files. `npm ci`, TypeScript,
+  lint, and 25 focused tests passed in that clean checkout before deployment.
+- Production HTTP returned 200 with the Expo app shell and bundle reference. A browser
+  visit to Discover redirected to the signed-out welcome screen with no runtime errors.
+  Authenticated production writes were not tested. Deployment protection was preserved.
+- `npm ci`/audit reported 41 existing dependency advisories: 15 moderate, 25 high,
+  1 critical. The critical shell-quote dependency is reached through react-devtools-core.
+  No dependency remediation or upgrades were made in this release.
+- Previous production rollback target: https://bitebook-9j91uf2d3-ten-fold-group.vercel.app
+  (recorded, not exercised). To roll back the deployed app without changing Git history:
+  `npx --yes vercel@64.0.2 rollback https://bitebook-9j91uf2d3-ten-fold-group.vercel.app --scope ten-fold-group`.
+
 ## Git Safety
 
 - Original branch: `main`.

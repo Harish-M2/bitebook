@@ -1304,11 +1304,13 @@ re-imported through the real function path: Dishoom → `indian`, BAO Soho → n
 
 ## 26. Discover Review Branch (2026-10-14)
 
-Work remains uncommitted on `feature/discover-redesign`, created from `main` at
-`5c793895186da8c62d98a0921288c30bdf0de887`. Pre-existing dependency, seed-script,
-Edge Function, editor-setting changes and debug.log were left untouched. Nothing was
-pushed or merged. See `docs/Bitebook_Discover_Review.md` for the complete file inventory,
-review instructions, targeted discard commands, and verification limitations.
+The owner authorized merging and production deployment after review. Release commit
+`144b3e580dabef3fb078a39633113cfe997d0681` was fast-forward merged from
+`feature/discover-redesign` into local `main`. No GitHub push was made. Pre-existing
+dependency, seed-script, Edge Function, editor-setting changes and debug.log were left
+untouched and uncommitted. See `docs/Bitebook_Discover_Review.md` for the complete file
+inventory and production release details; its old discard commands are historical and
+must not be used on merged main.
 
 Discover now has sectioned two-column food photography grids, eligibility-based
 recommendations, local restaurant/dish/cuisine search, explicit external place lookup,
@@ -1319,9 +1321,18 @@ existing review-free Visited history. Menu currency and request errors are surfa
 and logging refreshes recommendation caches. ThemeProvider is consistently dark,
 the conflicting light toggle is removed, and NativeWind matches the existing gold palette.
 
-Actual results: TypeScript and Expo lint pass; Expo Doctor passes 21/21; 23 focused
-Node tests and 19 isolated fixture-backed Playwright checks pass. Production web export
+Actual results: TypeScript and Expo lint pass; Expo Doctor passes 21/21; 25 focused
+Node tests and 22 isolated fixture-backed Playwright checks pass. Production web export
 passes. Linked migration list reports 0001-0055 in sync, read-only. Local pgTAP could
 not execute because 127.0.0.1:54322 refused the connection. Browser writes were all
 intercepted; authenticated live Supabase behavior, actual storage access, media uploads,
 and native-device workflows are NOT runtime-verified by this session.
+
+Production deployment `dpl_J82sRLcYMXXAv5mRSsUYAbVMqCNm` is Ready on
+https://bitebook-alpha.vercel.app, uploaded from an isolated checkout of the release
+commit with the committed dependencies and Vercel production configuration. The clean
+checkout passed npm ci, TypeScript, lint, and 25 tests. Production HTTP returned 200;
+the browser loaded the welcome screen and correctly redirected signed-out Discover
+access without runtime errors. Deployment protection remains enabled. Audit reported
+41 existing dependency advisories, including one critical shell-quote advisory through
+react-devtools-core; remediation was not part of this release.
