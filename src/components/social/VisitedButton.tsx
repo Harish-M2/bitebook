@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
+import { Caption } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { getVisit, markVisited, unmarkVisited } from '@/lib/db/visited';
 
@@ -32,13 +35,18 @@ export function VisitedButton({ restaurantId }: { restaurantId: string }) {
   const isVisited = Boolean(visit.data);
 
   return (
+    <View className="gap-xs">
     <Button
       label={isVisited ? 'Visited' : 'Mark as visited'}
       variant={isVisited ? 'secondary' : 'outline'}
-      icon={isVisited ? <Check size={16} color="#FFFFFF" /> : undefined}
-      loading={visit.isPending || toggle.isPending}
+      icon={isVisited ? <Check size={16} color={colors.accent} /> : undefined}
+      disabled={!user || visit.isError}
+      loading={visit.isLoading || toggle.isPending}
       onPress={() => toggle.mutate()}
       accessibilityLabel={isVisited ? 'Remove from visited restaurants' : 'Mark as visited'}
     />
+    {visit.isError ? <Button label="Retry visit status" variant="outline" onPress={() => void visit.refetch()} /> : null}
+    {toggle.isError ? <Caption color="danger">{toggle.error.message}</Caption> : null}
+    </View>
   );
 }

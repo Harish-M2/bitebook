@@ -1,7 +1,9 @@
 import { ExternalLink } from '@/components/external-link';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { colors } from '@/constants/colors';
 import type { MenuItem } from '@/lib/db/menus';
+import { formatMenuPrice } from '@/lib/format';
 import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
@@ -13,6 +15,8 @@ interface MenuModalProps {
   items: MenuItem[];
   isLoading: boolean;
   onClose: () => void;
+  error?: string;
+  onRetry?: () => void;
 }
 
 /**
@@ -20,7 +24,7 @@ interface MenuModalProps {
  * Shows all items with prices, descriptions, images, and nutrition info.
  * Includes close button and loading/empty states.
  */
-export function MenuModal({ visible, title, items, isLoading, onClose }: MenuModalProps) {
+export function MenuModal({ visible, title, items, isLoading, onClose, error, onRetry }: MenuModalProps) {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   const handleSelectItem = useCallback((item: MenuItem) => {
@@ -31,7 +35,7 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
     setSelectedItem(null);
   }, []);
 
-  if (selectedItem) {
+  if (visible && selectedItem) {
     return (
       <MenuItemDetailModal
         item={selectedItem}
@@ -51,7 +55,7 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
         {/* Header */}
         <View style={styles.header}>
           <Heading style={styles.headerTitle}>{title}</Heading>
-          <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8}>
+          <Pressable onPress={onClose} style={styles.closeButton} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close menu">
             <X size={24} color={colors.textPrimary} />
           </Pressable>
         </View>
@@ -62,6 +66,8 @@ export function MenuModal({ visible, title, items, isLoading, onClose }: MenuMod
             <ActivityIndicator size="large" color={colors.accent} />
             <BodyText style={styles.loadingText}>Loading menu...</BodyText>
           </View>
+        ) : error ? (
+          <ErrorState title="Could not load menu" description={error} onRetry={onRetry} />
         ) : items.length === 0 ? (
           <View style={styles.emptyContainer}>
             <BodyText style={styles.emptyText}>Menu not available here yet</BodyText>
@@ -100,6 +106,7 @@ interface MenuItemRowProps {
  * Single menu item in the list view - compact layout with image, name, and price.
  */
 function MenuItemRow({ item, onPress }: MenuItemRowProps) {
+  const price = formatMenuPrice(item.price, item.currency);
   return (
     <Pressable style={styles.itemRow} onPress={onPress}>
       {item.imageUrl && (
@@ -118,9 +125,9 @@ function MenuItemRow({ item, onPress }: MenuItemRowProps) {
           </Caption>
         )}
       </View>
-      {item.price && (
+      {price !== null && (
         <BodyText style={styles.itemRowPrice}>
-          ${item.price.toFixed(2)}
+          {price}
         </BodyText>
       )}
     </Pressable>
@@ -138,8 +145,9 @@ interface MenuItemDetailModalProps {
  * Shows large image, full description, price, and nutrition info.
  */
 function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailModalProps) {
+  const price = formatMenuPrice(item.price, item.currency);
   return (
-    <Modal visible={true} animationType="slide" presentationStyle="fullScreen">
+    <Modal visible={true} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={styles.detailContainer}>
         {/* Header */}
         <View style={styles.detailHeader}>
@@ -164,9 +172,9 @@ function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailMo
           <View style={styles.detailInfo}>
             <View style={styles.detailTitleRow}>
               <Heading style={styles.detailTitle}>{item.name}</Heading>
-              {item.price && (
+              {price !== null && (
                 <BodyText style={styles.detailPrice}>
-                  ${item.price.toFixed(2)}
+                  {price}
                 </BodyText>
               )}
             </View>

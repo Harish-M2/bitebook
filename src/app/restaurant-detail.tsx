@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Share2 } from 'lucide-react-native';
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
+import { FoodPhoto } from '@/components/food/FoodPhoto';
+import { MenuLinkForm } from '@/components/food/MenuLinkForm';
 import { ReviewList } from '@/components/reviews';
 import { SaveButton } from '@/components/social/SaveButton';
-import { MenuLinkForm } from '@/components/food/MenuLinkForm';
 import { VisitedButton } from '@/components/social/VisitedButton';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -19,6 +19,7 @@ import { listDishesForRestaurant } from '@/lib/db/dishes';
 import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
 import { listRestaurantVisitsForRestaurant } from '@/lib/db/restaurant-reviews';
 import { getRestaurant, getRestaurantPhotos } from '@/lib/db/restaurants';
+import { publicImageUrl } from '@/lib/db/storage';
 import { formatPriceLevel } from '@/lib/format';
 
 export default function RestaurantDetailScreen() {
@@ -70,7 +71,7 @@ export default function RestaurantDetailScreen() {
 
   const data = restaurant.data;
   const cuisine = data.restaurant_cuisines[0]?.cuisine?.name;
-  const heroImage = photos.data?.[0] ?? data.image_url ?? undefined;
+  const heroImage = photos.data?.[0] ?? publicImageUrl('restaurant-photos', data.image_url);
   const infoLines = [
     data.phone ? `Phone: ${data.phone}` : null,
     data.has_outdoor_seating ? 'Outdoor seating available' : null,
@@ -87,13 +88,13 @@ export default function RestaurantDetailScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center' }}>
-          <Image
-            source={heroImage}
-            accessibilityLabel={data.name}
+          <FoodPhoto
+            uri={heroImage}
+            label={data.name}
             style={{ width: '100%', height: 320, backgroundColor: colors.surfaceElevated, borderRadius: 24 }}
-            contentFit="cover"
           />
           <View className="gap-lg px-lg pt-lg">
+            {photos.isError ? <ErrorState title="Could not load restaurant photos" description={photos.error.message} onRetry={() => void photos.refetch()} /> : null}
             <View className="gap-xs">
               <Heading level={1}>{data.name}</Heading>
               <View className="flex-row items-center gap-xs">
@@ -145,6 +146,8 @@ export default function RestaurantDetailScreen() {
               <Heading level={2}>Popular dishes</Heading>
               {dishes.isPending ? (
                 <ActivityIndicator color={colors.accent} />
+              ) : dishes.isError ? (
+                <ErrorState title="Could not load dishes" description={dishes.error.message} onRetry={() => void dishes.refetch()} />
               ) : dishes.data && dishes.data.length > 0 ? (
                 dishes.data.slice(0, 6).map((dish) => (
                   <Pressable

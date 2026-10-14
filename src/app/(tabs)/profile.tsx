@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
 import { CuisineBreakdown } from '@/components/profile/CuisineBreakdown';
@@ -33,7 +33,7 @@ const EMPTY_STATS: DiaryStats = {
 /** Profile tab — identity, lifetime stats, and cuisine breakdown. */
 export default function ProfileScreen() {
   const { profile, user, signOut, refreshProfile } = useAuth();
-  const { colors: palette, themeName, toggleTheme } = useAppTheme();
+  const { colors: palette } = useAppTheme();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -245,32 +245,6 @@ export default function ProfileScreen() {
             <BodyText medium>Visited</BodyText>
             <MetadataText>Restaurants</MetadataText>
           </Pressable>
-        </View>
-
-        <View className="px-lg pt-lg">
-          <View
-            style={{
-              backgroundColor: palette.surface,
-              borderWidth: 1,
-              borderColor: palette.border,
-              borderRadius: 18,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-            <View>
-              <BodyText medium>Appearance</BodyText>
-              <Caption>{themeName === 'dark' ? 'Dark mode' : 'Light mode'}</Caption>
-            </View>
-            <Switch
-              value={themeName === 'dark'}
-              onValueChange={toggleTheme}
-              trackColor={{ false: palette.surfaceMuted, true: palette.accent }}
-              thumbColor={palette.white}
-            />
-          </View>
         </View>
 
         <Spacer size="xl" />

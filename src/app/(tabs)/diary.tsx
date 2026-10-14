@@ -5,6 +5,7 @@ import { FlatList, RefreshControl, View } from 'react-native';
 
 import { FoodDiaryItem } from '@/components/food/FoodDiaryItem';
 import { ProfileStats } from '@/components/profile/ProfileStats';
+import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Divider, Screen } from '@/components/ui/Screen';
@@ -78,6 +79,8 @@ export default function DiaryScreen() {
               <BodyText color="textSecondary">Every dish you&apos;ve tried, in one place.</BodyText>
             </View>
             <ProfileStats stats={stats.data ?? EMPTY_STATS} />
+            <Button label="Visited restaurants" variant="outline" onPress={() => router.push('/visited')} />
+            {stats.isError ? <ErrorState title="Could not load diary statistics" description={stats.error.message} onRetry={refresh} /> : null}
             <Divider />
           </View>
         }

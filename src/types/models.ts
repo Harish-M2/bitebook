@@ -14,7 +14,7 @@ export type UserSummary = {
   avatarUrl?: string | null;
 };
 
-export type PriceLevel = '£' | '££' | '£££' | '££££';
+export type PriceLevel = '' | '£' | '££' | '£££' | '££££';
 
 export type Restaurant = {
   id: string;
@@ -33,7 +33,7 @@ export type Restaurant = {
 export type Dish = {
   id: string;
   name: string;
-  restaurant: Pick<Restaurant, 'id' | 'name'>;
+  restaurant: Pick<Restaurant, 'id' | 'name'> & { imageUrl?: string | null };
   rating: number;
   ratingCount: number;
   imageUrl: string | null;

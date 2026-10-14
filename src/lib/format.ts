@@ -1,5 +1,15 @@
 import type { PriceLevel } from '@/types/models';
 
+export function formatMenuPrice(price: number | null | undefined, currency?: string | null): string | null {
+  if (price == null || !Number.isFinite(price) || price < 0) return null;
+  if (!currency?.trim()) return price.toFixed(2);
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: currency.trim().toUpperCase() }).format(price);
+  } catch {
+    return `${price.toFixed(2)} ${currency.trim()}`;
+  }
+}
+
 /** Formats large counts compactly, e.g. 8421 -> "8.4k". */
 export function formatCount(value: number): string {
   if (value >= 1000) {
@@ -81,8 +91,8 @@ const PRICE_LEVELS: PriceLevel[] = ['£', '££', '£££', '££££'];
 
 /**
  * `restaurants.price_level` is a smallint 1-4; the UI shows pound signs. Unknown or
- * out-of-range values fall back to "££" rather than rendering a blank gap in the row.
+ * out-of-range values stay blank rather than inventing a price level.
  */
 export function formatPriceLevel(level: number | null): PriceLevel {
-  return PRICE_LEVELS[(level ?? 2) - 1] ?? '££';
+  return level === null ? '' : PRICE_LEVELS[level - 1] ?? '';
 }

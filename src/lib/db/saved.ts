@@ -2,6 +2,13 @@ import { formatPriceLevel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Restaurant } from '@/types/models';
 
+export async function listSavedRestaurantIds(): Promise<string[]> {
+  const { data, error } = await supabase.from('saved_dishes').select('restaurant_id')
+    .not('restaurant_id', 'is', null);
+  if (error) throw error;
+  return (data ?? []).flatMap((row) => row.restaurant_id ? [row.restaurant_id] : []);
+}
+
 export async function saveRestaurant(restaurantId: string): Promise<boolean> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('Not authenticated');

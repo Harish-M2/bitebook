@@ -200,12 +200,16 @@ export type RecentlyReviewedRestaurant = {
  */
 export async function listRecentlyReviewedRestaurants(
   limit = 10,
+  recentPublicOnly = false,
 ): Promise<RecentlyReviewedRestaurant[]> {
-  const { data, error } = await supabase
+  let request = supabase
     .from('restaurant_reviews')
     .select('created_at, restaurant:restaurants(id, name, city, image_url)')
     .order('created_at', { ascending: false })
     .limit(limit * 4);
+  if (recentPublicOnly) request = request.eq('visibility', 'public')
+    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString());
+  const { data, error } = await request;
 
   if (error) throw error;
 
@@ -288,18 +292,20 @@ export type RestaurantRatingStat = { average: number; count: number };
  * see (RLS). Restaurants carry no stored aggregate, so Discover ranks from this.
  */
 export async function listRestaurantRatingStats(): Promise<Map<string, RestaurantRatingStat>> {
-  const { data, error } = await supabase
-    .from('restaurant_reviews')
-    .select('restaurant_id, overall_rating')
-    .limit(2000);
-  if (error) throw error;
-
   const totals = new Map<string, { sum: number; count: number }>();
-  for (const row of data ?? []) {
-    const entry = totals.get(row.restaurant_id) ?? { sum: 0, count: 0 };
-    entry.sum += Number(row.overall_rating);
-    entry.count += 1;
-    totals.set(row.restaurant_id, entry);
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from('restaurant_reviews')
+      .select('restaurant_id, overall_rating').eq('visibility', 'public')
+      .order('id').range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const entry = totals.get(row.restaurant_id) ?? { sum: 0, count: 0 };
+      entry.sum += Number(row.overall_rating);
+      entry.count += 1;
+      totals.set(row.restaurant_id, entry);
+    }
+    if ((data?.length ?? 0) < pageSize) break;
   }
   const stats = new Map<string, RestaurantRatingStat>();
   for (const [id, { sum, count }] of totals) stats.set(id, { average: sum / count, count });

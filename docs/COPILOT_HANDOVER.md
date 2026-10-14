@@ -1299,3 +1299,29 @@ grant to `service_role`. Three hardcoded signature strings in the pgTAP suite ha
 privilege checks, both Edge Functions deployed, and the two existing hosted restaurants
 re-imported through the real function path: Dishoom → `indian`, BAO Soho → none, and
 `cuisines_explored_count` moved 0 → 1.
+
+---
+
+## 26. Discover Review Branch (2026-10-14)
+
+Work remains uncommitted on `feature/discover-redesign`, created from `main` at
+`5c793895186da8c62d98a0921288c30bdf0de887`. Pre-existing dependency, seed-script,
+Edge Function, editor-setting changes and debug.log were left untouched. Nothing was
+pushed or merged. See `docs/Bitebook_Discover_Review.md` for the complete file inventory,
+review instructions, targeted discard commands, and verification limitations.
+
+Discover now has sectioned two-column food photography grids, eligibility-based
+recommendations, local restaurant/dish/cuisine search, explicit external place lookup,
+and persisted save/unsave states. The existing schema, logging RPCs, provider import
+deduplication, and private review-photo model are unchanged. Restaurant/dish image
+resolution and shared loading/error placeholders were improved; Diary links to the
+existing review-free Visited history. Menu currency and request errors are surfaced,
+and logging refreshes recommendation caches. ThemeProvider is consistently dark,
+the conflicting light toggle is removed, and NativeWind matches the existing gold palette.
+
+Actual results: TypeScript and Expo lint pass; Expo Doctor passes 21/21; 23 focused
+Node tests and 19 isolated fixture-backed Playwright checks pass. Production web export
+passes. Linked migration list reports 0001-0055 in sync, read-only. Local pgTAP could
+not execute because 127.0.0.1:54322 refused the connection. Browser writes were all
+intercepted; authenticated live Supabase behavior, actual storage access, media uploads,
+and native-device workflows are NOT runtime-verified by this session.

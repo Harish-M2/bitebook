@@ -144,6 +144,11 @@ export default function LogScreen() {
       void queryClient.invalidateQueries({ queryKey: ['restaurant-dishes'] });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-visits', user?.id] });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-visits-by-restaurant', draft.restaurant?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['restaurant-rating-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['recently-reviewed-restaurants'] });
+      void queryClient.invalidateQueries({ queryKey: ['trending-dishes'] });
+      void queryClient.invalidateQueries({ queryKey: ['discover-search'] });
+      void queryClient.invalidateQueries({ queryKey: ['friend-recommendations'] });
 
       if (Platform.OS === 'web') {
         reset();

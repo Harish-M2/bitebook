@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { readInvokeError } from '@/lib/db/places';
 
 export interface MenuItem {
   id: string;
@@ -93,18 +94,14 @@ async function searchAndCacheMenu(
     });
 
     if (error) {
-      console.error(`[Bitebook] Menu API error for ${restaurantName}:`, error);
-      // Logging is handled by Edge Function (service_role)
-      return [];
+      throw await readInvokeError(error, 'Could not load the menu');
     }
 
     const items = data?.items ?? [];
     // Caching and logging are handled by Edge Function
     return items;
   } catch (err) {
-    console.error(`[Bitebook] Failed to search menu for ${restaurantName}:`, err);
-    // Logging is handled by Edge Function (service_role)
-    return [];
+    throw err;
   }
 }
 

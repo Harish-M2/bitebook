@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, Plus, UtensilsCrossed } from 'lucide-react-native';
 import { useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
 import { Chip } from '@/components/ui/Chip';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
@@ -70,7 +71,7 @@ export function DishStep({ restaurantId, selected, onToggle }: DishStepProps) {
   // Only offer to create when the name is not already an exact match — the same comparison
   // the database's normalized_name uses, so the two cannot disagree.
   const exactExists = all.some((dish) => dish.name.trim().toLowerCase() === needle);
-  const canCreate = trimmed.length > 0 && !exactExists;
+  const canCreate = dishes.isSuccess && trimmed.length > 0 && !exactExists;
   const newDish: ChosenDish = {
     id: null,
     name: trimmed,
@@ -191,7 +192,9 @@ export function DishStep({ restaurantId, selected, onToggle }: DishStepProps) {
           </Pressable>
         )}
         ListEmptyComponent={
-          dishes.isPending || canCreate ? null : (
+          dishes.isPending ? <ActivityIndicator color={colors.accent} />
+            : dishes.isError ? <ErrorState title="Could not load dishes" description={dishes.error.message} onRetry={() => void dishes.refetch()} />
+              : canCreate ? null : (
             <View className="px-lg">
               <MetadataText>No dishes here yet. Type a name to add the first one.</MetadataText>
             </View>

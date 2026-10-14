@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Share2 } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
+import { FoodPhoto } from '@/components/food/FoodPhoto';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
@@ -49,11 +49,10 @@ export default function DishDetailScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center' }}>
-          <Image
-            source={data.imageUrl ?? undefined}
-            accessibilityLabel={data.name}
+          <FoodPhoto
+            uri={data.imageUrl}
+            label={data.name}
             style={{ width: '100%', height: 360, backgroundColor: colors.surfaceElevated, borderRadius: 24 }}
-            contentFit="cover"
           />
           <View className="gap-md px-lg pt-lg">
             <View className="gap-xxs">

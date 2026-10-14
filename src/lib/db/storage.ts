@@ -12,10 +12,21 @@ export type PrivateBucket = 'review-photos';
  * `storage_path`, never a URL, so every image in the UI has to go through here.
  */
 export function publicImageUrl(bucket: PublicBucket, storagePath: string | null): string | null {
-  if (!storagePath) {
+  const value = storagePath?.trim();
+  if (!value) {
     return null;
   }
-  return supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      return url.username || url.password ? null : url.href;
+    } catch {
+      return null;
+    }
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(value) || value.startsWith('//')) return null;
+  const path = value.replace(/^\/+/, '').replace(new RegExp(`^${bucket}/`), '');
+  return path ? supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl : null;
 }
 
 /** Signed URLs expire; an hour comfortably outlives a single session on a screen. */

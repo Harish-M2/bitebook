@@ -30,7 +30,8 @@ export function dishCoverUrl(
       (a.position ?? 0) - (b.position ?? 0) || a.created_at.localeCompare(b.created_at),
   )[0];
 
-  return publicImageUrl('dish-photos', first?.storage_path ?? null) ?? fallbackImageUrl;
+  return publicImageUrl('dish-photos', first?.storage_path ?? null)
+    ?? publicImageUrl('dish-photos', fallbackImageUrl);
 }
 
 /**

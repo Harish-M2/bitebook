@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, FlatList, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin } from 'lucide-react-native';
 
@@ -10,6 +10,7 @@ import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/plac
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { Caption, MetadataText } from '@/components/ui/Typography';
 import { RestaurantRow } from '@/components/food/RestaurantRow';
 import { PlaceResultRow } from '@/components/food/PlaceResultRow';
@@ -33,19 +34,20 @@ const MIN_QUERY_LENGTH = 2;
 export function RestaurantStep({ onSelect }: RestaurantStepProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query.trim());
-  const isSearching = debouncedQuery.length >= MIN_QUERY_LENGTH;
+  const waiting = query.trim() !== debouncedQuery;
+  const isSearching = query.trim().length >= MIN_QUERY_LENGTH && !waiting;
   const queryClient = useQueryClient();
 
   const known = useQuery({
     queryKey: [...queryKeys.restaurants(), 'search', debouncedQuery],
-    queryFn: () => searchRestaurants(debouncedQuery),
+    queryFn: ({ signal }) => searchRestaurants(debouncedQuery, signal),
     enabled: isSearching,
   });
 
   const places = useQuery({
     queryKey: queryKeys.placeSearch(debouncedQuery),
     queryFn: () => searchPlaces(debouncedQuery),
-    enabled: isSearching,
+    enabled: isSearching && known.isSuccess && known.data.length === 0,
     staleTime: 5 * 60_000,
   });
 
@@ -104,7 +106,10 @@ export function RestaurantStep({ onSelect }: RestaurantStepProps) {
             />
           )}
           ListFooterComponent={
-            newPlaces.length > 0 ? (
+            known.isError ? <ErrorState title="Restaurant search failed" description={known.error.message} onRetry={() => void known.refetch()} />
+              : places.isError && knownResults.length === 0 ? <ErrorState title="Place search failed" description={places.error.message} onRetry={() => void places.refetch()} />
+                : known.isFetching || (knownResults.length === 0 && places.isFetching) ? <ActivityIndicator color={colors.accent} />
+                  : newPlaces.length > 0 ? (
               <View className="gap-sm">
                 <View className="px-lg">
                   <Caption color="textSecondary">Add from search</Caption>
@@ -125,7 +130,7 @@ export function RestaurantStep({ onSelect }: RestaurantStepProps) {
             ) : null
           }
           ListEmptyComponent={
-            known.isPending || places.isPending || newPlaces.length > 0 ? null : (
+            known.isPending || known.isError || places.isFetching || places.isError || newPlaces.length > 0 ? null : (
               <EmptyState
                 icon={<MapPin size={40} color={colors.textMuted} />}
                 title="No restaurants found"
@@ -135,7 +140,7 @@ export function RestaurantStep({ onSelect }: RestaurantStepProps) {
           }
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
         />
-      ) : (
+      ) : waiting ? <ActivityIndicator color={colors.accent} /> : (
         <View className="px-lg">
           <MetadataText>Type at least {MIN_QUERY_LENGTH} characters to search.</MetadataText>
         </View>

@@ -1,10 +1,11 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 import { colors } from '@/constants/colors';
+import { useAuth } from '@/hooks/useAuth';
 import { getSavedRestaurants, unsaveRestaurant } from '@/lib/db/saved';
 import type { Restaurant } from '@/types/models';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Heart } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -32,39 +33,27 @@ export function SavedList({
   showCuisineFilter = true,
 }: SavedListProps) {
   const router = useRouter();
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const client = useQueryClient();
+  const saved = useQuery({ queryKey: ['saved-restaurants', user?.id ?? null, 'list'],
+    queryFn: () => getSavedRestaurants(100, 0), enabled: Boolean(user) });
+  const restaurants = saved.data ?? [];
+  const isLoading = saved.isLoading;
+  const isRefreshing = saved.isRefetching;
+  const error = saved.error?.message;
   const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
 
-  const loadSavedRestaurants = async () => {
-    try {
-      setError(null);
-      const data = await getSavedRestaurants(100, 0); // Load up to 100
-      setRestaurants(data);
-    } catch (_err) {
-      console.error('Error loading saved restaurants:', _err);
-      setError(_err instanceof Error ? _err.message : 'Error loading restaurants');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSavedRestaurants();
-  }, []);
-
   const handleRefresh = () => {
-    setIsRefreshing(true);
-    loadSavedRestaurants();
+    void saved.refetch();
   };
 
   const removeSavedRestaurant = async (restaurantId: string) => {
     try {
       await unsaveRestaurant(restaurantId);
-      setRestaurants((current) => current.filter((restaurant) => restaurant.id !== restaurantId));
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['saved-restaurants'] }),
+        client.invalidateQueries({ queryKey: ['is-saved'] }),
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove restaurant';
       if (Platform.OS === 'web') {

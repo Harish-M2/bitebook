@@ -11,6 +11,7 @@ const RESTAURANT_SELECT = `
   city,
   price_level,
   image_url,
+  restaurant_photos(storage_path, position),
   restaurant_cuisines(cuisine:cuisines(name, slug)),
   dishes(dietary_tags)
 `;
@@ -25,6 +26,7 @@ const RESTAURANT_SELECT_BY_CUISINE = `
   city,
   price_level,
   image_url,
+  restaurant_photos(storage_path, position),
   restaurant_cuisines!inner(cuisine:cuisines!inner(name, slug)),
   dishes(dietary_tags)
 `;
@@ -43,6 +45,7 @@ type RestaurantRowShape = {
   city: string | null;
   price_level: number | null;
   image_url: string | null;
+  restaurant_photos?: { storage_path: string; position: number | null }[];
   restaurant_cuisines: { cuisine: { name: string; slug: string } | null }[];
   dishes?: { dietary_tags: string[] | null }[] | null;
 };
@@ -58,7 +61,9 @@ function toRestaurant(row: RestaurantRowShape): Restaurant {
     // ratings pipeline exists.
     rating: 0,
     reviewCount: 0,
-    imageUrl: row.image_url,
+    imageUrl: publicImageUrl('restaurant-photos', row.image_url)
+      ?? publicImageUrl('restaurant-photos', [...(row.restaurant_photos ?? [])]
+        .sort((first, second) => (first.position ?? Infinity) - (second.position ?? Infinity))[0]?.storage_path ?? null),
     dietaryTags: [...new Set((row.dishes ?? []).flatMap((dish) => dish.dietary_tags ?? []))],
   };
 }
@@ -98,19 +103,20 @@ export async function listRestaurants(cuisineSlug?: string | null): Promise<Rest
  * someone has already added should not be searched for again, both to save a paid provider
  * call and because the local row carries the dishes other people have logged.
  */
-export async function searchRestaurants(query: string): Promise<Restaurant[]> {
+export async function searchRestaurants(query: string, signal?: AbortSignal): Promise<Restaurant[]> {
   const trimmed = query.trim();
   if (trimmed.length === 0) {
     return [];
   }
 
-  const { data, error } = await supabase
+  const request = supabase
     .from('restaurants')
     .select(RESTAURANT_SELECT)
     // Escaping matters: `%` and `_` in user input would otherwise widen the pattern, and a
     // lone `%` would match the entire catalogue.
     .ilike('name', `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`)
     .limit(PAGE_SIZE);
+  const { data, error } = await (signal ? request.abortSignal(signal) : request);
 
   if (error) {
     throw error;
@@ -119,21 +125,48 @@ export async function searchRestaurants(query: string): Promise<Restaurant[]> {
   return (data ?? []).map(toRestaurant);
 }
 
+export async function searchRestaurantsByCuisine(query: string, signal: AbortSignal): Promise<Restaurant[]> {
+  const cuisines = await supabase.from('cuisines').select('slug')
+    .ilike('name', `%${query.trim().replace(/[\\%_]/g, '\\$&')}%`).abortSignal(signal);
+  if (cuisines.error) throw cuisines.error;
+  if (!cuisines.data?.length) return [];
+  const { data, error } = await supabase.from('restaurants')
+    .select(RESTAURANT_SELECT_BY_CUISINE)
+    .in('restaurant_cuisines.cuisine.slug', cuisines.data.map((cuisine) => cuisine.slug))
+    .limit(PAGE_SIZE).abortSignal(signal);
+  if (error) throw error;
+  return (data ?? []).map(toRestaurant);
+}
+
 /**
  * "Trending" is currently the best-rated dishes with enough ratings to be meaningful. It is
  * deliberately not time-windowed yet — with no activity in the database, a 7-day window
  * would always be empty and look broken rather than simply new.
  */
-export async function listTrendingDishes(): Promise<Dish[]> {
-  const { data, error } = await supabase
+export function restaurantCoverUrl(
+  imageUrl: string | null,
+  photos: { storage_path: string; position: number | null }[] | null | undefined,
+): string | null {
+  return publicImageUrl('restaurant-photos', imageUrl)
+    ?? publicImageUrl('restaurant-photos', [...(photos ?? [])]
+      .sort((first, second) => (first.position ?? Infinity) - (second.position ?? Infinity))[0]?.storage_path ?? null);
+}
+
+export async function listTrendingDishes(cuisineSlug?: string | null): Promise<Dish[]> {
+  let request = supabase
     .from('dishes')
     .select(
-      `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants(id, name)`,
+      cuisineSlug
+        ? `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants!inner(id, name, image_url, restaurant_photos(storage_path, position), restaurant_cuisines!inner(cuisine:cuisines!inner(slug)))`
+        : `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants(id, name, image_url, restaurant_photos(storage_path, position))`,
     )
     .gt('rating_count', 0)
+    .not('aggregate_rating', 'is', null)
     .order('aggregate_rating', { ascending: false, nullsFirst: false })
     .order('rating_count', { ascending: false })
     .limit(10);
+  if (cuisineSlug) request = request.eq('restaurant.restaurant_cuisines.cuisine.slug', cuisineSlug);
+  const { data, error } = await request;
 
   if (error) {
     throw error;
@@ -147,7 +180,11 @@ export async function listTrendingDishes(): Promise<Dish[]> {
       {
         id: row.id,
         name: row.name,
-        restaurant: { id: row.restaurant.id, name: row.restaurant.name },
+        restaurant: {
+          id: row.restaurant.id,
+          name: row.restaurant.name,
+          imageUrl: restaurantCoverUrl(row.restaurant.image_url, row.restaurant.restaurant_photos),
+        },
         rating: row.aggregate_rating ?? 0,
         ratingCount: row.rating_count ?? 0,
         imageUrl: dishCoverUrl(row.dish_photos, row.image_url),
@@ -222,8 +259,7 @@ export async function getRestaurantPhotos(restaurantId: string): Promise<string[
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.warn(`[Bitebook] Failed to fetch photos for restaurant ${restaurantId}:`, error);
-    return [];
+    throw error;
   }
 
   return (data ?? [])
