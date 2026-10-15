@@ -1356,3 +1356,24 @@ settings changed. Future deployment gates must verify `/auth/v1/settings` with t
 production key, not just check that the variable is populated or that the welcome screen
 loads. Expo embeds EXPO_PUBLIC configuration at build time, so environment corrections
 require a rebuild. Do not roll back to a pre-fix bundle carrying a disabled legacy key.
+
+## 28. All-Changes Production Release (2026-10-15)
+
+The owner authorized committing all work and merging all local branches into main.
+Release `e18c3c669c3bf9aac7234093193838eb71170bc0` contains the core UX, compact cards,
+Back/Home navigation, private visit flow, package/lockfile updates, developer scripts,
+server publishable/secret-key helpers, and the new brand asset library. Every local
+feature branch is an ancestor of main. GitHub was not pushed; debug.log remains local.
+
+Vercel deployment `dpl_AAxKs3dz8JbsjqytLYmjh5xt396z` is Ready on
+https://bitebook-alpha.vercel.app. The source was deployed from a clean checkout of
+the merged commit with the corrected production publishable key. TypeScript, lint,
+38 tests, and all 37 fixture-backed production browser checks passed.
+
+Four shared-helper consumers were deployed to Supabase with JWT verification retained:
+places-search v20, places-import v21, search-restaurant-menus v7, submit-menu-url v5.
+All are ACTIVE; CORS preflight returned 200 and unauthenticated POST returned 401 for
+each. Real authenticated function/provider operations were not tested. No migrations,
+RLS policy changes, seed scripts, or changes to the remote-only fix-rls function ran.
+Existing 41 dependency advisories remain; local pgTAP and Deno execution were unavailable.
+See docs/Bitebook_Core_UX_Review.md for the complete release details and prior snapshots.

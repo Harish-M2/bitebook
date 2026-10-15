@@ -11,6 +11,32 @@ authorization. The release includes the user's package, server-helper, script, e
 and brand-asset changes that earlier snapshots intentionally excluded. The generated
 debug.log remains local. No GitHub push is authorized by this release request.
 
+## Combined Release Result (2026-10-15)
+
+- All local branches are included in local main. Release commit:
+  `e18c3c669c3bf9aac7234093193838eb71170bc0` (115 changed/created files).
+- Production: https://bitebook-alpha.vercel.app
+- Deployment: https://bitebook-4uu225m6u-ten-fold-group.vercel.app
+  (`dpl_AAxKs3dz8JbsjqytLYmjh5xt396z`), Ready.
+- This release includes the previously excluded package/lockfile updates, developer
+  scripts, editor settings, server API-key changes, and brand asset library, as well as
+  the core UX, compact spacing, and complete navigation work. Asset files are included;
+  no extra brand integration or live seeding scripts were executed.
+- Supabase deployments: places-search v20, places-import v21,
+  search-restaurant-menus v7, submit-menu-url v5. All four are ACTIVE with JWT verification
+  enabled. Each returned 200 for CORS preflight and 401 for unauthenticated POST.
+- Clean-checkout npm ci, TypeScript, lint, and 38 tests passed. All 37 fixture-backed
+  browser checks passed against production. The served publishable key and Home
+  navigation were verified. No real authenticated writes were exercised.
+- The credential-pattern scan found no matches across the 115 intended files. This
+  was a targeted pattern check, not a comprehensive security audit.
+- Migrations 0001-0055 remain in sync; no schema/RLS changes or remote-only function
+  changes were applied. The local pgTAP/Deno limitations and 41 existing dependency
+  advisories remain. No dependency remediation was performed beyond the owner's updates.
+- Source changes are committed locally, not pushed to GitHub. The generated debug.log
+  remains untracked. Earlier local-only release statements below are historical.
+- Previous web rollback target: https://bitebook-fmn2i67tu-ten-fold-group.vercel.app.
+
 ## Production Deployment
 
 The owner subsequently authorized production deployment. The reviewed source was
