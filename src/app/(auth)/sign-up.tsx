@@ -99,7 +99,7 @@ export default function SignUp() {
           keyboardShouldPersistTaps="handled">
           <View className="w-full max-w-md mx-auto">
             <View className="pb-md mb-md">
-              <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
+              <IconButton accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/welcome')}>
                 <ChevronLeft size={20} color={colors.textPrimary} />
               </IconButton>
             </View>

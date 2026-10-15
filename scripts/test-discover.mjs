@@ -48,12 +48,39 @@ function databaseMock(resultFor = () => ({ data: null, error: null })) {
 const storageMock = databaseMock();
 const storage = loadSource('src/lib/db/storage.ts', { '@/lib/supabase': { supabase: storageMock } });
 const format = loadSource('src/lib/format.ts');
+const requests = loadSource('src/lib/db/requests.ts');
 const photos = loadSource('src/lib/db/dishes.ts', { '@/lib/supabase': { supabase: storageMock } });
 const discovery = loadSource('src/lib/db/discovery.ts', {
   '@/lib/supabase': { supabase: storageMock }, '@/lib/db/restaurants': {},
 });
 const restaurant = (id, extras = {}) => ({ id, name: id, cuisine: 'Italian', priceLevel: '', city: '', rating: 0, reviewCount: 0, imageUrl: null, ...extras });
 const emptyContext = () => ({ friendRestaurantIds: new Set(), favouriteCuisines: new Set() });
+const filters = loadSource('src/lib/db/filters.ts');
+
+test('Distance filters convert miles to kilometres and do not treat unknown distance as nearby', () => {
+  assert.equal(filters.distanceKilometres('1 mi'), 1.609344);
+  assert.equal(filters.distanceKilometres('Unknown'), null);
+  assert.deepEqual(filters.filterRestaurants([restaurant('unknown'), restaurant('far', { distanceLabel: '1 mi' }), restaurant('near', { distanceLabel: '0.5 km' })], { maxDistance: 1 }).map((row) => row.id), ['near']);
+});
+
+test('Read requests resolve normally and reject stalled requests with an actionable timeout', async () => {
+  assert.equal(await requests.withRequestTimeout(async () => 'ready', undefined, 100), 'ready');
+  let requestSignal;
+  await assert.rejects(requests.withRequestTimeout((signal) => { requestSignal = signal; return new Promise(() => {}); }, undefined, 5), /timed out/);
+  assert.equal(requestSignal.aborted, true);
+});
+test('Read requests propagate caller cancellation instead of leaving a pending spinner', async () => {
+  const controller = new AbortController();
+  const pending = requests.withRequestTimeout(() => new Promise(() => {}), controller.signal, 1000);
+  controller.abort();
+  await assert.rejects(pending, /cancelled/);
+});
+test('A menu cache failure is not treated as a miss that triggers a provider request', async () => {
+  const db = databaseMock(() => ({ data: null, error: { message: 'Cache denied' } }));
+  db.functions = { invoke: () => { throw new Error('Provider should not be called'); } };
+  const menus = loadSource('src/lib/db/menus.ts', { '@/lib/supabase': { supabase: db }, '@/lib/db/places': {} });
+  await assert.rejects(menus.getRestaurantMenu('restaurant', 'Restaurant'), { message: 'Cache denied' });
+});
 
 test('Discover excludes catalogue-only restaurants', () => {
   assert.deepEqual(discovery.selectDiscoverRestaurants([restaurant('unrated')], emptyContext(), new Set()), []);
@@ -81,6 +108,28 @@ test('Recommendation selection does not mutate catalogue data', () => {
   const before = structuredClone(rows);
   discovery.selectDiscoverRestaurants(rows, emptyContext(), new Set());
   assert.deepEqual(rows, before);
+});
+test('Dish filters honor dish rating, dietary tags, cuisine, price and visited state', () => {
+  const dish = { id: 'dish', name: 'Pasta', rating: 4.5, ratingCount: 2, imageUrl: null,
+    dietaryTags: ['vegetarian'], restaurant: { id: 'restaurant', name: 'Restaurant', priceLevel: '££', cuisineSlugs: ['italian'] } };
+  assert.equal(discovery.filterDiscoverDishes([dish], { minRating: 4, dietaryTag: 'vegetarian', priceLevel: '££' }, 'italian', new Set()).length, 1);
+  assert.equal(discovery.filterDiscoverDishes([dish], { minRating: 5 }, null, new Set()).length, 0);
+  assert.equal(discovery.filterDiscoverDishes([dish], { dietaryTag: 'vegan' }, null, new Set()).length, 0);
+  assert.equal(discovery.filterDiscoverDishes([dish], { priceLevel: '£' }, null, new Set()).length, 0);
+  assert.equal(discovery.filterDiscoverDishes([dish], {}, 'japanese', new Set()).length, 0);
+  assert.equal(discovery.filterDiscoverDishes([dish], { hideVisited: true }, null, new Set(['restaurant'])).length, 0);
+});
+test('Mixed Discover items preserve real items and alternate restaurant and dish cards', () => {
+  const restaurantItem = { kind: 'restaurant', value: restaurant('restaurant') };
+  const dishItem = { kind: 'dish', value: { id: 'dish' } };
+  assert.deepEqual(discovery.mixDiscoverItems([restaurantItem], [dishItem]), [restaurantItem, dishItem]);
+  assert.deepEqual(discovery.mixDiscoverItems([], [dishItem]), [dishItem]);
+});
+test('Newest dish sort uses stored creation dates rather than the original rating order', () => {
+  const dish = { name: 'Dish', rating: 4, ratingCount: 1, imageUrl: null, restaurant: { id: 'restaurant', name: 'Restaurant' } };
+  const result = discovery.filterDiscoverDishes([{ ...dish, id: 'old', createdAt: '2026-10-01T12:00:00Z' },
+    { ...dish, id: 'new', createdAt: '2026-10-14T12:00:00Z' }], { sort: 'newest' }, null, new Set());
+  assert.deepEqual(result.map((item) => item.id), ['new', 'old']);
 });
 
 for (const [name, input, expected] of [
@@ -163,6 +212,55 @@ test('A review-free visit reuses the restaurant id without creating a review', a
   assert.equal(upsert[3].ignoreDuplicates, true);
   assert.ok(db.calls.every(([table]) => table === 'restaurant_visits'));
 });
+test('Private visit logging accepts no dishes and does not create reviews or bookmarks', async () => {
+  const db = databaseMock(() => ({ data: { id: 'visit', visited_at: '2026-10-14', notes: 'Dinner' }, error: null }));
+  const visits = loadSource('src/lib/db/visited.ts', { '@/lib/supabase': { supabase: db } });
+  const result = await visits.logPrivateVisit('owner', { restaurantId: 'restaurant', visitedAt: '2026-10-14', notes: 'Dinner', dishes: [] });
+  assert.equal(result.visitId, 'visit');
+  assert.equal(result.failedDishes, 0);
+  assert.ok(db.calls.every(([table]) => table === 'restaurant_visits'));
+});
+test('Private visits reuse existing normalized dishes and attach them idempotently without a rating', async () => {
+  const db = databaseMock((table) => ({ data: table === 'dishes' ? { id: 'dish' } : { id: 'visit', visited_at: '2026-10-14', notes: null }, error: null }));
+  const visits = loadSource('src/lib/db/visited.ts', { '@/lib/supabase': { supabase: db } });
+  await visits.logPrivateVisit('owner', { restaurantId: 'restaurant', visitedAt: '2026-10-14', notes: '', dishes: [{ name: ' Pasta ' }] });
+  assert.ok(db.calls.some(([table, method, field, value]) => table === 'dishes' && method === 'eq' && field === 'normalized_name' && value === 'pasta'));
+  assert.ok(!db.calls.some(([table, method]) => table === 'dishes' && method === 'insert'));
+  assert.ok(db.calls.some(([table, method, value, options]) => table === 'restaurant_visit_dishes' && method === 'upsert' && value.dish_id === 'dish' && options.ignoreDuplicates));
+  assert.ok(!db.calls.some(([table]) => table === 'reviews' || table === 'restaurant_reviews' || table === 'saved_dishes'));
+});
+test('Private visit logging reports partial dish failures while preserving the visit', async () => {
+  const db = databaseMock((table) => table === 'restaurant_visit_dishes' ? { data: null, error: { message: 'Fixture failure' } }
+    : { data: { id: 'visit', visited_at: '2026-10-14', notes: null }, error: null });
+  const visits = loadSource('src/lib/db/visited.ts', { '@/lib/supabase': { supabase: db } });
+  const result = await visits.logPrivateVisit('owner', { restaurantId: 'restaurant', visitedAt: '2026-10-14', notes: '', dishes: [{ id: 'dish', name: 'Pasta' }] });
+  assert.equal(result.visitId, 'visit');
+  assert.equal(result.failedDishes, 1);
+});
+test('Concurrent new-dish creation recovers the existing row after a uniqueness conflict', async () => {
+  let searches = 0;
+  const db = databaseMock((_table, actions) => {
+    if (actions.some(([method]) => method === 'insert')) return { data: null, error: { code: '23505', message: 'Already exists' } };
+    searches += 1;
+    return { data: searches === 1 ? null : { id: 'existing-dish' }, error: null };
+  });
+  const dishes = loadSource('src/lib/db/dishes.ts', { '@/lib/supabase': { supabase: db } });
+  assert.equal(await dishes.findOrCreateVisitDish('owner', 'restaurant', { name: ' Pasta ' }), 'existing-dish');
+  assert.equal(searches, 2);
+  const inserted = db.calls.find(([, method]) => method === 'insert')[2];
+  assert.equal(inserted.name, 'Pasta');
+  assert.equal(inserted.created_by_profile_id, 'owner');
+  assert.equal(inserted.aggregate_rating, undefined);
+});
+test('Retrying an existing private visit retains the original date and notes', async () => {
+  const db = databaseMock((_table, actions) => ({ data: actions.some(([method]) => method === 'upsert') ? null
+    : { id: 'existing-visit', visited_at: '2026-10-01', notes: 'Keep these notes' }, error: null }));
+  const visits = loadSource('src/lib/db/visited.ts', { '@/lib/supabase': { supabase: db } });
+  const result = await visits.logPrivateVisit('owner', { restaurantId: 'restaurant', visitedAt: '2026-10-14', notes: 'New notes', dishes: [] });
+  assert.equal(result.visitId, 'existing-visit');
+  assert.equal(result.existingDetailsRetained, true);
+  assert.ok(!db.calls.some(([, method]) => method === 'update' || method === 'delete'));
+});
 test('Dish logging calls the transaction RPC with the existing restaurant and dish', async () => {
   const db = databaseMock(() => ({ data: { dish_id: 'dish', review_id: 'review', diary_entry_id: 'entry' }, error: null }));
   const log = loadSource('src/lib/db/log.ts', { '@/lib/supabase': { supabase: db }, '@/lib/db/photos': {} });
@@ -192,4 +290,9 @@ test('Rating reads paginate public reviews instead of truncating the count', asy
   assert.equal(result.get('restaurant').average, 4005 / 1001);
   assert.equal(db.calls.filter(([, method]) => method === 'range').length, 2);
   assert.ok(db.calls.some(([, method, field, value]) => method === 'eq' && field === 'visibility' && value === 'public'));
+});
+test('Dish selections normalize new names but keep different existing dish IDs distinct', () => {
+  assert.equal(photos.sameDishSelection({ id: null, name: ' Soup ' }, { id: null, name: 'soup' }), true);
+  assert.equal(photos.sameDishSelection({ id: 'dish', name: 'Soup' }, { id: 'dish', name: 'Updated Soup' }), true);
+  assert.equal(photos.sameDishSelection({ id: 'first', name: 'Soup' }, { id: 'second', name: 'Soup' }), false);
 });

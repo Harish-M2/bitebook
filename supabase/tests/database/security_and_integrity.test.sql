@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(83);
+select plan(87);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -1111,6 +1111,51 @@ select ok(
   not has_table_privilege('anon', 'public.restaurant_visits', 'SELECT'),
   'anon has no access to restaurant_visits'
 );
+
+select id as core_visit_id, restaurant_id as core_restaurant_id
+from public.restaurant_visits
+where user_id = '11111111-1111-1111-1111-111111111111'
+limit 1 \gset
+
+select id as core_visit_dish_id
+from public.dishes
+where restaurant_id = :'core_restaurant_id'
+order by id
+limit 1 \gset
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select lives_ok(
+  format('insert into public.restaurant_visit_dishes (visit_id, dish_id) values (%L, %L)',
+    :'core_visit_id', :'core_visit_dish_id'),
+  'the owner can remember a dish without creating a review'
+);
+
+select throws_ok(
+  format('insert into public.restaurant_visit_dishes (visit_id, dish_id) values (%L, %L)',
+    :'core_visit_id', :'core_visit_dish_id'),
+  '23505', null,
+  'a remembered dish cannot be duplicated on the same private visit'
+);
+reset role;
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+select is(
+  (select count(*)::int from public.restaurant_visit_dishes where visit_id = :'core_visit_id'),
+  0,
+  'another user cannot read dishes remembered on a private visit'
+);
+
+select throws_ok(
+  format('insert into public.restaurant_visit_dishes (visit_id, dish_id) values (%L, %L) on conflict do nothing',
+    :'core_visit_id', :'core_visit_dish_id'),
+  '42501', null,
+  'another user cannot attach dishes to a private visit even with conflict handling'
+);
+reset role;
 
 select * from finish();
 rollback;

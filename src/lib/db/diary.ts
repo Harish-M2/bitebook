@@ -54,6 +54,7 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
     return [
       {
         id: row.id,
+        eatenAt: row.eaten_at,
         dateLabel: formatDiaryDate(row.eaten_at),
         rating: row.review?.rating ?? 0,
         restaurantReviewId: row.review?.restaurant_review_id ?? null,

@@ -1,3 +1,4 @@
+import { withRequestTimeout } from '@/lib/db/requests';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
@@ -16,7 +17,11 @@ async function getCurrentUserId(): Promise<string> {
 }
 
 /** Search public, onboarded profiles by username or display name. */
-export async function searchPeople(query: string, currentUserId: string): Promise<PersonSearchResult[]> {
+export async function searchPeople(query: string, currentUserId: string, signal?: AbortSignal): Promise<PersonSearchResult[]> {
+  return withRequestTimeout((readSignal) => searchPeopleResults(query, currentUserId, readSignal), signal);
+}
+
+async function searchPeopleResults(query: string, currentUserId: string, signal: AbortSignal): Promise<PersonSearchResult[]> {
   const normalizedQuery = query.trim();
   if (normalizedQuery.length < 2) return [];
 
@@ -31,14 +36,14 @@ export async function searchPeople(query: string, currentUserId: string): Promis
       .not('username', 'is', null)
       .neq('id', currentUserId)
       .ilike('username', pattern)
-      .limit(20),
+      .limit(20).abortSignal(signal),
     supabase
       .from('profiles')
       .select(fields)
       .not('username', 'is', null)
       .neq('id', currentUserId)
       .ilike('display_name', pattern)
-      .limit(20),
+      .limit(20).abortSignal(signal),
   ]);
 
   if (usernameMatches.error) throw usernameMatches.error;

@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import { PersonRow } from '@/components/social/PersonRow';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -32,17 +30,9 @@ export default function FollowingScreen() {
   });
 
   return (
-    <Screen>
+    <Screen navigation>
       <View className="w-full flex-1 gap-lg self-center px-lg pt-sm" style={{ maxWidth: 760 }}>
         <View className="flex-row items-center gap-md">
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            className="h-10 w-10 items-center justify-center rounded-pill border border-border">
-            <ArrowLeft size={20} color={colors.textPrimary} />
-          </Pressable>
           <View className="gap-xxs">
             <Heading level={2}>Following</Heading>
             {following.data ? <Caption>{following.data.length} {following.data.length === 1 ? 'person' : 'people'}</Caption> : null}

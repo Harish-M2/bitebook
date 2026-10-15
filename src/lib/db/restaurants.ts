@@ -1,5 +1,6 @@
 import { DISH_PHOTO_SELECT, dishCoverUrl } from '@/lib/db/dishes';
 import { readInvokeError } from '@/lib/db/places';
+import { withRequestTimeout } from '@/lib/db/requests';
 import { publicImageUrl } from '@/lib/db/storage';
 import { formatPriceLevel } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -55,6 +56,7 @@ function toRestaurant(row: RestaurantRowShape): Restaurant {
     id: row.id,
     name: row.name,
     cuisine: row.restaurant_cuisines?.[0]?.cuisine?.name ?? '',
+    cuisineSlugs: (row.restaurant_cuisines ?? []).flatMap((link) => link.cuisine ? [link.cuisine.slug] : []),
     priceLevel: formatPriceLevel(row.price_level),
     city: row.city ?? '',
     // Aggregates are not stored on restaurants; the row renders without them until the
@@ -76,18 +78,19 @@ function toRestaurant(row: RestaurantRowShape): Restaurant {
  * treat empty as "no data yet", not as a failure.
  */
 export async function listRestaurants(cuisineSlug?: string | null): Promise<Restaurant[]> {
-  const { data, error } = cuisineSlug
-    ? await supabase
+  const request = cuisineSlug
+    ? supabase
         .from('restaurants')
         .select(RESTAURANT_SELECT_BY_CUISINE)
         .eq('restaurant_cuisines.cuisine.slug', cuisineSlug)
         .order('created_at', { ascending: false })
         .limit(CATALOGUE_CAP)
-    : await supabase
+    : supabase
         .from('restaurants')
         .select(RESTAURANT_SELECT)
         .order('created_at', { ascending: false })
         .limit(CATALOGUE_CAP);
+  const { data, error } = await withRequestTimeout((signal) => request.abortSignal(signal));
 
   if (error) {
     throw error;
@@ -116,7 +119,7 @@ export async function searchRestaurants(query: string, signal?: AbortSignal): Pr
     // lone `%` would match the entire catalogue.
     .ilike('name', `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`)
     .limit(PAGE_SIZE);
-  const { data, error } = await (signal ? request.abortSignal(signal) : request);
+  const { data, error } = await withRequestTimeout((readSignal) => request.abortSignal(readSignal), signal);
 
   if (error) {
     throw error;
@@ -157,8 +160,8 @@ export async function listTrendingDishes(cuisineSlug?: string | null): Promise<D
     .from('dishes')
     .select(
       cuisineSlug
-        ? `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants!inner(id, name, image_url, restaurant_photos(storage_path, position), restaurant_cuisines!inner(cuisine:cuisines!inner(slug)))`
-        : `id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants(id, name, image_url, restaurant_photos(storage_path, position))`,
+        ? `id, name, created_at, image_url, dietary_tags, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants!inner(id, name, price_level, image_url, restaurant_photos(storage_path, position), restaurant_cuisines!inner(cuisine:cuisines!inner(slug)))`
+        : `id, name, created_at, image_url, dietary_tags, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}, restaurant:restaurants(id, name, price_level, image_url, restaurant_photos(storage_path, position), restaurant_cuisines(cuisine:cuisines(slug)))`,
     )
     .gt('rating_count', 0)
     .not('aggregate_rating', 'is', null)
@@ -166,7 +169,7 @@ export async function listTrendingDishes(cuisineSlug?: string | null): Promise<D
     .order('rating_count', { ascending: false })
     .limit(10);
   if (cuisineSlug) request = request.eq('restaurant.restaurant_cuisines.cuisine.slug', cuisineSlug);
-  const { data, error } = await request;
+  const { data, error } = await withRequestTimeout((signal) => request.abortSignal(signal));
 
   if (error) {
     throw error;
@@ -180,12 +183,16 @@ export async function listTrendingDishes(cuisineSlug?: string | null): Promise<D
       {
         id: row.id,
         name: row.name,
+        createdAt: row.created_at,
         restaurant: {
           id: row.restaurant.id,
           name: row.restaurant.name,
+          priceLevel: formatPriceLevel(row.restaurant.price_level),
+          cuisineSlugs: (row.restaurant.restaurant_cuisines ?? []).flatMap((link) => link.cuisine ? [link.cuisine.slug] : []),
           imageUrl: restaurantCoverUrl(row.restaurant.image_url, row.restaurant.restaurant_photos),
         },
         rating: row.aggregate_rating ?? 0,
+        dietaryTags: row.dietary_tags ?? [],
         ratingCount: row.rating_count ?? 0,
         imageUrl: dishCoverUrl(row.dish_photos, row.image_url),
       },

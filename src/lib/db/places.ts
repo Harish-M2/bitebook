@@ -1,3 +1,4 @@
+import { withRequestTimeout } from '@/lib/db/requests';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -78,13 +79,15 @@ export interface SearchPlacesOptions {
 export async function searchPlaces(
   query: string,
   options: SearchPlacesOptions = {},
+  signal?: AbortSignal,
 ): Promise<PlaceSearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
   const hasLocation = options.latitude != null && options.longitude != null;
 
-  const { data, error } = await supabase.functions.invoke<SearchResponse>('places-search', {
+  const { data, error } = await withRequestTimeout((readSignal) => supabase.functions.invoke<SearchResponse>('places-search', {
+    signal: readSignal,
     body: {
       query: trimmed,
       ...(hasLocation
@@ -92,7 +95,7 @@ export async function searchPlaces(
         : {}),
       ...(options.limit ? { limit: options.limit } : {}),
     },
-  });
+  }), signal);
 
   if (error) throw await readInvokeError(error, 'Place search failed');
 

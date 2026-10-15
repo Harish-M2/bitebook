@@ -1,10 +1,12 @@
-import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
-import { cn } from '@/lib/cn';
+import { FoodPhoto } from '@/components/food/FoodPhoto';
 import { Rating } from '@/components/ui/Rating';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
+import { cn } from '@/lib/cn';
+import { publicImageUrl } from '@/lib/db/storage';
+import type { VisitedRestaurant } from '@/lib/db/visited';
+import { formatDiaryDate } from '@/lib/format';
 import type { DiaryEntry } from '@/types/models';
 
 type FoodDiaryItemProps = {
@@ -16,7 +18,7 @@ type FoodDiaryItemProps = {
 /** Chronological diary row — date, dish + restaurant, the user's own rating, thumbnail. */
 export function FoodDiaryItem({ entry, onPress, className }: FoodDiaryItemProps) {
   return (
-    <Pressable onPress={onPress} className={cn('flex-row items-center gap-sm', className)}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`View diary entry for ${entry.dish.name}`} className={cn('flex-row items-center gap-sm', className)}>
       {/* Wide enough for "Yesterday" on one line: at w-14 it wrapped to "Yesterd / ay". */}
       <View className="w-[68px]">
         <MetadataText numberOfLines={1}>{entry.dateLabel}</MetadataText>
@@ -30,12 +32,27 @@ export function FoodDiaryItem({ entry, onPress, className }: FoodDiaryItemProps)
             the query has always selected it. */}
         {entry.rating > 0 ? <Rating value={entry.rating} size="sm" /> : null}
       </View>
-      <Image
-        source={entry.dish.imageUrl ?? undefined}
-        transition={150}
-        accessibilityLabel={entry.dish.name}
-        style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
+      <FoodPhoto
+        uri={entry.dish.imageUrl}
+        label={entry.dish.name}
+        style={{ width: 48, height: 48, borderRadius: 12 }}
       />
     </Pressable>
   );
+}
+
+export function VisitedDiaryItem({ visit, onPress }: { visit: VisitedRestaurant; onPress: () => void }) {
+  return <Pressable onPress={onPress} accessibilityRole="button"
+    accessibilityLabel={`View private visit to ${visit.restaurant?.name ?? 'restaurant'}`}
+    className="flex-row items-center gap-sm px-lg pb-lg">
+    <View className="w-[68px]"><MetadataText numberOfLines={1}>{formatDiaryDate(visit.visited_at)}</MetadataText></View>
+    <View className="flex-1 gap-xxs">
+      <BodyText medium numberOfLines={2}>{visit.restaurant?.name ?? 'Restaurant visit'}</BodyText>
+      <Caption>Private visit</Caption>
+      {visit.dishes?.length ? <Caption numberOfLines={2}>{visit.dishes.map((dish) => dish.name).join(', ')}</Caption> : null}
+      {visit.notes ? <Caption numberOfLines={2}>{visit.notes}</Caption> : null}
+    </View>
+    <FoodPhoto uri={publicImageUrl('restaurant-photos', visit.restaurant?.image_url ?? null)}
+      label={visit.restaurant?.name ?? 'Restaurant'} style={{ width: 48, height: 48, borderRadius: 12 }} />
+  </Pressable>;
 }

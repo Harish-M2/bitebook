@@ -1,6 +1,6 @@
 import { ExternalLink } from '@/components/external-link';
-import { BodyText, Caption, Heading } from '@/components/ui/Typography';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { BodyText, Caption, Heading } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
 import type { MenuItem } from '@/lib/db/menus';
 import { formatMenuPrice } from '@/lib/format';

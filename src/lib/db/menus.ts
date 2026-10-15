@@ -1,5 +1,17 @@
-import { supabase } from '@/lib/supabase';
 import { readInvokeError } from '@/lib/db/places';
+import { withRequestTimeout } from '@/lib/db/requests';
+import { supabase } from '@/lib/supabase';
+import type { Json } from '@/types/database';
+
+type MenuCacheRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  currency: string | null;
+  image_url: string | null;
+  nutrition: Json | null;
+};
 
 export interface MenuItem {
   id: string;
@@ -29,31 +41,34 @@ export interface CachedMenu {
  * Get cached menu for a restaurant from the database.
  * Returns null if not cached or cache has expired.
  */
-export async function getCachedMenu(restaurantId: string): Promise<MenuItem[] | null> {
-  const { data, error } = await (supabase
+export async function getCachedMenu(restaurantId: string, signal?: AbortSignal): Promise<MenuItem[] | null> {
+  // Migration 0035 defines menu_items, but the generated Database snapshot omits it.
+  const request = (supabase
     .from('menu_items' as any)
-    .select('id, name, description, price, currency, image_url, nutrition' as any)
+    .select('id, name, description, price, currency, image_url, nutrition')
     .eq('restaurant_id', restaurantId)
     .gt('expires_at', new Date().toISOString())
     .order('name', { ascending: true }) as any);
+  const { data, error } = await withRequestTimeout<{ data: MenuCacheRow[] | null; error: { message: string } | null }>(
+    (readSignal) => request.abortSignal(readSignal), signal);
 
   if (error) {
-    console.warn(`[Bitebook] Failed to fetch cached menu for restaurant ${restaurantId}:`, error);
-    return null;
+    throw error;
   }
 
   if (!data || data.length === 0) {
     return null;
   }
 
-  return data.map((row: any) => ({
+  return data.map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
     price: row.price,
     currency: row.currency,
     imageUrl: row.image_url,
-    nutrition: row.nutrition,
+    nutrition: row.nutrition && typeof row.nutrition === 'object' && !Array.isArray(row.nutrition)
+      ? Object.fromEntries(Object.entries(row.nutrition).filter(([, value]) => typeof value === 'number')) : null,
   }));
 }
 
@@ -65,16 +80,17 @@ export async function getCachedMenu(restaurantId: string): Promise<MenuItem[] | 
 export async function getRestaurantMenu(
   restaurantId: string,
   restaurantName: string,
+  signal?: AbortSignal,
 ): Promise<MenuItem[]> {
   // Check cache first
-  const cached = await getCachedMenu(restaurantId);
+  const cached = await getCachedMenu(restaurantId, signal);
   if (cached) {
     // Cache hit - don't log from client, Edge Function logs during fetch
     return cached;
   }
 
   // Cache miss - fetch from API
-  return searchAndCacheMenu(restaurantId, restaurantName);
+  return searchAndCacheMenu(restaurantId, restaurantName, signal);
 }
 
 /**
@@ -84,14 +100,16 @@ export async function getRestaurantMenu(
 async function searchAndCacheMenu(
   restaurantId: string,
   restaurantName: string,
+  signal?: AbortSignal,
 ): Promise<MenuItem[]> {
   try {
-    const { data, error } = await supabase.functions.invoke('search-restaurant-menus', {
+    const { data, error } = await withRequestTimeout((readSignal) => supabase.functions.invoke('search-restaurant-menus', {
+      signal: readSignal,
       body: {
         restaurantId,
         restaurantName,
       },
-    });
+    }), signal);
 
     if (error) {
       throw await readInvokeError(error, 'Could not load the menu');

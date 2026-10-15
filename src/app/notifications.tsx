@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { ArrowLeft, Bell } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -10,10 +9,10 @@ import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typogr
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
 import {
-  getAllNotifications,
-  markAllNotificationsAsRead,
-  markNotificationAsRead,
-  type Notification,
+    getAllNotifications,
+    markAllNotificationsAsRead,
+    markNotificationAsRead,
+    type Notification,
 } from '@/lib/db/notifications';
 
 function formatWhen(iso: string): string {
@@ -59,18 +58,10 @@ export default function NotificationsScreen() {
   const hasUnread = (notifications.data ?? []).some((n) => !n.is_read);
 
   return (
-    <Screen>
+    <Screen navigation>
       <View className="w-full flex-1 gap-lg self-center px-lg pt-sm" style={{ maxWidth: 760 }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center gap-md">
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              className="h-10 w-10 items-center justify-center rounded-pill border border-border">
-              <ArrowLeft size={20} color={colors.textPrimary} />
-            </Pressable>
             <Heading level={2}>Notifications</Heading>
           </View>
           {hasUnread ? (

@@ -1,6 +1,7 @@
 import { View, type ViewProps } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
+import { PageNavigation } from '@/components/ui/PageNavigation';
 import { spacing, type SpacingToken } from '@/constants/spacing';
 import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
@@ -9,10 +10,11 @@ type ScreenProps = ViewProps & {
   /** Safe-area edges to apply padding for. Defaults to top-only since most screens
    * sit above the tab bar, which already handles the bottom inset. */
   edges?: readonly Edge[];
+  navigation?: boolean;
 };
 
 /** Full-screen container with the Bitebook background colour and safe-area handling. */
-export function Screen({ children, className, edges = ['top', 'left', 'right'], style, ...rest }: ScreenProps) {
+export function Screen({ children, className, edges = ['top', 'left', 'right'], navigation = false, style, ...rest }: ScreenProps) {
   const { colors } = useAppTheme();
 
   return (
@@ -22,6 +24,7 @@ export function Screen({ children, className, edges = ['top', 'left', 'right'], 
       style={[{ backgroundColor: colors.background }, style]}
       {...rest}>
       <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center', flex: 1 }}>
+        {navigation ? <PageNavigation /> : null}
         {children}
       </View>
     </SafeAreaView>

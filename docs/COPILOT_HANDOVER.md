@@ -1336,3 +1336,23 @@ the browser loaded the welcome screen and correctly redirected signed-out Discov
 access without runtime errors. Deployment protection remains enabled. Audit reported
 41 existing dependency advisories, including one critical shell-quote advisory through
 react-devtools-core; remediation was not part of this release.
+
+## 27. Production Supabase Key Correction (2026-10-14)
+
+The first production release still used a disabled legacy JWT anon key in Vercel's
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, even though the local environment contained a
+valid `sb_publishable_` key for the same Supabase project. The production key returned
+401 "Legacy API keys are disabled" from `/auth/v1/settings`; the local key returned 200.
+
+Only that Vercel production environment variable was updated, then the existing release
+source was rebuilt as `dpl_HL8wBo6mibc9wcrmCAfXvpwabSjG`, now live on
+https://bitebook-alpha.vercel.app. The served production JavaScript was checked to
+contain the validated publishable key without printing its value. The sign-in endpoint
+returned 400 `invalid_credentials` for a deliberately nonexistent test account instead
+of the legacy-key error. Successful login with real credentials was not tested.
+
+No application code, dependencies, database data, RLS policies, or Supabase legacy-key
+settings changed. Future deployment gates must verify `/auth/v1/settings` with the actual
+production key, not just check that the variable is populated or that the welcome screen
+loads. Expo embeds EXPO_PUBLIC configuration at build time, so environment corrections
+require a rebuild. Do not roll back to a pre-fix bundle carrying a disabled legacy key.

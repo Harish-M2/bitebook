@@ -1,24 +1,25 @@
-import { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
-import { queryKeys } from '@/lib/queryClient';
-import { searchRestaurants } from '@/lib/db/restaurants';
-import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { SearchBar } from '@/components/ui/SearchBar';
+import { PlaceResultRow } from '@/components/food/PlaceResultRow';
+import { RestaurantRow } from '@/components/food/RestaurantRow';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { SearchBar } from '@/components/ui/SearchBar';
 import { Caption, MetadataText } from '@/components/ui/Typography';
-import { RestaurantRow } from '@/components/food/RestaurantRow';
-import { PlaceResultRow } from '@/components/food/PlaceResultRow';
+import { colors } from '@/constants/colors';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
+import { searchRestaurants } from '@/lib/db/restaurants';
+import { queryKeys } from '@/lib/queryClient';
 
 export type ChosenRestaurant = { id: string; name: string; city: string | null };
 
 type RestaurantStepProps = {
   onSelect: (restaurant: ChosenRestaurant) => void;
+  initialQuery?: string;
 };
 
 const MIN_QUERY_LENGTH = 2;
@@ -31,8 +32,8 @@ const MIN_QUERY_LENGTH = 2;
  * carries the dishes other people logged there, and re-importing it would spend a paid
  * provider call to arrive at the same row.
  */
-export function RestaurantStep({ onSelect }: RestaurantStepProps) {
-  const [query, setQuery] = useState('');
+export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepProps) {
+  const [query, setQuery] = useState(initialQuery);
   const debouncedQuery = useDebouncedValue(query.trim());
   const waiting = query.trim() !== debouncedQuery;
   const isSearching = query.trim().length >= MIN_QUERY_LENGTH && !waiting;
@@ -46,7 +47,7 @@ export function RestaurantStep({ onSelect }: RestaurantStepProps) {
 
   const places = useQuery({
     queryKey: queryKeys.placeSearch(debouncedQuery),
-    queryFn: () => searchPlaces(debouncedQuery),
+    queryFn: ({ signal }) => searchPlaces(debouncedQuery, {}, signal),
     enabled: isSearching && known.isSuccess && known.data.length === 0,
     staleTime: 5 * 60_000,
   });

@@ -82,10 +82,13 @@ export function FilterBar({
 
   const activeFilterCount =
     Object.values(activeFilters).filter((v) => v !== undefined).length + (activeCuisine ? 1 : 0);
+  const hasDistance = restaurants.some((restaurant) => Boolean(restaurant.distanceLabel));
 
   return (
     <View style={compact ? undefined : styles.container}>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open filters"
         style={[
           styles.filterButton,
           activeFilterCount > 0 && styles.filterButtonActive,
@@ -112,6 +115,9 @@ export function FilterBar({
               <Text style={styles.modalTitle}>Filters</Text>
               <Pressable
                 onPress={() => setShowFilters(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close filters"
+                style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
                 hitSlop={8}
               >
                 <X size={24} color={colors.textPrimary} />
@@ -272,7 +278,7 @@ export function FilterBar({
               </View>
 
               {/* Distance Filter */}
-              <View style={styles.filterSection}>
+              {hasDistance ? <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Maximum Distance</Text>
                 <View style={styles.filterChips}>
                   {DISTANCE_OPTIONS.map((distance) => (
@@ -295,7 +301,7 @@ export function FilterBar({
                     </Pressable>
                   ))}
                 </View>
-              </View>
+              </View> : null}
 
               {/* Filter Summary */}
               {activeFilterCount > 0 && (

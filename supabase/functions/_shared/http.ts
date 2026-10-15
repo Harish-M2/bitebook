@@ -25,6 +25,20 @@ export function errorResponse(message: string, status: number): Response {
   return jsonResponse({ error: message }, status);
 }
 
+export function defaultApiKey(variableName: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(Deno.env.get(variableName) ?? '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const key = (parsed as Record<string, unknown>).default;
+    return typeof key === 'string' && key.length > 0 ? key : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolves the caller's user from the Authorization header.
  *
@@ -42,9 +56,16 @@ export async function requireUser(
     return { error: errorResponse('Missing Authorization header', 401) };
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const publishableKey = defaultApiKey('SUPABASE_PUBLISHABLE_KEYS');
+
+  if (!supabaseUrl || !publishableKey) {
+    return { error: errorResponse('Database not configured', 500) };
+  }
+
   const client = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    supabaseUrl,
+    publishableKey,
     { global: { headers: { Authorization: authHeader } } },
   );
 
@@ -62,9 +83,16 @@ export async function requireUser(
  * granted to `authenticated` precisely so that this is the only way in.
  */
 export function serviceClient(): SupabaseClient {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const secretKey = defaultApiKey('SUPABASE_SECRET_KEYS');
+
+  if (!supabaseUrl || !secretKey) {
+    throw new Error('Supabase service client is not configured');
+  }
+
   return createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    supabaseUrl,
+    secretKey,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }

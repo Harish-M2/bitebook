@@ -21,9 +21,9 @@ export default function DishDetailScreen() {
     enabled: Boolean(dishId),
   });
 
-  if (dish.isPending) {
+  if (dish.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -33,7 +33,7 @@ export default function DishDetailScreen() {
 
   if (dish.isError || !dish.data) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load this dish"
           description={dish.error?.message ?? 'Dish not found.'}
@@ -46,7 +46,7 @@ export default function DishDetailScreen() {
   const data = dish.data;
 
   return (
-    <Screen>
+    <Screen navigation>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center' }}>
           <FoodPhoto
@@ -66,7 +66,7 @@ export default function DishDetailScreen() {
             )}
             {data.description ? <BodyText color="textSecondary">{data.description}</BodyText> : null}
             <View className="flex-row gap-sm">
-              <Button label="Log" size="lg" onPress={() => router.push('/(tabs)/log')} />
+              <Button label="Log" size="lg" onPress={() => router.push({ pathname: '/(tabs)/log', params: { restaurantName: data.restaurant.name } })} />
               <Pressable
                 className="h-[52px] w-[52px] items-center justify-center rounded-md border border-border"
                 accessibilityRole="button"

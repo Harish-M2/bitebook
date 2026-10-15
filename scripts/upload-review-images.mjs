@@ -9,16 +9,16 @@ import https from 'https';
 import { v4 as uuidv4 } from 'uuid';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseSecretKey = process.env.BITEBOOK_SUPABASE_SECRET;
 const userId = 'bd698dd9-015c-4275-a3c1-a981f2cac822'; // Your user ID
 
-if (!supabaseUrl || !supabaseServiceKey) {
+if (!supabaseUrl || !supabaseSecretKey) {
   console.error('❌ Missing environment variables');
-  console.error('Set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  console.error('Set EXPO_PUBLIC_SUPABASE_URL and BITEBOOK_SUPABASE_SECRET');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
 // Food images from Unsplash
 const reviewImages = [

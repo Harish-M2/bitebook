@@ -1,20 +1,21 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Switch,
-  Text,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { Screen } from '@/components/ui/Screen';
 import { colors } from '@/constants/colors';
 import {
-  getNotificationPreferences,
-  updateNotificationPreferences,
-  type NotificationPreferences,
+    getNotificationPreferences,
+    updateNotificationPreferences,
+    type NotificationPreferences,
 } from '@/lib/db/notifications';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    View,
+} from 'react-native';
 
 /**
  * Notification settings screen
@@ -63,21 +64,22 @@ export default function NotificationSettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <Screen navigation>
         <ActivityIndicator size="large" color={colors.accent} />
-      </View>
+      </Screen>
     );
   }
 
   if (!preferences) {
     return (
-      <View style={styles.container}>
+      <Screen navigation>
         <Text style={styles.errorText}>Failed to load settings</Text>
-      </View>
+      </Screen>
     );
   }
 
   return (
+    <Screen navigation>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Section: Activity Notifications */}
       <View style={styles.section}>
@@ -128,6 +130,7 @@ export default function NotificationSettingsScreen() {
         </Text>
       </View>
     </ScrollView>
+    </Screen>
   );
 }
 

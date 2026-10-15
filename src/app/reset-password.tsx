@@ -69,7 +69,7 @@ export default function ResetPassword() {
 
   if (isCheckingRecovery) {
     return (
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <Screen navigation edges={['top', 'bottom', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <BodyText>Loading reset link...</BodyText>
         </View>
@@ -106,7 +106,7 @@ export default function ResetPassword() {
 
   if (isSuccess) {
     return (
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <Screen navigation edges={['top', 'bottom', 'left', 'right']}>
         <View className="flex-1 justify-center items-center px-xl">
           <View className="w-full max-w-md">
             <View className="items-center justify-center mb-lg">
@@ -127,7 +127,7 @@ export default function ResetPassword() {
 
   if (!hasRecoverySession) {
     return (
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <Screen navigation edges={['top', 'bottom', 'left', 'right']}>
         <View className="flex-1 justify-center items-center px-xl">
           <View className="w-full max-w-md">
             <Heading style={{ textAlign: 'center' }}>Invalid reset link</Heading>
@@ -149,7 +149,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <Screen edges={['top', 'bottom', 'left', 'right']}>
+    <Screen navigation edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

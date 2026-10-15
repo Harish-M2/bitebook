@@ -54,7 +54,7 @@ export default function ForgotPassword() {
           keyboardShouldPersistTaps="handled">
           <View className="w-full max-w-md mx-auto">
             <View className="pb-md mb-md">
-              <IconButton accessibilityLabel="Go back" onPress={() => router.back()}>
+              <IconButton accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/sign-in')}>
                 <ChevronLeft size={20} color={colors.textPrimary} />
               </IconButton>
             </View>
@@ -143,7 +143,7 @@ export default function ForgotPassword() {
                   label="Back to sign in"
                   size="lg"
                   fullWidth
-                  onPress={() => router.back()}
+                  onPress={() => router.replace('/sign-in')}
                 />
               </>
             )}

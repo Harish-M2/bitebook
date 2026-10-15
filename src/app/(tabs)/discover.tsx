@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Bookmark, Compass, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { DishCard } from '@/components/food/DishCard';
 import { FilterBar } from '@/components/food/FilterBar';
@@ -19,14 +19,15 @@ import { Screen } from '@/components/ui/Screen';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
+import { spacing } from '@/constants/spacing';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDiscover } from '@/hooks/useDiscover';
 import { useAppTheme } from '@/hooks/useTheme';
-import { selectDiscoverRestaurants, type DiscoverFilter, type DiscoverItem, type DiscoverSection } from '@/lib/db/discovery';
+import { filterDiscoverDishes, mixDiscoverItems, selectDiscoverRestaurants, type DiscoverFilter, type DiscoverItem, type DiscoverSection } from '@/lib/db/discovery';
 import { filterRestaurants, type RestaurantFilters } from '@/lib/db/filters';
-import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
 import { getRestaurantMenu } from '@/lib/db/menus';
+import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
 import { searchPeople } from '@/lib/db/social';
 import { queryKeys } from '@/lib/queryClient';
 
@@ -45,6 +46,8 @@ function toGridRows(sections: DiscoverSection[]): GridRow[] {
 }
 
 export default function DiscoverScreen() {
+  const { width } = useWindowDimensions();
+  const gridGap = width >= 768 ? spacing.xl : spacing.md;
   const router = useRouter();
   const client = useQueryClient();
   const { user } = useAuth();
@@ -63,18 +66,19 @@ export default function DiscoverScreen() {
   const data = useDiscover(debouncedQuery, cuisine, mode === 'food' && searching && !waiting);
   const menu = useQuery({
     queryKey: ['restaurant-menu', menuRestaurant?.id],
-    queryFn: () => getRestaurantMenu(menuRestaurant!.id, menuRestaurant!.name),
+    queryFn: ({ signal }) => getRestaurantMenu(menuRestaurant!.id, menuRestaurant!.name, signal),
     enabled: Boolean(menuRestaurant),
+    retry: false,
   });
   const people = useQuery({
     queryKey: ['people-search', user?.id, debouncedQuery],
-    queryFn: () => searchPeople(debouncedQuery, user!.id),
+    queryFn: ({ signal }) => searchPeople(debouncedQuery, user!.id, signal),
     enabled: mode === 'people' && searching && !waiting && Boolean(user),
   });
   const showPlaces = mode === 'food' && searching && !waiting && externalQuery === debouncedQuery;
   const places = useQuery({
     queryKey: queryKeys.placeSearch(debouncedQuery),
-    queryFn: () => searchPlaces(debouncedQuery),
+    queryFn: ({ signal }) => searchPlaces(debouncedQuery, {}, signal),
     enabled: showPlaces,
     staleTime: 5 * 60_000,
   });
@@ -102,13 +106,15 @@ export default function DiscoverScreen() {
       .filter((item) => (data.preferences.data ?? []).includes(item.id)).map((item) => item.name)),
   };
   const recentIds = new Set((data.recent.data ?? []).map((restaurant) => restaurant.id));
-  const candidates = ratedRestaurants.filter((restaurant) => !filters.hideVisited || !visitedIds.has(restaurant.id));
+  const candidates = ratedRestaurants.filter((restaurant) => (!filters.hideVisited || !visitedIds.has(restaurant.id))
+    && (!cuisine || restaurant.cuisineSlugs?.includes(cuisine)));
   const recommended = selectDiscoverRestaurants(candidates, context, recentIds, filters);
   const trending = selectDiscoverRestaurants(candidates, context, recentIds, filters, true);
   const personalised = recommended.filter((restaurant) => context.friendRestaurantIds.has(restaurant.id) || context.favouriteCuisines.has(restaurant.cuisine));
   const chosenIds = new Set(personalised.map((restaurant) => restaurant.id));
   const restaurantItems = (restaurants: typeof candidates): DiscoverItem[] => restaurants.map((value) => ({ kind: 'restaurant', value }));
-  const dishItems: DiscoverItem[] = (searching ? data.search.data?.dishes ?? [] : data.dishes.data ?? []).map((value) => ({ kind: 'dish', value }));
+  const dishItems: DiscoverItem[] = filterDiscoverDishes(searching ? data.search.data?.dishes ?? [] : data.dishes.data ?? [], filters, cuisine, visitedIds)
+    .map((value) => ({ kind: 'dish', value }));
   const sections: DiscoverSection[] = searching ? [
     { title: 'Restaurants', items: tab === 'Dishes' ? [] : restaurantItems(filterRestaurants(candidates, filters)) },
     { title: 'Dishes', items: tab === 'Restaurants' ? [] : dishItems },
@@ -117,9 +123,8 @@ export default function DiscoverScreen() {
     : tab === 'Restaurants' ? [{ title: 'Recommended restaurants', items: restaurantItems(recommended) }]
     : [
       { title: 'Picked for you', items: restaurantItems(personalised) },
-      { title: 'Trending restaurants', items: restaurantItems(trending.filter((restaurant) => !chosenIds.has(restaurant.id))) },
+      { title: 'Discover picks', items: mixDiscoverItems(restaurantItems(trending.filter((restaurant) => !chosenIds.has(restaurant.id))), dishItems) },
       { title: 'Highly rated restaurants', items: restaurantItems(recommended.filter((restaurant) => !chosenIds.has(restaurant.id) && !recentIds.has(restaurant.id))) },
-      { title: 'Popular dishes', items: dishItems },
     ];
   const rows = waiting ? [] : toGridRows(sections);
   const savedIds = new Set(data.saved.data ?? []);
@@ -130,7 +135,7 @@ export default function DiscoverScreen() {
     queries.forEach((request) => void request.refetch());
     if (searching) void data.search.refetch();
   };
-  const errors = searching ? [data.search].filter((request) => request.isError) : queries.filter((request) => request.isError);
+  const errors = (searching ? [data.search, data.ratings, data.saved] : queries).filter((request) => request.isError);
 
   const header = (
     <View className="gap-md px-lg pb-md pt-xs">
@@ -155,8 +160,8 @@ export default function DiscoverScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {FILTERS.map((filter) => <Chip key={filter} label={filter} selected={tab === filter} onPress={() => setTab(filter)} />)}
           </ScrollView>
-          {tab !== 'Dishes' && !searching ? <FilterBar compact restaurants={ratedRestaurants} activeFilters={filters}
-            onFiltersChange={setFilters} cuisines={data.cuisines.data ?? []} activeCuisine={cuisine} onCuisineChange={setCuisine} /> : null}
+          <FilterBar compact restaurants={ratedRestaurants} activeFilters={filters}
+            onFiltersChange={setFilters} cuisines={data.cuisines.data ?? []} activeCuisine={cuisine} onCuisineChange={setCuisine} />
           {errors.length ? <ErrorState title="Some discoveries could not load" description={errors[0].error?.message} onRetry={refresh} /> : null}
         </View>
       ) : null}
@@ -192,7 +197,7 @@ export default function DiscoverScreen() {
       <FlatList<GridRow> data={rows} keyExtractor={(row) => row.key} ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled" onRefresh={refresh} refreshing={data.restaurants.isRefetching || data.search.isRefetching}
         renderItem={({ item }) => item.title ? <Heading level={3} className="px-lg pb-sm pt-sm">{item.title}</Heading> : (
-          <View className="flex-row gap-sm px-lg pb-md">
+          <View className="flex-row px-lg" style={{ columnGap: gridGap, paddingBottom: gridGap }}>
             {item.items?.map((entry) => <View key={`${entry.kind}-${entry.value.id}`} style={{ flex: 1, minWidth: 0 }}>
               {entry.kind === 'dish' ? <DishCard variant="grid" dish={entry.value}
                 onPress={() => router.push({ pathname: '/dish-detail', params: { dishId: entry.value.id } })} />

@@ -50,6 +50,37 @@ export interface RestaurantDish {
   imageUrl: string | null;
 }
 
+export function sameDishSelection(first: { id: string | null; name: string }, second: { id: string | null; name: string }): boolean {
+  return first.id && second.id ? first.id === second.id
+    : first.name.trim().toLowerCase() === second.name.trim().toLowerCase();
+}
+
+export async function findOrCreateVisitDish(
+  userId: string,
+  restaurantId: string,
+  dish: { id?: string | null; name: string; category?: string | null; dietaryTags?: string[] },
+): Promise<string> {
+  if (dish.id) return dish.id;
+  const name = dish.name.trim();
+  if (!name) throw new Error('Enter a dish name.');
+  const find = () => supabase.from('dishes').select('id')
+    .eq('restaurant_id', restaurantId).eq('normalized_name', name.toLowerCase()).maybeSingle();
+  const existing = await find();
+  if (existing.error) throw existing.error;
+  if (existing.data) return existing.data.id;
+  const created = await supabase.from('dishes').insert({
+    restaurant_id: restaurantId, name, created_by_profile_id: userId,
+    category: dish.category ?? null, dietary_tags: dish.dietaryTags ?? [],
+  }).select('id').single();
+  if (!created.error) return created.data.id;
+  if (created.error.code === '23505') {
+    const raced = await find();
+    if (raced.error) throw raced.error;
+    if (raced.data) return raced.data.id;
+  }
+  throw created.error;
+}
+
 export interface DishDetail {
   id: string;
   name: string;

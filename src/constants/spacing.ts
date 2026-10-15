@@ -20,6 +20,13 @@ export const spacing = {
 
 export type SpacingToken = keyof typeof spacing;
 
+export const foodGridLayout = {
+  imageMaxHeight: 240,
+  titleMinHeight: spacing.xl,
+  detailsMinHeight: spacing.xxxl + spacing.xxs,
+  actionsMinHeight: spacing.xl,
+} as const;
+
 /**
  * Corner radii (spec section 6, "Radius").
  */

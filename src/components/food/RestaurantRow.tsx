@@ -1,10 +1,11 @@
 import { Bookmark, Menu } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { FoodPhoto } from '@/components/food/FoodPhoto';
 import { Rating } from '@/components/ui/Rating';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
+import { foodGridLayout, radius, spacing } from '@/constants/spacing';
 import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
 import { formatCount } from '@/lib/format';
@@ -23,6 +24,7 @@ type RestaurantRowProps = {
 
 /** Horizontal restaurant list row — thumbnail, name/cuisine/price/distance, rating, menu & save buttons. */
 export function RestaurantRow({ restaurant, onPress, onSave, onViewMenu, className, isSaved = false, saveDisabled = false, variant = 'row' }: RestaurantRowProps) {
+  const { fontScale } = useWindowDimensions();
   const { colors } = useAppTheme();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -39,7 +41,7 @@ export function RestaurantRow({ restaurant, onPress, onSave, onViewMenu, classNa
   };
 
   return (
-    <View className={cn(variant === 'grid' ? 'flex-1 rounded-md border border-border bg-surface overflow-hidden' : 'flex-row items-center gap-sm', className)}>
+    <View className={cn(variant === 'grid' ? 'w-full rounded-md border border-border bg-surface overflow-hidden' : 'flex-row items-center gap-sm', className)}>
       <Pressable
         onPress={onPress}
         className={variant === 'grid' ? 'min-w-0' : 'min-w-0 flex-1 flex-row items-center gap-sm'}
@@ -48,26 +50,32 @@ export function RestaurantRow({ restaurant, onPress, onSave, onViewMenu, classNa
         <FoodPhoto
           uri={restaurant.imageUrl}
           label={restaurant.name}
-          style={variant === 'grid' ? { width: '100%', aspectRatio: 1 } : { width: 72, height: 72, borderRadius: 14 }}
+          style={variant === 'grid' ? { width: '100%', aspectRatio: 1, maxHeight: foodGridLayout.imageMaxHeight } : { width: 72, height: 72, borderRadius: 14 }}
         />
         <View className={cn('gap-xxs', variant === 'grid' ? 'p-sm' : 'flex-1')}>
-          <BodyText medium numberOfLines={2}>
+          <BodyText medium numberOfLines={variant === 'grid' ? 1 : 2} style={variant === 'grid' ? { minHeight: foodGridLayout.titleMinHeight * fontScale } : undefined}>
             {restaurant.name}
           </BodyText>
+          <View className="gap-xxs" style={variant === 'grid' ? { minHeight: foodGridLayout.detailsMinHeight * fontScale } : undefined}>
           <Caption numberOfLines={1}>
             {[restaurant.cuisine, restaurant.priceLevel, restaurant.distanceLabel]
               .filter(Boolean)
               .join(' · ')}
           </Caption>
           {variant === 'grid' && restaurant.city ? <Caption numberOfLines={1}>{restaurant.city}</Caption> : null}
+          </View>
+          <View style={variant === 'grid' ? { minHeight: foodGridLayout.actionsMinHeight * fontScale, justifyContent: 'center' } : undefined}>
           {restaurant.reviewCount > 0 ? (
             <Rating value={restaurant.rating} size="sm" count={formatCount(restaurant.reviewCount)} />
           ) : (
             <MetadataText>No ratings yet</MetadataText>
           )}
+          </View>
         </View>
       </Pressable>
-      <View className={variant === 'grid' ? 'flex-row justify-end px-sm pb-xs' : 'flex-row gap-sm'}>
+      <View className={variant === 'grid' ? 'flex-row gap-xxs' : 'flex-row gap-sm'}
+        style={variant === 'grid' ? { position: 'absolute', top: spacing.xs, right: spacing.xs,
+          backgroundColor: colors.surface, borderRadius: radius.sm } : undefined}>
       {onViewMenu ? (
       <Pressable
         onPress={onViewMenu}

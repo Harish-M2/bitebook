@@ -11,13 +11,14 @@
  * The Spoonacular API key lives in this function's environment and never leaves it.
  */
 
-import {
-  corsHeaders,
-  errorResponse,
-  jsonResponse,
-  requireUser,
-} from '../_shared/http.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
+import {
+    corsHeaders,
+    defaultApiKey,
+    errorResponse,
+    jsonResponse,
+    requireUser,
+} from '../_shared/http.ts';
 
 interface SearchRequestBody {
   restaurantId?: unknown;
@@ -199,7 +200,7 @@ Deno.serve(async (request) => {
 
   // Initialize Supabase client
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = defaultApiKey('SUPABASE_SECRET_KEYS');
 
   if (!supabaseUrl || !supabaseServiceKey) {
     return errorResponse('Database not configured', 500);

@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
-import { MapPin, Calendar } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import { Calendar, MapPin } from 'lucide-react-native';
+import { useState } from 'react';
+import { FlatList, Pressable, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
-import { formatRelativeTime } from '@/lib/format';
-import { Screen } from '@/components/ui/Screen';
-import { Heading, BodyText, Caption } from '@/components/ui/Typography';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { PhotoGalleryModal } from '@/components/ui/PhotoGalleryModal';
-import { getUserGalleryItem } from '@/lib/db/gallery';
 import { Rating } from '@/components/ui/Rating';
+import { Screen } from '@/components/ui/Screen';
+import { BodyText, Caption, Heading } from '@/components/ui/Typography';
+import { colors } from '@/constants/colors';
+import { getUserGalleryItem } from '@/lib/db/gallery';
+import { formatRelativeTime } from '@/lib/format';
 
 export default function GalleryDetailScreen() {
   const { reviewId } = useLocalSearchParams<{ reviewId: string }>();
@@ -24,9 +24,9 @@ export default function GalleryDetailScreen() {
     enabled: !!reviewId,
   });
 
-  if (!reviewId || item.isLoading) {
+  if (item.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <BodyText color="textSecondary">Loading...</BodyText>
         </View>
@@ -34,9 +34,9 @@ export default function GalleryDetailScreen() {
     );
   }
 
-  if (item.isError || !item.data) {
+  if (!reviewId || item.isError || !item.data) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load review"
           description={item.error?.message ?? 'Review not found'}
@@ -53,7 +53,7 @@ export default function GalleryDetailScreen() {
 
   return (
     <>
-      <Screen>
+      <Screen navigation>
         <FlatList
           data={[1]}
           keyExtractor={() => 'detail'}

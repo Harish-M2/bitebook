@@ -29,6 +29,11 @@ export type RankContext = {
   favouriteCuisines: Set<string>;
 };
 
+export function distanceKilometres(label?: string): number | null {
+  const match = label?.match(/(\d+(?:\.\d+)?)\s*(km|mi)/i);
+  return match ? Number(match[1]) * (match[2].toLowerCase() === 'mi' ? 1.609344 : 1) : null;
+}
+
 /**
  * Orders restaurants. Input order is newest-first, and Array#sort is stable, so ties keep
  * that order. "Recommended" favours friends' picks, then the user's cuisines, then quality.
@@ -88,15 +93,8 @@ export function filterRestaurants(
 
     // Filter by distance (if distanceLabel contains a number)
     if (filters.maxDistance !== undefined && filters.maxDistance > 0) {
-      if (restaurant.distanceLabel) {
-        const distanceMatch = restaurant.distanceLabel.match(/(\d+(?:\.\d+)?)\s*(km|mi)/i);
-        if (distanceMatch) {
-          const distance = parseFloat(distanceMatch[1]);
-          if (distance > filters.maxDistance) {
-            return false;
-          }
-        }
-      }
+      const distance = distanceKilometres(restaurant.distanceLabel);
+      if (distance === null || distance > filters.maxDistance) return false;
     }
 
     return true;

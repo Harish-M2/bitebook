@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Star, Users } from 'lucide-react-native';
+import { Star, Users } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
@@ -53,9 +53,9 @@ export default function UserProfileScreen() {
     enabled: Boolean(userId),
   });
 
-  if (profile.isPending) {
+  if (profile.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -65,7 +65,7 @@ export default function UserProfileScreen() {
 
   if (profile.isError) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load profile"
           description={profile.error.message}
@@ -77,7 +77,7 @@ export default function UserProfileScreen() {
 
   if (!profile.data) {
     return (
-      <Screen>
+      <Screen navigation>
         <EmptyState title="Profile not found" description="This account may no longer be available." />
       </Screen>
     );
@@ -88,18 +88,9 @@ export default function UserProfileScreen() {
   const isOwnProfile = currentUser?.id === profileData.id;
 
   return (
-    <Screen>
+    <Screen navigation>
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}>
         <View className="w-full gap-lg self-center px-lg pt-sm" style={{ maxWidth: 760 }}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            className="h-10 w-10 items-center justify-center rounded-pill border border-border">
-            <ArrowLeft size={20} color={colors.textPrimary} />
-          </Pressable>
-
           <View
             className="items-center gap-sm overflow-hidden rounded-xl border border-border bg-surface px-lg pb-xl pt-[72px]"
             style={{

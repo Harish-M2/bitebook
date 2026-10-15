@@ -1,26 +1,26 @@
+import * as Location from 'expo-location';
+import { router } from 'expo-router';
+import { LogOut, MapPin } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
-import { MapPin } from 'lucide-react-native';
-import { router } from 'expo-router';
-import * as Location from 'expo-location';
 
 import {
-  Avatar,
-  BodyText,
-  Button,
-  Caption,
-  Chip,
-  Heading,
-  MetadataText,
-  Screen,
-  Spacer,
-  TextField,
+    Avatar,
+    BodyText,
+    Button,
+    Caption,
+    Chip,
+    Heading,
+    MetadataText,
+    Screen,
+    Spacer,
+    TextField,
 } from '@/components/ui';
 import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { listCuisines, type Cuisine } from '@/lib/db/cuisines';
-import { setCuisinePreferences } from '@/lib/db/preferences';
 import { followProfiles, listSuggestedProfiles } from '@/lib/db/follows';
+import { setCuisinePreferences } from '@/lib/db/preferences';
 import { isUsernameTakenError, updateProfile, type Profile } from '@/lib/db/profiles';
 
 /** Mirrors profiles_username_length and profiles_username_format in 0002_profiles.sql. */
@@ -66,7 +66,22 @@ function StepProgress({ step }: { step: Step }) {
  * rather than trapping them ("Do not make onboarding excessively long").
  */
 export default function Onboarding() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const leaveOnboarding = async () => {
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      const { error } = await signOut();
+      if (error) setLeaveError(error);
+      else router.replace('/welcome');
+    } catch {
+      setLeaveError('Could not sign out. Please try again.');
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   // A user who already has a username is resuming (or deep-linked here), so skip straight
   // past the identity step rather than asking them to re-enter it. Derived rather than set
@@ -76,7 +91,12 @@ export default function Onboarding() {
   const setStep = setChosenStep;
 
   return (
-    <Screen edges={['top', 'bottom', 'left', 'right']}>
+    <Screen navigation={Boolean(profile?.username)} edges={['top', 'bottom', 'left', 'right']}>
+      {!profile?.username ? <View className="items-end gap-xs px-lg pt-xs">
+        <Button label="Sign out" variant="ghost" loading={leaving}
+          icon={<LogOut size={18} color={colors.accent} />} onPress={() => void leaveOnboarding()} />
+        {leaveError ? <Caption color="danger">{leaveError}</Caption> : null}
+      </View> : null}
       <View className="px-xl pt-md">
         <StepProgress step={step} />
       </View>

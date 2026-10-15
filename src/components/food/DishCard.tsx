@@ -1,8 +1,9 @@
-import { Pressable, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { FoodPhoto } from '@/components/food/FoodPhoto';
 import { Rating } from '@/components/ui/Rating';
 import { BodyText, Caption } from '@/components/ui/Typography';
+import { foodGridLayout } from '@/constants/spacing';
 import { cn } from '@/lib/cn';
 import { formatCount } from '@/lib/format';
 import type { Dish } from '@/types/models';
@@ -17,27 +18,33 @@ type DishCardProps = {
 
 /** Vertical dish card for horizontal trending/popular rails. */
 export function DishCard({ dish, onPress, showRestaurant = true, className, variant = 'rail' }: DishCardProps) {
+  const { fontScale } = useWindowDimensions();
   const photoUrl = dish.imageUrl ?? dish.restaurant.imageUrl;
   const isRestaurantPhoto = !dish.imageUrl && Boolean(dish.restaurant.imageUrl);
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`View ${dish.name} at ${dish.restaurant.name}`} className={cn(variant === 'rail' ? 'w-[140px]' : 'flex-1 rounded-md border border-border bg-surface overflow-hidden', className)}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`View ${dish.name} at ${dish.restaurant.name}`} className={cn(variant === 'rail' ? 'w-[140px]' : 'w-full rounded-md border border-border bg-surface overflow-hidden', className)}>
       <FoodPhoto
         uri={photoUrl}
         label={isRestaurantPhoto ? `${dish.restaurant.name} restaurant photo` : dish.name}
         emptyLabel="No photo yet"
-        style={{ width: '100%', ...(photoUrl ? { aspectRatio: 1 } : { height: 96 }), borderRadius: variant === 'rail' ? 18 : 0 }}
+        style={{ width: '100%', ...(variant === 'grid' ? { aspectRatio: 1, maxHeight: foodGridLayout.imageMaxHeight }
+          : photoUrl ? { aspectRatio: 1 } : { height: 96 }), borderRadius: variant === 'rail' ? 18 : 0 }}
       />
       <View className={cn('gap-xxs', variant === 'grid' ? 'p-sm' : 'mt-sm')}>
-        <BodyText medium numberOfLines={2}>
+        <BodyText medium numberOfLines={variant === 'grid' ? 1 : 2} style={variant === 'grid' ? { minHeight: foodGridLayout.titleMinHeight * fontScale } : undefined}>
           {dish.name}
         </BodyText>
+        <View className="gap-xxs" style={variant === 'grid' ? { minHeight: foodGridLayout.detailsMinHeight * fontScale } : undefined}>
         {showRestaurant ? (
           <Caption numberOfLines={1}>{dish.restaurant.name}</Caption>
         ) : null}
         {isRestaurantPhoto ? <Caption color="textMuted">Restaurant photo</Caption> : null}
+        </View>
+        <View style={variant === 'grid' ? { minHeight: foodGridLayout.actionsMinHeight * fontScale, justifyContent: 'center' } : undefined}>
         {dish.ratingCount > 0 ? (
           <Rating value={dish.rating} size="sm" count={formatCount(dish.ratingCount)} />
         ) : <Caption>No ratings yet</Caption>}
+        </View>
       </View>
     </Pressable>
   );

@@ -47,9 +47,9 @@ export default function RestaurantDetailScreen() {
     enabled: Boolean(restaurantId),
   });
 
-  if (restaurant.isPending) {
+  if (restaurant.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -59,7 +59,7 @@ export default function RestaurantDetailScreen() {
 
   if (restaurant.isError || !restaurant.data || !restaurantId) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load this restaurant"
           description={restaurant.error?.message ?? 'Restaurant not found.'}
@@ -85,7 +85,7 @@ export default function RestaurantDetailScreen() {
   ].filter((link): link is { label: string; url: string } => link !== null);
 
   return (
-    <Screen>
+    <Screen navigation>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View style={{ width: '100%', maxWidth: 980, alignSelf: 'center' }}>
           <FoodPhoto
@@ -128,7 +128,7 @@ export default function RestaurantDetailScreen() {
               </View>
             ) : null}
 
-            <View className="flex-row items-center gap-sm">
+            <View className="flex-row flex-wrap items-center gap-sm">
               <SaveButton restaurantId={data.id} showLabel />
               <Pressable
                 className="h-[40px] w-[40px] items-center justify-center rounded-md border border-border"
@@ -136,7 +136,7 @@ export default function RestaurantDetailScreen() {
                 accessibilityLabel="Share restaurant">
                 <Share2 size={18} color={colors.textPrimary} />
               </Pressable>
-              <Button label="Log a dish" onPress={() => router.push('/(tabs)/log')} />
+              <Button label="Log a dish" onPress={() => router.push({ pathname: '/(tabs)/log', params: { restaurantName: data.name } })} />
             </View>
             <View className="flex-row">
               <VisitedButton restaurantId={data.id} />

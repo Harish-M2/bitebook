@@ -9,7 +9,7 @@ import { Rating } from '@/components/ui/Rating';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
 import { colors } from '@/constants/colors';
-import { listDishesForRestaurant, type RestaurantDish } from '@/lib/db/dishes';
+import { listDishesForRestaurant, sameDishSelection, type RestaurantDish } from '@/lib/db/dishes';
 
 export type DishCategory = 'starter' | 'main' | 'dessert' | 'side' | 'drink';
 export type DishDietaryTag = 'vegetarian' | 'non_vegetarian' | 'vegan' | 'halal' | 'gluten_free';
@@ -79,7 +79,7 @@ export function DishStep({ restaurantId, selected, onToggle }: DishStepProps) {
     dietaryTags: newDishDietaryTags,
   };
   const isSelected = (dish: ChosenDish) =>
-    selected.some((item) => item.id === dish.id && item.name === dish.name);
+    selected.some((item) => sameDishSelection(item, dish));
   const canSelectMore = selected.length < MAX_DISHES_PER_VISIT;
 
   return (

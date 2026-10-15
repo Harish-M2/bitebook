@@ -44,7 +44,7 @@ export default function VisitedScreen() {
   });
 
   return (
-    <Screen>
+    <Screen navigation>
       <Heading level={2} className="px-lg pb-md pt-xs">
         Visited
       </Heading>

@@ -13,17 +13,18 @@ import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { listDishesForRestaurant } from '@/lib/db/dishes';
 import {
-  addVisitDish,
-  getVisitById,
-  listVisitDishIds,
-  removeVisitDish,
-  unmarkVisited,
-  updateVisit,
+    addVisitDish,
+    getVisitById,
+    listVisitDishIds,
+    removeVisitDish,
+    unmarkVisited,
+    updateVisit,
 } from '@/lib/db/visited';
 
 function isValidDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 /** Private notes, date and remembered dishes for a visited restaurant. Never public. */
@@ -68,7 +69,8 @@ export default function VisitEditScreen() {
     mutationFn: () => updateVisit(visitId!, { notes: notes.trim() || null, visited_at: date }),
     onSuccess: () => {
       invalidate();
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/visited');
     },
   });
   const toggleDish = useMutation({
@@ -83,13 +85,14 @@ export default function VisitEditScreen() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['visit'] });
       invalidate();
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/visited');
     },
   });
 
-  if (visit.isPending) {
+  if (visit.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -98,7 +101,7 @@ export default function VisitEditScreen() {
   }
   if (visit.isError || !visit.data) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load this visit"
           description={visit.error?.message ?? 'Visit not found.'}
@@ -111,7 +114,7 @@ export default function VisitEditScreen() {
   const canSave = isValidDate(date) && notes.length <= 1000;
 
   return (
-    <Screen>
+    <Screen navigation>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 32 }}>
         <View className="gap-md px-lg pt-xs" style={{ width: '100%', maxWidth: 620, alignSelf: 'center' }}>
           <Heading level={2}>{visit.data.restaurant?.name ?? 'Visit'}</Heading>

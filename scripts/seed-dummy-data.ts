@@ -8,14 +8,14 @@ import { createClient } from '@supabase/supabase-js';
 import * as https from 'https';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseSecretKey = process.env.BITEBOOK_SUPABASE_SECRET || '';
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+if (!supabaseUrl || !supabaseSecretKey) {
+  console.error('❌ Missing Supabase URL or BITEBOOK_SUPABASE_SECRET');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
 /**
  * Dummy review data with real restaurants and dish names

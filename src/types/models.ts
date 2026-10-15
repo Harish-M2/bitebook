@@ -20,6 +20,7 @@ export type Restaurant = {
   id: string;
   name: string;
   cuisine: string;
+  cuisineSlugs?: string[];
   priceLevel: PriceLevel;
   city: string;
   distanceLabel?: string;
@@ -33,7 +34,9 @@ export type Restaurant = {
 export type Dish = {
   id: string;
   name: string;
-  restaurant: Pick<Restaurant, 'id' | 'name'> & { imageUrl?: string | null };
+  createdAt?: string;
+  restaurant: Pick<Restaurant, 'id' | 'name'> & { imageUrl?: string | null; priceLevel?: PriceLevel; cuisineSlugs?: string[]; distanceLabel?: string };
+  dietaryTags?: string[];
   rating: number;
   ratingCount: number;
   imageUrl: string | null;
@@ -99,6 +102,7 @@ export type FeedActivity = {
 
 export type DiaryEntry = {
   id: string;
+  eatenAt?: string;
   dish: Dish;
   restaurantReviewId?: string | null;
   /** Pre-formatted date label, e.g. "20 Aug". */

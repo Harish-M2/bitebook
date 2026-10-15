@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { BookOpen } from 'lucide-react-native';
+import { useState } from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
 
-import { FoodDiaryItem } from '@/components/food/FoodDiaryItem';
+import { FoodDiaryItem, VisitedDiaryItem } from '@/components/food/FoodDiaryItem';
 import { ProfileStats } from '@/components/profile/ProfileStats';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Divider, Screen } from '@/components/ui/Screen';
@@ -15,6 +17,7 @@ import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { listDiaryEntries } from '@/lib/db/diary';
 import { getDiaryStats } from '@/lib/db/stats';
+import { listVisited, type VisitedRestaurant } from '@/lib/db/visited';
 import { queryKeys } from '@/lib/queryClient';
 import type { DiaryEntry, DiaryStats } from '@/types/models';
 
@@ -24,12 +27,14 @@ const EMPTY_STATS: DiaryStats = {
   cuisinesExplored: 0,
   averageRating: 0,
 };
+type DiaryRow = { kind: 'dish'; entry: DiaryEntry } | { kind: 'visit'; visit: VisitedRestaurant };
 
 /** Diary tab — personal chronological log of every dish tried, with summary stats. */
 export default function DiaryScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const [view, setView] = useState<'All' | 'Dishes' | 'Visits'>('All');
 
   const entries = useQuery({
     queryKey: queryKeys.diary(userId ?? ''),
@@ -42,13 +47,22 @@ export default function DiaryScreen() {
     queryFn: () => getDiaryStats(userId as string),
     enabled: userId !== null,
   });
+  const visits = useQuery({ queryKey: ['visited-list', userId], queryFn: listVisited, enabled: userId !== null });
+  const rows: DiaryRow[] = [
+    ...(view === 'Visits' ? [] : (entries.data ?? []).map((entry) => ({ kind: 'dish' as const, entry }))),
+    ...(view === 'Dishes' ? [] : (visits.data ?? []).map((visit) => ({ kind: 'visit' as const, visit }))),
+  ].sort((first, second) => {
+    const date = (row: DiaryRow) => row.kind === 'dish' ? row.entry.eatenAt ?? '' : row.visit.visited_at;
+    return date(second).localeCompare(date(first));
+  });
 
   const refresh = () => {
     void entries.refetch();
     void stats.refetch();
+    void visits.refetch();
   };
 
-  if (entries.isError) {
+  if (entries.isError && visits.isError) {
     return (
       <Screen>
         <ErrorState
@@ -62,12 +76,12 @@ export default function DiaryScreen() {
 
   return (
     <Screen>
-      <FlatList<DiaryEntry>
-        data={entries.data ?? []}
-        keyExtractor={(item) => item.id}
+      <FlatList<DiaryRow>
+        data={rows}
+        keyExtractor={(item) => item.kind === 'dish' ? `dish-${item.entry.id}` : `visit-${item.visit.id}`}
         refreshControl={
           <RefreshControl
-            refreshing={entries.isRefetching || stats.isRefetching}
+            refreshing={entries.isRefetching || visits.isRefetching || stats.isRefetching}
             onRefresh={refresh}
             tintColor={colors.textSecondary}
           />
@@ -76,38 +90,43 @@ export default function DiaryScreen() {
           <View className="gap-lg px-lg pb-md pt-xs">
             <View className="gap-xxs">
               <Heading level={2}>Your diary</Heading>
-              <BodyText color="textSecondary">Every dish you&apos;ve tried, in one place.</BodyText>
+              <BodyText color="textSecondary">Your visits and dishes, in one place.</BodyText>
             </View>
             <ProfileStats stats={stats.data ?? EMPTY_STATS} />
             <Button label="Visited restaurants" variant="outline" onPress={() => router.push('/visited')} />
+            <View className="flex-row gap-xs">{(['All', 'Dishes', 'Visits'] as const).map((label) =>
+              <Chip key={label} label={label} selected={view === label} onPress={() => setView(label)} />)}</View>
+            {entries.isError ? <ErrorState title="Could not load dishes" description={entries.error.message} onRetry={refresh} /> : null}
+            {visits.isError ? <ErrorState title="Could not load visits" description={visits.error.message} onRetry={refresh} /> : null}
             {stats.isError ? <ErrorState title="Could not load diary statistics" description={stats.error.message} onRetry={refresh} /> : null}
             <Divider />
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => item.kind === 'visit' ? <VisitedDiaryItem visit={item.visit}
+          onPress={() => router.push({ pathname: '/visit-edit', params: { visitId: item.visit.id } })} /> : (
           <FoodDiaryItem
-            entry={item}
+            entry={item.entry}
             className="px-lg pb-lg"
             onPress={() => {
-              if (item.restaurantReviewId) {
+              if (item.entry.restaurantReviewId) {
                 router.push({
                   pathname: '/restaurant-review-detail',
-                  params: { restaurantReviewId: item.restaurantReviewId },
+                  params: { restaurantReviewId: item.entry.restaurantReviewId },
                 });
               } else {
-                router.push({ pathname: '/dish-detail', params: { dishId: item.dish.id } });
+                router.push({ pathname: '/dish-detail', params: { dishId: item.entry.dish.id } });
               }
             }}
           />
         )}
         ListEmptyComponent={
-          entries.isPending ? (
+          (view !== 'Visits' && entries.isLoading) || (view !== 'Dishes' && visits.isLoading) ? (
             <DiarySkeleton />
           ) : (
             <EmptyState
               icon={<BookOpen size={40} color={colors.textMuted} />}
               title="No entries yet"
-              description="Dishes you log will show up here as your personal food diary."
+              description="Visits and dishes you log will appear in your personal diary."
             />
           )
         }

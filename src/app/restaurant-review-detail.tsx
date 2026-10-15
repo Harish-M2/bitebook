@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ArrowLeft, MapPin } from 'lucide-react-native';
+import { MapPin } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -41,9 +41,9 @@ export default function RestaurantReviewDetailScreen() {
     enabled: Boolean(restaurantReviewId),
   });
 
-  if (visit.isPending) {
+  if (visit.isLoading) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={palette.accent} />
         </View>
@@ -53,7 +53,7 @@ export default function RestaurantReviewDetailScreen() {
 
   if (visit.isError) {
     return (
-      <Screen>
+      <Screen navigation>
         <ErrorState
           title="Could not load this restaurant review"
           description={visit.error.message}
@@ -65,9 +65,8 @@ export default function RestaurantReviewDetailScreen() {
 
   if (!visit.data) {
     return (
-      <Screen>
+      <Screen navigation>
         <View className="flex-1 gap-md px-lg pt-md">
-          <BackButton onPress={() => router.back()} />
           <Heading level={2}>Review not available</Heading>
           <Caption>This visit may be private or no longer available.</Caption>
         </View>
@@ -84,11 +83,9 @@ export default function RestaurantReviewDetailScreen() {
   );
 
   return (
-    <Screen>
+    <Screen navigation>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         <View className="mx-auto w-full max-w-[760px] gap-md px-lg pt-sm">
-          <BackButton onPress={() => router.back()} />
-
           <View className="gap-sm">
             <Heading level={1}>{data.restaurant.name}</Heading>
             {location ? (
@@ -195,18 +192,5 @@ export default function RestaurantReviewDetailScreen() {
         </View>
       </ScrollView>
     </Screen>
-  );
-}
-
-function BackButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      className="h-9 w-9 items-center justify-center rounded-full border border-border">
-      <ArrowLeft size={18} color={colors.textPrimary} />
-    </Pressable>
   );
 }

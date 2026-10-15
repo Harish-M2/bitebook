@@ -21,11 +21,12 @@ type ConfirmStepProps = {
   overallRating: number;
   reviewText: string;
   visitedAt: string;
-  recommendationTier: number;
+  recommendationTier: number | null;
+  privateVisit?: boolean;
   visibility: ReviewVisibility;
   details: VisitDetailsDraft;
   /** Jump back to a step to change it; the draft is kept. */
-  onEdit: (step: 'dishes' | 'dishReviews' | 'media' | 'restaurantReview') => void;
+  onEdit: (step: 'dishes' | 'dishReviews' | 'media' | 'restaurantReview' | 'visitNotes') => void;
 };
 
 const VISIBILITY_COPY: Record<ReviewVisibility, string> = {
@@ -63,6 +64,7 @@ export function ConfirmStep({
   visibility,
   details,
   onEdit,
+  privateVisit = false,
 }: ConfirmStepProps) {
   const VisibilityIcon = VISIBILITY_ICON[visibility];
   const detailLines = [
@@ -92,7 +94,7 @@ export function ConfirmStep({
             ['dishReviews', 'Edit dish ratings'],
             ['media', 'Edit media'],
             ['restaurantReview', 'Edit review'],
-          ] as const).map(([target, label]) => (
+          ] as const).filter(([target]) => !privateVisit || target === 'dishes').map(([target, label]) => (
             <Pressable
               key={target}
               onPress={() => onEdit(target)}
@@ -103,6 +105,9 @@ export function ConfirmStep({
               <MetadataText color="accent">{label}</MetadataText>
             </Pressable>
           ))}
+          {privateVisit ? <Pressable accessibilityRole="button" onPress={() => onEdit('visitNotes')} className="px-sm py-xs">
+            <MetadataText color="accent">Edit visit</MetadataText>
+          </Pressable> : null}
         </View>
 
         {media.length > 0 ? (
@@ -137,12 +142,12 @@ export function ConfirmStep({
             </View>
           </View>
 
-          <Rating value={overallRating} size="md" />
-          {recommendation ? (
+          {!privateVisit ? <Rating value={overallRating} size="md" /> : null}
+          {!privateVisit && recommendation ? (
             <BodyText>{recommendation.emoji} {recommendation.label}</BodyText>
           ) : null}
 
-          {detailLines.length > 0 ? <Caption>{detailLines.join(' · ')}</Caption> : null}
+          {!privateVisit && detailLines.length > 0 ? <Caption>{detailLines.join(' · ')}</Caption> : null}
 
           {reviewText.trim().length > 0 ? (
             <BodyText color="textSecondary">{reviewText.trim()}</BodyText>
@@ -153,7 +158,7 @@ export function ConfirmStep({
               <View key={`${dish.id ?? dish.name}-${index}`} className="gap-xxs">
                 <View className="flex-row items-center justify-between gap-sm">
                   <BodyText medium numberOfLines={1} className="flex-1">{dish.name}</BodyText>
-                  <Rating value={dish.rating} size="sm" />
+                  {!privateVisit ? <Rating value={dish.rating} size="sm" /> : null}
                 </View>
                 {dish.category || dish.dietaryTags?.length ? (
                   <Caption>
@@ -163,7 +168,7 @@ export function ConfirmStep({
                     ].filter(Boolean).join(' · ')}
                   </Caption>
                 ) : null}
-                {dish.comment.trim() ? (
+                {!privateVisit && dish.comment.trim() ? (
                   <Caption>{dish.comment.trim()}</Caption>
                 ) : null}
               </View>

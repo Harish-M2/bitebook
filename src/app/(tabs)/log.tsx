@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
@@ -11,32 +11,39 @@ import { PhotoStep, type ReviewMediaDraft } from '@/components/log/PhotoStep';
 import { RatingStep, type DishReviewDraft } from '@/components/log/RatingStep';
 import { RestaurantStep, type ChosenRestaurant } from '@/components/log/RestaurantStep';
 import { ReviewStep } from '@/components/log/ReviewStep';
+import {
+    EMPTY_VISIT_DETAILS,
+    isValidPartySize,
+    isValidSpend,
+    toVisitDetailsInput,
+    type VisitDetailsDraft,
+} from '@/components/log/visitDetails';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { Screen } from '@/components/ui/Screen';
+import { TextField } from '@/components/ui/TextField';
 import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
+import { sameDishSelection } from '@/lib/db/dishes';
 import { logRestaurantReview } from '@/lib/db/log';
-import {
-  EMPTY_VISIT_DETAILS,
-  isValidPartySize,
-  isValidSpend,
-  toVisitDetailsInput,
-  type VisitDetailsDraft,
-} from '@/components/log/visitDetails';
+import { logPrivateVisit } from '@/lib/db/visited';
 import { localDateString } from '@/lib/format';
 import { queryKeys } from '@/lib/queryClient';
 import type { ReviewVisibility } from '@/types/database';
 
 const STEPS = ['restaurant', 'dishes', 'dishReviews', 'media', 'restaurantReview', 'confirm'] as const;
 type Step = (typeof STEPS)[number];
+type LogStep = Step | 'visitNotes';
+const VISIT_STEPS: LogStep[] = ['restaurant', 'dishes', 'visitNotes', 'confirm'];
 
-const TITLES: Record<Step, string> = {
+const TITLES: Record<LogStep, string> = {
   restaurant: 'Where did you eat?',
   dishes: 'What did you have?',
   dishReviews: 'Rate each dish',
   media: 'Add photos or video',
   restaurantReview: 'Review the visit',
   confirm: 'Ready to log',
+  visitNotes: 'Your visit',
 };
 
 interface Draft {
@@ -67,7 +74,8 @@ function createEmptyDraft(): Draft {
 
 function isValidVisitDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 /**
@@ -83,16 +91,20 @@ function isValidVisitDate(value: string): boolean {
  */
 export default function LogScreen() {
   const router = useRouter();
+  const { restaurantName } = useLocalSearchParams<{ restaurantName?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [step, setStep] = useState<Step>('restaurant');
+  const [step, setStep] = useState<LogStep>('restaurant');
+  const [logMode, setLogMode] = useState<'review' | 'visit'>('review');
   const [draft, setDraft] = useState<Draft>(createEmptyDraft);
 
-  const stepIndex = STEPS.indexOf(step);
+  const steps: readonly LogStep[] = logMode === 'visit' ? VISIT_STEPS : STEPS;
+  const stepIndex = steps.indexOf(step);
 
   const reset = useCallback(() => {
     setDraft(createEmptyDraft());
     setStep('restaurant');
+    setLogMode('review');
   }, []);
 
   // Leaving the tab mid-flow and coming back should not resume a half-finished draft: the
@@ -107,10 +119,16 @@ export default function LogScreen() {
   const submit = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('You need to be signed in to log a dish.');
-      if (!draft.restaurant || draft.dishes.length === 0) throw new Error('The visit is incomplete.');
+      if (!draft.restaurant) throw new Error('Choose a restaurant.');
+      if (!isValidVisitDate(draft.visitedAt)) throw new Error('Enter a valid visit date.');
+      if (logMode === 'visit') return { kind: 'visit' as const, ...await logPrivateVisit(user.id, {
+        restaurantId: draft.restaurant.id, visitedAt: draft.visitedAt,
+        notes: draft.restaurantComment, dishes: draft.dishes,
+      }) };
+      if (draft.dishes.length === 0) throw new Error('The visit is incomplete.');
       if (draft.recommendationTier === null) throw new Error('Choose a recommendation for this restaurant.');
 
-      return logRestaurantReview(user.id, {
+      const result = await logRestaurantReview(user.id, {
         restaurantId: draft.restaurant.id,
         overallRating: draft.overallRating,
         restaurantComment: draft.restaurantComment,
@@ -128,9 +146,26 @@ export default function LogScreen() {
         media: draft.media,
         details: toVisitDetailsInput(draft.details),
       });
+      return { kind: 'review' as const, ...result };
     },
     onSuccess: (result) => {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (result.kind === 'visit') {
+        void queryClient.invalidateQueries({ queryKey: ['visited-list'] });
+        void queryClient.invalidateQueries({ queryKey: ['visit'] });
+        void queryClient.invalidateQueries({ queryKey: ['visit-dishes'] });
+        void queryClient.invalidateQueries({ queryKey: ['restaurant-dishes'] });
+        const message = result.failedDishes > 0
+          ? `Your private visit is saved, but ${result.failedDishes} dish attachment(s) failed. Retry Save visit to finish.`
+          : result.existingDetailsRetained
+            ? 'Your dishes are saved. The existing visit date and notes were kept.'
+            : 'Your private visit is saved in your diary.';
+        if (Platform.OS === 'web') window.alert(message);
+        else Alert.alert('Visit saved', message);
+        if (result.failedDishes === 0) { reset(); router.replace('/(tabs)/diary'); }
+        return;
+      }
 
       if (user) {
         // Every surface that counts or lists this entry is now stale.
@@ -197,19 +232,23 @@ export default function LogScreen() {
 
   function goBack() {
     if (stepIndex === 0) {
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/(tabs)/home');
       return;
     }
-    setStep(STEPS[stepIndex - 1]);
+    setStep(steps[stepIndex - 1]);
   }
 
   function goNext() {
-    setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)]);
+    setStep(steps[Math.min(stepIndex + 1, steps.length - 1)]);
   }
 
   const canAdvance = useMemo(() => {
     if (step === 'dishes') {
-      return draft.dishes.length > 0;
+      return logMode === 'visit' || draft.dishes.length > 0;
+    }
+    if (step === 'visitNotes') {
+      return isValidVisitDate(draft.visitedAt) && draft.restaurantComment.trim().length <= 1000;
     }
     if (step === 'dishReviews') {
       return draft.dishes.length > 0 && draft.dishes.every((dish) => dish.rating >= 0.5);
@@ -224,21 +263,21 @@ export default function LogScreen() {
       );
     }
     return true;
-  }, [step, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt, draft.details.spend, draft.details.partySize]);
+  }, [step, logMode, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt, draft.restaurantComment, draft.details.spend, draft.details.partySize]);
 
   const showFooter = step !== 'restaurant';
 
   return (
     <Screen>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
         className="flex-1">
         <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
           <View style={{ width: '100%', maxWidth: 980, flex: 1 }}>
             <LogStepHeader
               title={TITLES[step]}
               stepIndex={stepIndex}
-              stepCount={STEPS.length}
+              stepCount={steps.length}
               onBack={goBack}
               action={
                 step === 'media' ? (
@@ -249,10 +288,18 @@ export default function LogScreen() {
               }
             />
 
+            {step === 'dishes' ? <View className="flex-row gap-xs px-lg pb-xs">
+              <Chip label="Review" selected={logMode === 'review'} onPress={() => setLogMode('review')} />
+              <Chip label="Visit only" selected={logMode === 'visit'} onPress={() => setLogMode('visit')} />
+            </View> : null}
+
             {step === 'restaurant' && (
               <RestaurantStep
+                initialQuery={restaurantName ?? draft.restaurant?.name ?? ''}
                 onSelect={(restaurant) => {
-                  setDraft({ ...createEmptyDraft(), restaurant });
+                  setDraft((current) => current.restaurant?.id === restaurant.id
+                    ? { ...current, restaurant }
+                    : { ...createEmptyDraft(), restaurant });
                   setStep('dishes');
                 }}
               />
@@ -265,10 +312,10 @@ export default function LogScreen() {
                 onToggle={(dish: ChosenDish) => {
                   setDraft((current) => {
                     const alreadySelected = current.dishes.some(
-                      (selected) => selected.id === dish.id && selected.name === dish.name,
+                      (selected) => sameDishSelection(selected, dish),
                     );
                     const dishes = alreadySelected
-                      ? current.dishes.filter((selected) => !(selected.id === dish.id && selected.name === dish.name))
+                      ? current.dishes.filter((selected) => !sameDishSelection(selected, dish))
                       : current.dishes.length < 20
                         ? [...current.dishes, { ...dish, rating: 0, comment: '' }]
                         : current.dishes;
@@ -325,18 +372,29 @@ export default function LogScreen() {
               </ScrollView>
             )}
 
-            {step === 'confirm' && draft.restaurant && draft.dishes.length > 0 && draft.recommendationTier !== null && (
+            {step === 'visitNotes' ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="gap-md px-lg py-md">
+              <MetadataText>Private visit</MetadataText>
+              <TextField label="Visit date" value={draft.visitedAt} placeholder="YYYY-MM-DD" maxLength={10}
+                onChangeText={(visitedAt) => setDraft((current) => ({ ...current, visitedAt }))}
+                error={isValidVisitDate(draft.visitedAt) ? null : 'Enter a valid date'} />
+              <TextField label="Visit notes (optional)" value={draft.restaurantComment} placeholder="What would you like to remember?"
+                multiline maxLength={1000} minHeight={88}
+                onChangeText={(restaurantComment) => setDraft((current) => ({ ...current, restaurantComment }))} />
+            </ScrollView> : null}
+
+            {step === 'confirm' && draft.restaurant && (logMode === 'visit' || (draft.dishes.length > 0 && draft.recommendationTier !== null)) && (
               <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
                 <ConfirmStep
                   restaurantName={draft.restaurant.name}
                   city={draft.restaurant.city}
                   dishes={draft.dishes}
-                  media={draft.media}
-                  overallRating={draft.overallRating}
+                  media={logMode === 'visit' ? [] : draft.media}
+                  overallRating={logMode === 'visit' ? 0 : draft.overallRating}
                   reviewText={draft.restaurantComment}
                   visitedAt={draft.visitedAt}
                   recommendationTier={draft.recommendationTier}
-                  visibility={draft.visibility}
+                  visibility={logMode === 'visit' ? 'private' : draft.visibility}
+                  privateVisit={logMode === 'visit'}
                   details={draft.details}
                   onEdit={setStep}
                 />
@@ -346,7 +404,7 @@ export default function LogScreen() {
             {showFooter ? (
               <View className="px-lg pb-md pt-sm">
                 <Button
-                  label={step === 'confirm' ? 'Log it' : 'Continue'}
+                  label={step === 'confirm' ? logMode === 'visit' ? 'Save visit' : 'Log it' : 'Continue'}
                   variant="primary"
                   size="lg"
                   fullWidth

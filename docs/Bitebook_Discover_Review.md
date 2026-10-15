@@ -33,6 +33,19 @@ discard commands on merged `main`. Deployment success must be verified separatel
 
 ## Git Safety
 
+### Production Configuration Follow-up
+
+The initial deployment's Vercel client key was a legacy JWT key rejected by Supabase
+with 401 "Legacy API keys are disabled". The production variable was replaced with the
+already-verified publishable key for the same project, and the same source was rebuilt.
+Current deployment: https://bitebook-i8nc2zspb-ten-fold-group.vercel.app
+(`dpl_HL8wBo6mibc9wcrmCAfXvpwabSjG`), Ready on https://bitebook-alpha.vercel.app.
+Auth settings now return 200; the served bundle contains the corrected publishable key.
+A nonexistent-account request returns the expected 400 `invalid_credentials`, not the
+legacy-key error. No real user credentials were used. No application code or database
+security changes were required. Pre-fix bundles must be rebuilt with the corrected key
+before being used as rollback targets.
+
 - Original branch: `main`.
 - Active review branch: `feature/discover-redesign`.
 - Original commit: `5c793895186da8c62d98a0921288c30bdf0de887`.
