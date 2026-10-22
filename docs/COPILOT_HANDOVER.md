@@ -1385,10 +1385,10 @@ See docs/Bitebook_Core_UX_Review.md for the complete release details and prior s
 
 ## 29. Pre-Launch Improvements (2026-10-22)
 
-Work is isolated on `fix/final-prelaunch-improvements`, based on `main`. The earlier
-`feature/bitebook-auth-redesign` commit `b5b7c8e` was separate during implementation and is
-being merged into this release as requested. The pre-existing `debug.log` was preserved
-until the user requested committing all work.
+Pre-launch work was committed as `515401b` on `fix/final-prelaunch-improvements`.
+Auth redesign `b5b7c8e` was integrated in merge commit `2a0cb92`, then `main` was
+fast-forwarded and pushed to GitHub at the owner's request. The pre-existing `debug.log`
+was included in the requested all-changes commit.
 
 Appearance now supports `system`, `dark`, and `light`. `ThemeProvider` stores the user's
 choice in AsyncStorage under `bitebook.appearance`, follows system appearance when `system`
@@ -1422,24 +1422,46 @@ provider results use an already-granted location bias when available and Google 
 otherwise. Search does not request location permission, and the former London fallback was
 removed.
 
-Local migrations `0056_restaurant_review_spend_band.sql` and
-`0057_idempotent_restaurant_review_log.sql` are pending. A read-only linked migration list
-confirmed production remains at `0055`; neither migration was applied. Reads and grouped
-visit-detail writes tolerate the pre-0056 schema and report when a selected spend band
-cannot yet be persisted. Database types were hand-updated for the pending schema. pgTAP
+Migrations `0056_restaurant_review_spend_band.sql` and
+`0057_idempotent_restaurant_review_log.sql` were applied to production after explicit
+owner approval on 2026-10-22. Linked history confirms all migrations through `0057`;
+a read-only catalog query confirms `spend_band`, `client_request_id`, and the
+security-invoker idempotent RPC exist. Reads and grouped visit-detail writes still
+tolerate the pre-0056 schema. Database types were hand-updated for this schema. pgTAP
 declares 94 checks but could not run because the local database at `127.0.0.1:54322` is
 unavailable; `npx supabase start` confirmed neither Docker nor Podman is installed/on
-`PATH`. No live database or Storage runtime verification was performed. Node tests cover
-save-before-delete replacement ordering, but
+`PATH`. Migration execution and catalog presence were verified live; transactional
+logging, retry behavior, and Storage operations were not tested against production.
+Node tests cover save-before-delete replacement ordering, but
 the fixture browser could not resolve the review-detail query for owner controls and no
 native device was available; interactive persisted-media replacement/deletion therefore
 remains unverified end to end.
 
 Verification completed: `npx tsc --noEmit`, `npx expo lint`, Expo web export, 47 Node tests,
-39 isolated Playwright checks, Profile light/dark persistence, system appearance changes,
+39 isolated app Playwright checks, 30 auth checks, Profile light/dark persistence, system appearance changes,
 and 320/390/1440px browser layouts. Browser checks used fixtures and performed no live
 database writes. No native simulator/device session was available. `npx expo-doctor` was
 not run; the SDK install check reports five existing patch-version mismatches (`expo`,
 `expo-constants`, `expo-linking`, `expo-location`, `expo-router`), and its proposed updates
 were declined. Installation reported 36 npm audit advisories (10 moderate, 25 high, 1
 critical); no audit remediation was attempted in this phase.
+
+## 30. Merged Pre-Launch Production Release (2026-10-22)
+
+Vercel's Git integration deployed `main` commit `2a0cb92` as
+`dpl_F6VjZaL4MEhMF7WEoqhj928WysFE`; the deployment is Ready and assigned to
+https://bitebook-alpha.vercel.app. Build logs confirm the expected commit. The restored
+image-backed Welcome and auth screens use the same `bitebook.appearance` preference as
+Profile; separate auth theme providers were removed. Auth forms fit 320px screens.
+
+Production smoke verified HTTP 200, the loaded Welcome background, immediate theme
+switching and persistence after reload, sign-in navigation, no horizontal overflow at
+320/390/1440px, and no browser runtime exceptions in a fresh unauthenticated context.
+The Auth settings endpoint returned 200 using Vercel's production environment. No live
+sign-in submission, email, transactional logging, or Storage writes were exercised.
+
+The shared Google Places helper consumers were deployed: `places-search` v21 and
+`places-import` v22 are ACTIVE with `verify_jwt=true`. Both returned 200 for CORS
+preflight and 401 for unauthenticated POSTs. Authenticated provider behavior remains
+unverified. The owner approved production deployment with the documented pgTAP,
+native-device, dependency audit, and SDK patch-version limitations still outstanding.
