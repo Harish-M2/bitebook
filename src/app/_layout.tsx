@@ -95,8 +95,10 @@ function SplashScreenController({ fontsReady }: { fontsReady: boolean }) {
  */
 function RootNavigator() {
   const { session, needsOnboarding } = useAuth();
-  const { colors } = useAppTheme();
+  const { colors, isReady: themeReady } = useAppTheme();
   const isSignedIn = Boolean(session);
+
+  if (!themeReady) return null;
 
   return (
     <Stack

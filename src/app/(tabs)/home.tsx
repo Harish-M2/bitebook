@@ -1,16 +1,18 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Bell, UtensilsCrossed } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { CommentsModal } from '@/components/ui/CommentsModal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Heading, MetadataText } from '@/components/ui/Typography';
+import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
 import { listFeed } from '@/lib/db/feed';
@@ -73,9 +75,9 @@ export default function HomeScreen() {
         }
         ListHeaderComponent={
           <View className="flex-row items-center justify-between pb-md pr-lg">
-            <Heading level={2} className="px-lg pt-xs">
-              Bitebook
-            </Heading>
+            <View className="px-lg pt-xs">
+              <BrandLogo width={144} />
+            </View>
             <Pressable
               onPress={() => router.push('/notifications')}
               hitSlop={8}
@@ -127,7 +129,7 @@ export default function HomeScreen() {
             <FeedSkeleton />
           ) : (
             <EmptyState
-              icon={<UtensilsCrossed size={40} color={colors.textMuted} />}
+              icon={<BrandIcon name="food" size={40} muted />}
               title="Your feed is quiet"
               description="Follow friends to see what they're trying and rating."
             />

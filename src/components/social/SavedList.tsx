@@ -1,11 +1,11 @@
 import type { Palette } from '@/constants/colors';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
 import { getSavedRestaurants, unsaveRestaurant } from '@/lib/db/saved';
 import type { Restaurant } from '@/types/models';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Heart } from 'lucide-react-native';
 import { useState } from 'react';
 import {
     ActivityIndicator,
@@ -134,7 +134,7 @@ export function SavedList({
   if (error) {
     return (
       <View style={styles.centerContainer}>
-        <Heart size={48} color={colors.danger} />
+        <BrandIcon name="bookmark" size={48} muted />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -146,7 +146,7 @@ export function SavedList({
   if (restaurants.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Heart size={48} color={colors.textSecondary} />
+        <BrandIcon name="bookmark" size={48} muted />
         <Text style={styles.emptyTitle}>No Saved Restaurants</Text>
         <Text style={styles.emptyText}>
           Start saving restaurants to see them here
@@ -218,15 +218,14 @@ export function SavedList({
                 </Text>
                 <TouchableOpacity
                   style={styles.unsaveButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Unsave ${restaurant.name}`}
                   onPress={() =>
                     handleUnsave(restaurant.id, restaurant.name)
                   }
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Heart
-                    size={20}
-                    color={colors.danger}
-                  />
+                  <BrandIcon name="bookmark" size={20} variant="gold" />
                 </TouchableOpacity>
               </View>
 

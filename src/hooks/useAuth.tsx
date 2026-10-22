@@ -37,11 +37,15 @@ type AuthContextValue = {
   profile: Profile | null;
   /** True until the initial session lookup resolves. */
   isLoading: boolean;
+  /** True only after Supabase reports a password-recovery event. */
+  isPasswordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   /** True once `profile` has loaded and `profile.username` is still null. */
   needsOnboarding: boolean;
   refreshProfile: () => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
-  signUpWithPassword: (email: string, password: string) => Promise<SignUpResult>;
+  signUpWithPassword: (email: string, password: string, displayName: string) => Promise<SignUpResult>;
+  resendSignUpConfirmation: (email: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
 };
@@ -57,6 +61,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const clearPasswordRecovery = useCallback(() => setIsPasswordRecovery(false), []);
 
   const userId = session?.user.id ?? null;
 
@@ -88,9 +94,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
       setSession(nextSession);
+      if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
+      if (event === 'SIGNED_OUT') setIsPasswordRecovery(false);
       setIsLoading(false);
     });
 
@@ -127,6 +135,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user: session?.user ?? null,
       profile,
       isLoading,
+      isPasswordRecovery,
+      clearPasswordRecovery,
       needsOnboarding: profile !== null && profile.username === null,
       refreshProfile: async () => {
         if (userId) {
@@ -134,10 +144,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       },
       signInWithPassword: async (email, password) => {
+        setIsPasswordRecovery(false);
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return { error: error?.message ?? null };
       },
-      signUpWithPassword: async (email, password) => {
+      signUpWithPassword: async (email, password, displayName) => {
         if (!isSupabaseConfigured) {
           return {
             error: 'Supabase is not configured. Add the required EXPO_PUBLIC variables to .env and restart Expo.',
@@ -149,17 +160,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo: getAuthRedirectUrl() },
+            options: {
+              emailRedirectTo: getAuthRedirectUrl(),
+              data: { display_name: displayName.trim() },
+            },
           });
+          const needsEmailConfirmation = Boolean(
+            !error && !data.session && data.user?.identities?.length
+          );
           return {
-            error: error?.message ?? null,
-            needsEmailConfirmation: !error && data.session === null,
+            error: error?.message ?? (!data.session && !needsEmailConfirmation
+              ? 'We could not confirm this account creation. Try signing in or resetting your password.'
+              : null),
+            needsEmailConfirmation,
           };
         } catch (error) {
           return {
             error: error instanceof Error ? error.message : 'Could not reach Supabase. Check your network connection.',
             needsEmailConfirmation: false,
           };
+        }
+      },
+      resendSignUpConfirmation: async (email) => {
+        if (!isSupabaseConfigured) {
+          return { error: 'Supabase is not configured. Add the required EXPO_PUBLIC variables to .env and restart Expo.' };
+        }
+
+        try {
+          const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: { emailRedirectTo: getAuthRedirectUrl() },
+          });
+          return { error: error?.message ?? null };
+        } catch (error) {
+          return { error: error instanceof Error ? error.message : 'Could not resend the confirmation email. Check your network connection.' };
         }
       },
       signOut: async () => {
@@ -173,7 +208,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return { error: error?.message ?? null };
       },
     }),
-    [session, isLoading, profile, userId, loadProfile]
+    [session, isLoading, isPasswordRecovery, profile, userId, loadProfile, clearPasswordRecovery]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

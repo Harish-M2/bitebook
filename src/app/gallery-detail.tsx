@@ -1,7 +1,8 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
-import { Calendar, MapPin } from 'lucide-react-native';
+import { Calendar } from 'lucide-react-native';
 import { useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
@@ -64,7 +65,7 @@ export default function GalleryDetailScreen() {
                 <View className="gap-xxs">
                   <BodyText medium>{review.dishName}</BodyText>
                   <View className="flex-row items-center gap-xs">
-                    <MapPin size={14} color={colors.textSecondary} />
+                    <BrandIcon name="location" size={14} muted />
                     <Caption>{review.restaurantName}</Caption>
                   </View>
                 </View>

@@ -1,6 +1,6 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { MapPin } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 
@@ -168,7 +168,7 @@ export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepPr
                 <ErrorState title="Bitebook search failed" description={known.error.message} onRetry={retrySearch} />
               ) : (
                 <EmptyState
-                icon={<MapPin size={40} color={colors.textMuted} />}
+                icon={<BrandIcon name="location" size={40} muted />}
                 title="No restaurants found"
                 description="Try a different spelling, or include the town or city."
               />

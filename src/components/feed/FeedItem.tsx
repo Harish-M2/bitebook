@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
-import { Bookmark, Heart, MessageCircle } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Rating } from '@/components/ui/Rating';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
 import { useAppTheme } from '@/hooks/useTheme';
@@ -133,7 +133,7 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress, on
           disabled={isLiking}
           accessibilityRole="button"
           accessibilityLabel="Like">
-          <Heart size={18} color={colors.textSecondary} fill={isLiking ? colors.accent : undefined} />
+          <BrandIcon name="favourite" size={18} variant={isLiking ? 'gold' : 'ivory'} />
           <MetadataText>{likeCount}</MetadataText>
         </Pressable> : null}
         {activity.review_id ? <Pressable
@@ -141,7 +141,7 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress, on
           onPress={onCommentPress}
           accessibilityRole="button"
           accessibilityLabel="Comment">
-          <MessageCircle size={18} color={colors.textSecondary} />
+          <BrandIcon name="comment" size={18} />
           <MetadataText>{activity.commentCount}</MetadataText>
         </Pressable> : null}
         <Pressable
@@ -150,7 +150,7 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress, on
           disabled={isSaving}
           accessibilityRole="button"
           accessibilityLabel="Save">
-          <Bookmark size={18} color={colors.textSecondary} fill={isSaved ? colors.accent : undefined} />
+          <BrandIcon name="bookmark" size={18} variant={isSaved ? 'gold' : 'ivory'} />
         </Pressable>
       </View>
     </View>

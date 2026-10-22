@@ -1,6 +1,7 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Bookmark, Compass, Users } from 'lucide-react-native';
+import { Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 
@@ -145,7 +146,7 @@ export default function DiscoverScreen() {
           <BodyText color="textSecondary">Your next great bite.</BodyText>
         </View>
         <Pressable onPress={() => router.push('/saved')} accessibilityRole="button" accessibilityLabel="Open saved restaurants" style={{ padding: 12 }}>
-          <Bookmark size={24} color={colors.accent} />
+          <BrandIcon name="bookmark" size={24} variant="gold" />
         </Pressable>
       </View>
       <SearchBar value={query} onChangeText={(value) => { setQuery(value); setExternalQuery(null); }}
@@ -214,7 +215,7 @@ export default function DiscoverScreen() {
           </View>
         )}
         ListEmptyComponent={loading ? <View className="flex-row gap-sm px-lg"><Skeleton width="48%" height={240} /><Skeleton width="48%" height={240} /></View>
-          : errors.length ? null : <EmptyState icon={<Compass size={36} color={colors.accent} />}
+          : errors.length ? null : <EmptyState icon={<BrandIcon name="discover" size={36} variant="gold" />}
             title={searching ? 'No matching bites' : 'No recommendations yet'}
             description={searching ? 'Try a restaurant, dish or cuisine.' : 'Recommendations will appear as places are rated and your tastes take shape.'} />}
         ListFooterComponent={searching && !waiting ? (

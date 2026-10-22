@@ -1,5 +1,6 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Plus, UtensilsCrossed } from 'lucide-react-native';
+import { Check, Plus } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 
@@ -177,7 +178,7 @@ export function DishStep({ restaurantId, selected, onToggle }: DishStepProps) {
               {isSelected({ id: item.id, name: item.name }) ? (
                 <Check size={20} color={colors.accent} />
               ) : (
-                <UtensilsCrossed size={20} color={colors.textMuted} />
+                <BrandIcon name="food" size={20} muted />
               )}
             </View>
             <View className="flex-1 gap-xxs">

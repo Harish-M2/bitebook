@@ -1,10 +1,10 @@
 import { Tabs } from 'expo-router/js-tabs';
-import { BookOpen, Compass, House, Plus, User } from 'lucide-react-native';
 import type { GestureResponderEvent } from 'react-native';
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/hooks/useTheme';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 
 type LogTabButtonProps = {
   children?: React.ReactNode;
@@ -36,7 +36,7 @@ function LogTabButton({ onPress }: LogTabButtonProps) {
           shadowOffset: { width: 0, height: 4 },
           elevation: 6,
         }}>
-        <Plus size={26} color={colors.background} strokeWidth={2.5} />
+        <BrandIcon name="add" size={26} variant="green" />
       </View>
     </Pressable>
   );
@@ -59,7 +59,7 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
@@ -77,14 +77,14 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <House size={24} color={color} />,
+          tabBarIcon: ({ focused }) => <BrandIcon name="home" variant={focused ? 'gold' : 'ivory'} muted={!focused} />,
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
           title: 'Discover',
-          tabBarIcon: ({ color }) => <Compass size={24} color={color} />,
+          tabBarIcon: ({ focused }) => <BrandIcon name="discover" variant={focused ? 'gold' : 'ivory'} muted={!focused} />,
         }}
       />
       <Tabs.Screen
@@ -98,14 +98,14 @@ export default function TabsLayout() {
         name="diary"
         options={{
           title: 'Diary',
-          tabBarIcon: ({ color }) => <BookOpen size={24} color={color} />,
+          tabBarIcon: ({ focused }) => <BrandIcon name="calendar" variant={focused ? 'gold' : 'ivory'} muted={!focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          tabBarIcon: ({ focused }) => <BrandIcon name="profile" variant={focused ? 'gold' : 'ivory'} muted={!focused} />,
         }}
       />
     </Tabs>

@@ -1,24 +1,31 @@
 /**
  * Bitebook design tokens — colours.
  *
- * The app now supports a premium dark and light mode with a warmer luxury palette.
+ * The app uses the supplied forest, champagne, ivory, and charcoal branding.
  * Keep the token names stable so the rest of the UI can swap theme values without
  * chasing hard-coded hex values across the codebase.
  */
 
+export const brandColors = {
+  forest: '#0E2F26',
+  gold: '#D4AF7C',
+  ivory: '#F8F5ED',
+  charcoal: '#1A1A1A',
+} as const;
+
 const darkPalette = {
   background: '#0B0D0E',
-  surface: '#12171A',
-  surfaceElevated: '#1A2125',
-  surfaceMuted: '#20282C',
-  border: '#2F383D',
-  textPrimary: '#F4F1EC',
+  surface: brandColors.charcoal,
+  surfaceElevated: '#242424',
+  surfaceMuted: '#2A2A2A',
+  border: '#3C403D',
+  textPrimary: brandColors.ivory,
   textSecondary: '#BAB7B1',
-  textMuted: '#7D8488',
-  accent: '#D7B98A',
-  accentDark: '#A6814D',
+  textMuted: '#8E9590',
+  accent: brandColors.gold,
+  accentDark: brandColors.forest,
   accentSoft: '#F2E4C9',
-  rating: '#E5B566',
+  rating: brandColors.gold,
   danger: '#E86F5D',
   success: '#4CB782',
   warning: '#E4B450',
@@ -30,16 +37,16 @@ const darkPalette = {
 } as const;
 
 const lightPalette = {
-  background: '#F3EFE9',
+  background: brandColors.ivory,
   surface: '#FFFFFF',
   surfaceElevated: '#F8F3EE',
   surfaceMuted: '#EEE5D9',
   border: '#D9CBB7',
-  textPrimary: '#171A1D',
+  textPrimary: brandColors.forest,
   textSecondary: '#545E66',
   textMuted: '#626B67',
   accent: '#8C5B28',
-  accentDark: '#7A4E24',
+  accentDark: brandColors.forest,
   accentSoft: '#F2E3C6',
   rating: '#8C5B28',
   danger: '#A73F35',

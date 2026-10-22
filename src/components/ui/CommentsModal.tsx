@@ -1,5 +1,6 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, Send, X } from 'lucide-react-native';
+import { Send, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
     ActivityIndicator,
@@ -136,7 +137,7 @@ export function CommentsModal({ visible, reviewId, onClose }: CommentsModalProps
               )}
               ListEmptyComponent={
                 <EmptyState
-                  icon={<MessageCircle size={32} color={colors.textMuted} />}
+                  icon={<BrandIcon name="comment" size={32} muted />}
                   title="No comments yet"
                   description="Start the conversation."
                 />

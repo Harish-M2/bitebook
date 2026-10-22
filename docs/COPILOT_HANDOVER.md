@@ -1386,9 +1386,9 @@ See docs/Bitebook_Core_UX_Review.md for the complete release details and prior s
 ## 29. Pre-Launch Improvements (2026-10-22)
 
 Work is isolated on `fix/final-prelaunch-improvements`, based on `main`. The earlier
-`feature/bitebook-auth-redesign` commit `b5b7c8e` remains separate and was not merged into
-this branch. No commit, push, deploy, or remote migration apply has been performed for
-this improvement phase. The pre-existing untracked `debug.log` was preserved.
+`feature/bitebook-auth-redesign` commit `b5b7c8e` was separate during implementation and is
+being merged into this release as requested. The pre-existing `debug.log` was preserved
+until the user requested committing all work.
 
 Appearance now supports `system`, `dark`, and `light`. `ThemeProvider` stores the user's
 choice in AsyncStorage under `bitebook.appearance`, follows system appearance when `system`

@@ -1,5 +1,5 @@
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { Image } from 'expo-image';
-import { UtensilsCrossed } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -27,7 +27,7 @@ function PhotoSource({ uri, label, style, emptyLabel = 'Bitebook' }: FoodPhotoPr
         <View
           accessibilityLabel={status === 'loading' ? `Loading ${label} photo` : `Photo unavailable for ${label}`}
           style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <UtensilsCrossed size={24} color={colors.accent} />
+          <BrandLogo variant="symbol" width={28} decorative />
           <Caption color="textMuted">{status === 'loading' ? 'Bitebook' : emptyLabel}</Caption>
           {status === 'loading' ? <ActivityIndicator size="small" color={colors.accent} /> : null}
         </View>

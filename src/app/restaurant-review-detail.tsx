@@ -1,9 +1,10 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ImagePlus, MapPin, Trash2 } from 'lucide-react-native';
+import { ImagePlus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 
@@ -159,7 +160,7 @@ export default function RestaurantReviewDetailScreen() {
             <Heading level={1}>{data.restaurant.name}</Heading>
             {location ? (
               <View className="flex-row items-center gap-xxs">
-                <MapPin size={14} color={palette.textMuted} />
+                <BrandIcon name="location" size={14} muted />
                 <Caption>{location}</Caption>
               </View>
             ) : null}

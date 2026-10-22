@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MapPin, Share2 } from 'lucide-react-native';
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 
 import { FeedItem } from '@/components/feed/FeedItem';
@@ -9,6 +8,7 @@ import { MenuLinkForm } from '@/components/food/MenuLinkForm';
 import { ReviewList } from '@/components/reviews';
 import { SaveButton } from '@/components/social/SaveButton';
 import { VisitedButton } from '@/components/social/VisitedButton';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
@@ -99,7 +99,7 @@ export default function RestaurantDetailScreen() {
             <View className="gap-xs">
               <Heading level={1}>{data.name}</Heading>
               <View className="flex-row items-center gap-xs">
-                <MapPin size={15} color={colors.textSecondary} />
+                <BrandIcon name="location" size={15} muted />
                 <Caption>{[cuisine, formatPriceLevel(data.price_level), data.city].filter(Boolean).join(' · ')}</Caption>
               </View>
               {data.address ? (
@@ -135,7 +135,7 @@ export default function RestaurantDetailScreen() {
                 className="h-[40px] w-[40px] items-center justify-center rounded-md border border-border"
                 accessibilityRole="button"
                 accessibilityLabel="Share restaurant">
-                <Share2 size={18} color={colors.textPrimary} />
+                <BrandIcon name="share" size={18} />
               </Pressable>
               <Button label="Log a dish" onPress={() => router.push({ pathname: '/(tabs)/log', params: { restaurantName: data.name } })} />
             </View>
