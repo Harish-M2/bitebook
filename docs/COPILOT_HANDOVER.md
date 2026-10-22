@@ -1465,3 +1465,12 @@ The shared Google Places helper consumers were deployed: `places-search` v21 and
 preflight and 401 for unauthenticated POSTs. Authenticated provider behavior remains
 unverified. The owner approved production deployment with the documented pgTAP,
 native-device, dependency audit, and SDK patch-version limitations still outstanding.
+
+## 31. Continue Button Visual State Correction (2026-10-22)
+
+The Log button became enabled but retained rendered opacity `0.5` after the conditional
+NativeWind `opacity-50` class was removed. The shared Button now explicitly sets opacity
+for both enabled and disabled states. The browser regression first reproduced the stale
+opacity, then passed with the fix. Its 41 checks now cover selecting/clearing dishes,
+rating dishes, and completing both restaurant rating and recommendation requirements;
+enabled Continue renders at opacity `1`, while incomplete steps remain disabled and dim.

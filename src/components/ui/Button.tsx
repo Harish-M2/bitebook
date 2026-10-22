@@ -71,9 +71,10 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       disabled={isDisabled}
-      className={cn('flex-row items-center justify-center gap-xxs rounded-pill', sizeClass[size], fullWidth && 'self-stretch', isDisabled && 'opacity-50', className)}
+      className={cn('flex-row items-center justify-center gap-xxs rounded-pill', sizeClass[size], fullWidth && 'self-stretch', className)}
       style={[
         {
+          opacity: isDisabled ? 0.5 : 1,
           backgroundColor: backgroundColorMap[variant],
           borderWidth: variant === 'outline' || variant === 'secondary' ? 1 : 0,
           borderColor: borderColorMap[variant],
