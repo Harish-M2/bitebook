@@ -1,8 +1,8 @@
-import { Search } from 'lucide-react-native';
 import { TextInput, View, type TextInputProps } from 'react-native';
 
-import { cn } from '@/lib/cn';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { colors } from '@/constants/colors';
+import { cn } from '@/lib/cn';
 
 type SearchBarProps = Omit<TextInputProps, 'style'> & {
   className?: string;
@@ -16,7 +16,7 @@ export function SearchBar({ className, placeholder = 'Search...', ...rest }: Sea
         'flex-row items-center gap-xs rounded-pill border border-border bg-surface-elevated px-md py-sm',
         className
       )}>
-      <Search size={18} color={colors.textMuted} />
+      <BrandIcon name="discover" size={18} muted />
       <TextInput
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}

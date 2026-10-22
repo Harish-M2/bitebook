@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Heart } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Caption } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
@@ -35,7 +35,6 @@ export function SaveButton({ restaurantId, showLabel = false, size = 24, onStatu
   });
   const loading = saved.isLoading || toggle.isPending;
   const selected = Boolean(saved.data);
-  const color = selected ? colors.accent : colors.textSecondary;
   const error = saved.error ?? toggle.error;
 
   return (
@@ -45,7 +44,7 @@ export function SaveButton({ restaurantId, showLabel = false, size = 24, onStatu
         disabled={loading || !user} onPress={() => saved.isError ? void saved.refetch() : toggle.mutate()}
         style={{ minWidth: 44, minHeight: 44, padding: 8, justifyContent: 'center', alignItems: 'center' }}>
         {loading ? <ActivityIndicator color={colors.accent} /> : <View className="flex-row items-center gap-xs">
-          <Heart size={size} color={color} fill={selected ? color : 'none'} />
+          <BrandIcon name="bookmark" size={size} variant={selected ? 'gold' : 'ivory'} />
           {showLabel ? <Caption color={selected ? 'accent' : 'textSecondary'}>{selected ? 'Saved' : 'Save'}</Caption> : null}
         </View>}
       </Pressable>

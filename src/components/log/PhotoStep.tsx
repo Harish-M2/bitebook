@@ -1,8 +1,9 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useEvent } from 'expo';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ArrowLeft, ArrowRight, Camera, ImageIcon, Play, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, ImageIcon, Play, Plus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 
@@ -257,7 +258,7 @@ export function PhotoStep({ media, onChange, dishNames = [] }: PhotoStepProps) {
           variant="outline"
           fullWidth
           disabled={isPreparing || remaining <= 0}
-          icon={<Camera size={18} color={colors.textPrimary} />}
+          icon={<BrandIcon name="camera" size={18} />}
           onPress={() => void pick('camera')}
         />
       </View>

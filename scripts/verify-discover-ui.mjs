@@ -34,9 +34,9 @@ const ratings = [{ id: 'review', restaurant_id: restaurantId, overall_rating: 4.
   created_at: new Date().toISOString(), restaurant, author: profile },
   { id: 'second-review', restaurant_id: secondRestaurant.id, overall_rating: 4, recommendation_tier: 4,
     created_at: new Date().toISOString(), restaurant: secondRestaurant, author: profile }];
-const screenshots = join(tmpdir(), 'bitebook-discover-review');
+const screenshots = process.env.BITEBOOK_SCREENSHOTS ?? join(tmpdir(), 'bitebook-discover-review');
 await mkdir(screenshots, { recursive: true });
-const bitmap = await readFile(new URL('../assets/images/icon.png', import.meta.url));
+const bitmap = await readFile(process.env.BITEBOOK_TEST_PHOTO ?? new URL('../assets/images/icon.png', import.meta.url));
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 await context.addInitScript(({ storageKey, session }) => {
@@ -139,7 +139,7 @@ try {
   passed('Real image component renders a loaded asset and a branded missing-photo fallback');
   await visible(page.getByText('No photo yet', { exact: true }));
   const missingPhoto = await page.getByLabel(`Photo unavailable for ${dish.name}`).boundingBox();
-  const restaurantPhoto = await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).locator('img').last().boundingBox();
+  const restaurantPhoto = await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).locator(`img[alt="${restaurant.name}"]`).boundingBox();
   assert.ok(Math.abs(missingPhoto.height - restaurantPhoto.height) <= 1);
   passed('Photo-free dish placeholders retain the same grid image height as restaurant photos');
   const leftCard = await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).boundingBox();
@@ -221,7 +221,7 @@ try {
   passed('Diary links to retained review-free visited history');
   for (const [route, text] of [['home', 'Bitebook'], ['log', 'Where did you eat?'], ['diary', 'Your diary'], ['profile', 'Fixture Taster'], ['discover', 'Discover']]) {
     await page.goto(`${baseUrl}/${route}`);
-    await visible(page.getByText(text, { exact: true }).first());
+    await visible(route === 'home' ? page.getByTestId('brand-logo-horizontal-dark') : page.getByText(text, { exact: true }).first());
     await visible(page.getByRole('button', { name: 'Log a dish', exact: true }));
     for (const label of ['Home', 'Discover', 'Diary', 'Profile']) await visible(page.getByText(label, { exact: true }).last());
   }
@@ -312,7 +312,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
   await visible(page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }));
   await page.screenshot({ path: join(screenshots, 'discover-desktop.png'), fullPage: true });
-  const desktopPhoto = await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).locator('img').last().boundingBox();
+  const desktopPhoto = await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).locator(`img[alt="${restaurant.name}"]`).boundingBox();
   assert.ok(desktopPhoto.height <= 240);
   const desktopRestaurantTile = await page.getByRole('button', { name: `View menu for ${restaurant.name}`, exact: true }).locator('..').locator('..').boundingBox();
   const desktopDishTile = await page.getByRole('button', { name: `View ${dish.name} at ${restaurant.name}`, exact: true }).boundingBox();
@@ -458,6 +458,85 @@ try {
       passed('Optional onboarding steps provide a working Home exit once identity is complete');
     }
     await onboardingContext.close();
+  }
+  if (process.env.BITEBOOK_BRANDING_REVIEW === '1') {
+    const viewports = [
+      ['mobile', { width: 390, height: 844 }],
+      ['tablet', { width: 834, height: 1112 }],
+      ['desktop', { width: 1440, height: 900 }],
+    ];
+    const destinations = [
+      ['home', 'home', 'Your feed is quiet'], ['discover', 'discover', restaurant.name],
+      ['log', 'add', 'Where did you eat?'], ['saved', 'saved', restaurant.name],
+      ['diary', 'diary', 'Your diary'],
+      ['profile', 'profile', profile.display_name],
+      [`restaurant-detail?restaurantId=${restaurantId}`, 'restaurant-detail', restaurant.name],
+      [`dish-detail?dishId=${dishId}`, 'dish-detail', dish.name],
+    ];
+    for (const [viewportName, viewport] of viewports) {
+      await page.setViewportSize(viewport);
+      for (const [route, name, text] of destinations) {
+        await page.goto(`${baseUrl}/${route}`);
+        await visible(page.getByText(text, { exact: true }).first());
+        await page.waitForFunction(() => {
+          const branded = [...document.querySelectorAll('[data-testid^="brand-"]')];
+          return branded.length > 0 && branded.every((element) => {
+            const image = element.tagName === 'IMG' ? element : element.querySelector('img');
+            return image?.complete && image.naturalWidth > 0;
+          });
+        });
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name} overflow`);
+        assert.ok(await page.locator('[data-testid^="brand-icon-"]').evaluateAll((elements) =>
+          elements.every((element) => {
+            const box = element.getBoundingClientRect();
+            return Math.abs(box.width - box.height) < 1;
+          })), `${name} stretched icon`);
+        for (const [tabName, iconName] of [['Home', 'home'], ['Discover', 'discover'], ['Diary', 'calendar'], ['Profile', 'profile']]) {
+          const tab = page.getByRole('tab', { name: tabName, exact: true });
+          if (['saved', 'restaurant-detail', 'dish-detail'].includes(name)) continue;
+          assert.equal(await tab.count(), 1, `${name}: ${tabName} tab must exist`);
+          const selected = await tab.getAttribute('aria-selected') === 'true';
+          const icon = tab.getByTestId(`brand-icon-${iconName}-${selected ? 'gold' : 'ivory'}`);
+          await visible(icon);
+          assert.ok(await icon.evaluate((element, selected) => {
+            for (let current = element; current && current.getAttribute('role') !== 'tab'; current = current.parentElement) {
+              const style = getComputedStyle(current);
+              if (Number(style.opacity) < (selected ? 0.95 : 0.6) || style.display === 'none') return false;
+            }
+            return true;
+          }, selected), `${tabName} selected variant hidden`);
+        }
+        if (await page.getByRole('button', { name: 'Log a dish', exact: true }).count() && !route.includes('detail')) {
+          const add = page.getByRole('button', { name: 'Log a dish', exact: true });
+          await visible(add.getByTestId('brand-icon-add-green'));
+          const box = await add.boundingBox();
+          assert.ok(box.width >= 44 && box.height >= 44);
+        }
+        await page.waitForFunction(() => [...document.images]
+          .filter((image) => image.src.includes('/__fixture/photo.png'))
+          .every((image) => {
+            if (!image.complete || !image.naturalWidth) return false;
+            for (let current = image; current; current = current.parentElement) {
+              if (Number(getComputedStyle(current).opacity) < 0.99) return false;
+            }
+            return true;
+          }));
+        await page.screenshot({ path: join(screenshots, `${name}-${viewportName}.png`), fullPage: true, animations: 'disabled' });
+      }
+      passed(`Brand assets load, icons stay square, tab states and eight screen captures: ${viewportName}`);
+    }
+    const authContext = await browser.newContext({ viewport: { width: 320, height: 568 } });
+    await authContext.route((url) => url.hostname === supabaseUrl.hostname, (route) => route.fulfill({ json: [] }));
+    const authPage = await authContext.newPage();
+    authPage.on('pageerror', (error) => errors.push(error.message));
+    for (const route of ['welcome', 'sign-in', 'sign-up', 'forgot-password']) {
+      await authPage.goto(`${baseUrl}/${route}`);
+      await visible(authPage.getByRole('img', { name: 'Bitebook', exact: true }));
+      assert.ok(await authPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await authPage.screenshot({ path: join(screenshots, `${route}-small-mobile.png`), fullPage: true });
+    }
+    await authContext.close();
+    passed('Four auth screens retain visible brand identity without horizontal overflow at 320px');
   }
   assert.deepEqual(errors, []);
   passed('No browser runtime exceptions');

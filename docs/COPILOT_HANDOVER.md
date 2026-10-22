@@ -1377,3 +1377,25 @@ each. Real authenticated function/provider operations were not tested. No migrat
 RLS policy changes, seed scripts, or changes to the remote-only fix-rls function ran.
 Existing 41 dependency advisories remain; local pgTAP and Deno execution were unavailable.
 See docs/Bitebook_Core_UX_Review.md for the complete release details and prior snapshots.
+
+## 29. Branding Integration Worktree (2026-10-15, Not Published)
+
+Branch feature/bitebook-branding was created from local main 9afa5f3. Branding work is
+uncommitted; nothing was pushed, merged or published. Production remains the section 28
+release. See docs/branding/README.md for the complete 59-file asset inventory, actual
+placements, changed-file list, screenshots, and native/store steps.
+
+The central registry is src/constants/branding.ts, with shared BrandIcon/BrandLogo
+renderers. The original SVG pack and Expo assets remain preserved. Reproducible PNG
+derivatives live in assets/bitebook_brand_assets/generated; app.json now uses them for
+launcher, adaptive icon, splash and favicon. Runtime/NativeWind tokens use the exact
+brand gold/ivory and charcoal surfaces without adding a light theme. Tabs remain Home,
+Discover, raised Log, Diary, Profile; Saved is still separate. No API/auth/database or
+dependency implementation changes were made.
+
+TypeScript, lint, 38 regression tests, 41 fixture-backed browser checks, and web/iOS/
+Android JS asset exports pass. Expo Doctor is 20/21 due to existing patch mismatches.
+Real native icon/splash behavior, authenticated live writes and a full accessibility
+audit remain unverified. No adb is available on PATH; Windows cannot run iOS Simulator.
+The watched local web preview uses port 8092. Avoid CI mode while editing: it disables
+Metro file watching and can serve stale auth/layout transforms even on page reload.

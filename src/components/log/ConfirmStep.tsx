@@ -1,5 +1,6 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Image } from 'expo-image';
-import { Film, Globe, Lock, MapPin, Users, UtensilsCrossed } from 'lucide-react-native';
+import { Film, Globe, Lock, Users } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import type { ReviewMediaDraft } from '@/components/log/PhotoStep';
@@ -137,7 +138,7 @@ export function ConfirmStep({
               {restaurantName}
             </Heading>
             <View className="flex-row items-center gap-xxs">
-              <UtensilsCrossed size={13} color={colors.textMuted} />
+              <BrandIcon name="food" size={13} muted />
               <Caption numberOfLines={1}>{city ?? 'Restaurant visit'}</Caption>
             </View>
           </View>
@@ -182,7 +183,7 @@ export function ConfirmStep({
         </Surface>
 
         <View className="mt-sm flex-row items-center gap-xxs px-xs">
-          <MapPin size={12} color={colors.textMuted} />
+          <BrandIcon name="location" size={12} muted />
           <MetadataText>{city ? `${restaurantName} · ${city}` : restaurantName}</MetadataText>
         </View>
       </View>

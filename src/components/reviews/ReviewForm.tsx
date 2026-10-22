@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Button } from '@/components/ui/Button';
 import { colors } from '@/constants/colors';
 import { logActivity } from '@/lib/db/activity';
@@ -10,7 +11,7 @@ import {
 import { uploadReviewPhoto } from '@/lib/storage/photos';
 import { supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { AlertCircle, Camera, X } from 'lucide-react-native';
+import { AlertCircle, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -248,7 +249,7 @@ export const ReviewForm = ({
             onPress={pickImage}
             disabled={isSubmitting}
           >
-            <Camera size={20} color={colors.accent} />
+            <BrandIcon name="camera" size={20} variant="gold" />
             <Text style={styles.photoButtonText}>Choose Photo</Text>
           </TouchableOpacity>
 
@@ -257,7 +258,7 @@ export const ReviewForm = ({
             onPress={takePhoto}
             disabled={isSubmitting}
           >
-            <Camera size={20} color={colors.accent} />
+            <BrandIcon name="camera" size={20} variant="gold" />
             <Text style={styles.photoButtonText}>Take Photo</Text>
           </TouchableOpacity>
         </View>

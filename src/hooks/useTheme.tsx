@@ -10,11 +10,13 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  return <ThemeContext.Provider value={DARK_THEME}>{children}</ThemeContext.Provider>;
+export function ThemeProvider({ children, themeName = 'dark' }: { children: ReactNode; themeName?: ThemeName }) {
+  const value = themeName === 'light' ? LIGHT_THEME : DARK_THEME;
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 const DARK_THEME: ThemeContextValue = { themeName: 'dark', isDark: true, colors: theme.dark };
+const LIGHT_THEME: ThemeContextValue = { themeName: 'light', isDark: false, colors: theme.light };
 
 export function useAppTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);

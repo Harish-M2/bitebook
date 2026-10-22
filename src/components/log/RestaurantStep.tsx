@@ -1,5 +1,5 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MapPin } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 
@@ -133,7 +133,7 @@ export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepPr
           ListEmptyComponent={
             known.isPending || known.isError || places.isFetching || places.isError || newPlaces.length > 0 ? null : (
               <EmptyState
-                icon={<MapPin size={40} color={colors.textMuted} />}
+                icon={<BrandIcon name="location" size={40} muted />}
                 title="No restaurants found"
                 description="Try a different spelling, or include the town or city."
               />

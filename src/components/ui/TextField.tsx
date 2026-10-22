@@ -57,6 +57,7 @@ export function TextField({
         <View className="flex-row items-center gap-xs">
           {leftIcon ? <View>{leftIcon}</View> : null}
           <TextInput
+            accessibilityLabel={rest.accessibilityLabel ?? label}
             placeholderTextColor={palette.textMuted}
             selectionColor={palette.accent}
             style={{

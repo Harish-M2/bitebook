@@ -12,6 +12,7 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 type ButtonProps = Omit<PressableProps, 'children'> & {
   label: string;
   variant?: ButtonVariant;
+  textColor?: ColorToken;
   size?: ButtonSize;
   loading?: boolean;
   icon?: ReactNode;
@@ -30,6 +31,7 @@ const sizeClass: Record<ButtonSize, string> = {
 export function Button({
   label,
   variant = 'primary',
+  textColor,
   size = 'md',
   loading = false,
   icon,
@@ -62,6 +64,7 @@ export function Button({
     outline: 'textPrimary',
     ghost: 'accent',
   };
+  const labelColor = textColor ?? textColorMap[variant];
 
   return (
     <Pressable
@@ -84,11 +87,11 @@ export function Button({
       ]}
       {...rest}>
       {loading ? (
-        <ActivityIndicator color={palette[textColorMap[variant]]} />
+        <ActivityIndicator color={palette[labelColor]} />
       ) : (
         <>
           {icon}
-          <BodyText medium color={textColorMap[variant]}>
+          <BodyText medium color={labelColor}>
             {label}
           </BodyText>
         </>

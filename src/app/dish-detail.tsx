@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Share2 } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { FoodPhoto } from '@/components/food/FoodPhoto';
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
@@ -71,7 +71,7 @@ export default function DishDetailScreen() {
                 className="h-[52px] w-[52px] items-center justify-center rounded-md border border-border"
                 accessibilityRole="button"
                 accessibilityLabel="Share dish">
-                <Share2 size={20} color={colors.textPrimary} />
+                <BrandIcon name="share" size={20} />
               </Pressable>
             </View>
             <Heading level={2}>Reviews from people you follow</Heading>

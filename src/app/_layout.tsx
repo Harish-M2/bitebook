@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AuthAppearanceProvider, useAuthAppearance } from '@/components/auth/AuthAppearanceProvider';
 import { colors } from '@/constants/colors';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ThemeProvider, useAppTheme } from '@/hooks/useTheme';
@@ -45,14 +46,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <ThemeProvider>
-            {/* Mounted before the fonts gate so the session lookup starts immediately. */}
-            <AuthProvider>
-              <ThemeStatusBar />
-              <SplashScreenController fontsReady={fontsReady} />
-              {fontsReady ? <RootNavigator /> : null}
-            </AuthProvider>
-          </ThemeProvider>
+          <AuthAppearanceProvider>
+            <ThemeProvider>
+              {/* Mounted before the fonts gate so the session lookup starts immediately. */}
+              <AuthProvider>
+                <ThemeStatusBar />
+                <SplashScreenController fontsReady={fontsReady} />
+                {fontsReady ? <RootNavigator /> : null}
+              </AuthProvider>
+            </ThemeProvider>
+          </AuthAppearanceProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
@@ -65,12 +68,13 @@ export default function RootLayout() {
  */
 function SplashScreenController({ fontsReady }: { fontsReady: boolean }) {
   const { isLoading } = useAuth();
+  const { isReady: appearanceReady } = useAuthAppearance();
 
   useEffect(() => {
-    if (fontsReady && !isLoading) {
+    if (fontsReady && !isLoading && appearanceReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsReady, isLoading]);
+  }, [fontsReady, isLoading, appearanceReady]);
 
   return null;
 }
@@ -82,7 +86,10 @@ function SplashScreenController({ fontsReady }: { fontsReady: boolean }) {
  */
 function RootNavigator() {
   const { session, needsOnboarding } = useAuth();
+  const { isReady: appearanceReady } = useAuthAppearance();
   const isSignedIn = Boolean(session);
+
+  if (!appearanceReady) return null;
 
   return (
     <Stack

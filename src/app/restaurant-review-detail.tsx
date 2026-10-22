@@ -1,8 +1,8 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { MapPin } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -12,7 +12,6 @@ import { Rating } from '@/components/ui/Rating';
 import { Screen } from '@/components/ui/Screen';
 import { Surface } from '@/components/ui/Surface';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
 import { useAppTheme } from '@/hooks/useTheme';
 import { getRestaurantVisitSummary } from '@/lib/db/restaurant-reviews';
@@ -90,7 +89,7 @@ export default function RestaurantReviewDetailScreen() {
             <Heading level={1}>{data.restaurant.name}</Heading>
             {location ? (
               <View className="flex-row items-center gap-xxs">
-                <MapPin size={14} color={colors.textMuted} />
+                <BrandIcon name="location" size={14} muted />
                 <Caption>{location}</Caption>
               </View>
             ) : null}

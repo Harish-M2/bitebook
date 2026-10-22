@@ -1,4 +1,5 @@
-import { Bookmark, Menu } from 'lucide-react-native';
+import { BrandIcon } from '@/components/ui/BrandIcon';
+import { Menu } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
@@ -95,11 +96,7 @@ export function RestaurantRow({ restaurant, onPress, onSave, onViewMenu, classNa
         accessibilityLabel={`${isSaved ? 'Unsave' : 'Save'} ${restaurant.name}`}
         accessibilityRole="button"
         accessibilityState={{ disabled: saveDisabled || isSaving, selected: isSaved }}>
-        <Bookmark
-          size={20}
-          color={isSaved ? colors.accent : colors.textSecondary}
-          fill={isSaved ? colors.accent : undefined}
-        />
+        <BrandIcon name="bookmark" size={20} variant={isSaved ? 'gold' : 'ivory'} />
       </Pressable>
       ) : null}
       </View>

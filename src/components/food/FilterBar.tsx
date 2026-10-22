@@ -1,8 +1,9 @@
+import { BrandIcon } from '@/components/ui/BrandIcon';
 import { colors } from '@/constants/colors';
 import type { RestaurantFilters } from '@/lib/db/filters';
 import { getPriceLevels, SORT_OPTIONS } from '@/lib/db/filters';
 import type { Restaurant } from '@/types/models';
-import { ChevronDown, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
     Modal,
@@ -98,7 +99,7 @@ export function FilterBar({
         <Text style={styles.filterButtonText}>
           Filter {activeFilterCount > 0 && `(${activeFilterCount})`}
         </Text>
-        <ChevronDown size={16} color={colors.textPrimary} />
+        <BrandIcon name="filter" size={16} variant={activeFilterCount > 0 ? 'gold' : 'ivory'} />
       </Pressable>
 
       <Modal
