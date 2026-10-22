@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { ConfirmStep } from '@/components/log/ConfirmStep';
 import { DishStep, type ChosenDish } from '@/components/log/DishStep';
@@ -14,14 +15,15 @@ import { ReviewStep } from '@/components/log/ReviewStep';
 import {
     EMPTY_VISIT_DETAILS,
     isValidPartySize,
-    isValidSpend,
     toVisitDetailsInput,
     type VisitDetailsDraft,
 } from '@/components/log/visitDetails';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
+import { useToast } from '@/components/ui/Toast';
 import { MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
 import { sameDishSelection } from '@/lib/db/dishes';
@@ -47,6 +49,7 @@ const TITLES: Record<LogStep, string> = {
 };
 
 interface Draft {
+  clientRequestId: string;
   restaurant: ChosenRestaurant | null;
   dishes: DishReviewDraft[];
   media: ReviewMediaDraft[];
@@ -60,6 +63,7 @@ interface Draft {
 
 function createEmptyDraft(): Draft {
   return {
+  clientRequestId: Crypto.randomUUID(),
   restaurant: null,
     dishes: [],
     media: [],
@@ -94,9 +98,11 @@ export default function LogScreen() {
   const { restaurantName } = useLocalSearchParams<{ restaurantName?: string }>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [step, setStep] = useState<LogStep>('restaurant');
   const [logMode, setLogMode] = useState<'review' | 'visit'>('review');
   const [draft, setDraft] = useState<Draft>(createEmptyDraft);
+  const submitLocked = useRef(false);
 
   const steps: readonly LogStep[] = logMode === 'visit' ? VISIT_STEPS : STEPS;
   const stepIndex = steps.indexOf(step);
@@ -129,6 +135,7 @@ export default function LogScreen() {
       if (draft.recommendationTier === null) throw new Error('Choose a recommendation for this restaurant.');
 
       const result = await logRestaurantReview(user.id, {
+        clientRequestId: draft.clientRequestId,
         restaurantId: draft.restaurant.id,
         overallRating: draft.overallRating,
         restaurantComment: draft.restaurantComment,
@@ -149,6 +156,7 @@ export default function LogScreen() {
       return { kind: 'review' as const, ...result };
     },
     onSuccess: (result) => {
+      submitLocked.current = false;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       if (result.kind === 'visit') {
@@ -161,8 +169,11 @@ export default function LogScreen() {
           : result.existingDetailsRetained
             ? 'Your dishes are saved. The existing visit date and notes were kept.'
             : 'Your private visit is saved in your diary.';
-        if (Platform.OS === 'web') window.alert(message);
-        else Alert.alert('Visit saved', message);
+        showToast({
+          title: result.failedDishes > 0 ? 'Visit saved with an issue' : 'Visit saved',
+          message,
+          tone: result.failedDishes > 0 ? 'error' : 'success',
+        });
         if (result.failedDishes === 0) { reset(); router.replace('/(tabs)/diary'); }
         return;
       }
@@ -180,53 +191,34 @@ export default function LogScreen() {
       void queryClient.invalidateQueries({ queryKey: ['restaurant-visits', user?.id] });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-visits-by-restaurant', draft.restaurant?.id] });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-rating-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['dish'] });
       void queryClient.invalidateQueries({ queryKey: ['recently-reviewed-restaurants'] });
       void queryClient.invalidateQueries({ queryKey: ['trending-dishes'] });
       void queryClient.invalidateQueries({ queryKey: ['discover-search'] });
       void queryClient.invalidateQueries({ queryKey: ['friend-recommendations'] });
 
-      if (Platform.OS === 'web') {
-        reset();
-        router.replace('/(tabs)/diary');
-        window.alert(result.mediaFailedCount > 0
-          ? `Visit logged. ${result.mediaFailedCount} media item${result.mediaFailedCount === 1 ? '' : 's'} could not be uploaded.`
-          : 'Visit logged. Your restaurant review and dishes are in your diary.');
-        return;
-      }
-
-      if (result.mediaFailedCount > 0) {
-        Alert.alert(
-          'Visit logged, but some media did not upload',
-          `Your visit and dishes are in your diary. ${result.mediaFailedCount} media item${result.mediaFailedCount === 1 ? '' : 's'} could not be uploaded.`,
-          [
-            {
-              text: 'View diary',
-              onPress: () => {
-                reset();
-                router.push('/(tabs)/diary');
-              },
-            },
-          ],
-        );
-      } else {
-        Alert.alert('Visit logged', 'Your restaurant review and dishes are in your diary.', [
-          {
-            text: 'View diary',
-            onPress: () => {
-              reset();
-              router.push('/(tabs)/diary');
-            },
-          },
-        ]);
-      }
+      showToast({
+        title: result.mediaFailedCount > 0 || result.detailsFailed ? 'Visit logged with an issue' : 'Visit logged',
+        message: [
+          result.mediaFailedCount > 0
+            ? `Your review is saved, but ${result.mediaFailedCount} media item${result.mediaFailedCount === 1 ? '' : 's'} could not be uploaded.`
+            : null,
+          result.detailsFailed ? 'The visit is saved, but the optional spend band could not be stored until the database update is applied.' : null,
+          result.mediaFailedCount === 0 && !result.detailsFailed ? 'Your restaurant review and dishes are in your diary.' : null,
+        ].filter(Boolean).join(' '),
+        tone: result.mediaFailedCount > 0 || result.detailsFailed ? 'error' : 'success',
+      });
+      if (result.mediaFailedCount > 0) return;
+      reset();
+      router.replace('/(tabs)/diary');
     },
     onError: (error: Error) => {
+      submitLocked.current = false;
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      if (Platform.OS === 'web') {
-        window.alert(`Could not log this visit\n\n${error.message}`);
-      } else {
-        Alert.alert('Could not log this visit', error.message);
-      }
+      showToast({ title: 'Could not log this visit', message: `${error.message} Your draft is still here; you can retry.`, tone: 'error' });
+    },
+    onSettled: () => {
+      submitLocked.current = false;
     },
   });
 
@@ -258,12 +250,25 @@ export default function LogScreen() {
         draft.overallRating >= 0.5 &&
         draft.recommendationTier !== null &&
         isValidVisitDate(draft.visitedAt) &&
-        isValidSpend(draft.details.spend) &&
         isValidPartySize(draft.details.partySize)
       );
     }
     return true;
-  }, [step, logMode, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt, draft.restaurantComment, draft.details.spend, draft.details.partySize]);
+  }, [step, logMode, draft.dishes, draft.overallRating, draft.recommendationTier, draft.visitedAt, draft.restaurantComment, draft.details.partySize]);
+
+  const advanceMessage = step === 'dishes' && logMode === 'review' && draft.dishes.length === 0
+    ? 'Choose at least one dish to review.'
+    : step === 'dishReviews' && draft.dishes.some((dish) => dish.rating < 0.5)
+      ? `Add a rating for ${draft.dishes.filter((dish) => dish.rating < 0.5).map((dish) => dish.name).join(', ')}.`
+      : step === 'visitNotes' && !isValidVisitDate(draft.visitedAt)
+        ? 'Choose a valid visit date.'
+        : step === 'restaurantReview' && draft.overallRating < 0.5
+          ? 'Add an overall experience rating to continue.'
+          : step === 'restaurantReview' && draft.recommendationTier === null
+            ? 'Choose a restaurant recommendation to continue.'
+            : step === 'restaurantReview' && !isValidPartySize(draft.details.partySize)
+              ? 'Correct the party size or clear it to continue.'
+              : null;
 
   const showFooter = step !== 'restaurant';
 
@@ -374,9 +379,8 @@ export default function LogScreen() {
 
             {step === 'visitNotes' ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="gap-md px-lg py-md">
               <MetadataText>Private visit</MetadataText>
-              <TextField label="Visit date" value={draft.visitedAt} placeholder="YYYY-MM-DD" maxLength={10}
-                onChangeText={(visitedAt) => setDraft((current) => ({ ...current, visitedAt }))}
-                error={isValidVisitDate(draft.visitedAt) ? null : 'Enter a valid date'} />
+              <DatePickerField label="Visit date" value={draft.visitedAt}
+                onChange={(visitedAt) => setDraft((current) => ({ ...current, visitedAt }))} />
               <TextField label="Visit notes (optional)" value={draft.restaurantComment} placeholder="What would you like to remember?"
                 multiline maxLength={1000} minHeight={88}
                 onChangeText={(restaurantComment) => setDraft((current) => ({ ...current, restaurantComment }))} />
@@ -403,6 +407,7 @@ export default function LogScreen() {
 
             {showFooter ? (
               <View className="px-lg pb-md pt-sm">
+                {advanceMessage ? <MetadataText color="danger">{advanceMessage}</MetadataText> : null}
                 <Button
                   label={step === 'confirm' ? logMode === 'visit' ? 'Save visit' : 'Log it' : 'Continue'}
                   variant="primary"
@@ -412,6 +417,8 @@ export default function LogScreen() {
                   loading={submit.isPending}
                   onPress={() => {
                     if (step === 'confirm') {
+                      if (submitLocked.current) return;
+                      submitLocked.current = true;
                       submit.mutate();
                     } else {
                       void Haptics.selectionAsync();

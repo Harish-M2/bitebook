@@ -16,8 +16,8 @@ import {
     Spacer,
     TextField,
 } from '@/components/ui';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listCuisines, type Cuisine } from '@/lib/db/cuisines';
 import { followProfiles, listSuggestedProfiles } from '@/lib/db/follows';
 import { setCuisinePreferences } from '@/lib/db/preferences';
@@ -67,6 +67,7 @@ function StepProgress({ step }: { step: Step }) {
  */
 export default function Onboarding() {
   const { user, profile, refreshProfile, signOut } = useAuth();
+  const { colors } = useAppTheme();
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const leaveOnboarding = async () => {
@@ -230,6 +231,7 @@ function IdentityStep({
 }
 
 function CuisinesStep({ userId, onDone }: { userId: string | null; onDone: () => void }) {
+  const { colors } = useAppTheme();
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -322,6 +324,7 @@ function CuisinesStep({ userId, onDone }: { userId: string | null; onDone: () =>
 }
 
 function LocationStep({ onDone }: { onDone: () => void }) {
+  const { colors } = useAppTheme();
   const [isRequesting, setIsRequesting] = useState(false);
 
   const handleEnable = async () => {
@@ -370,6 +373,7 @@ function LocationStep({ onDone }: { onDone: () => void }) {
 }
 
 function FollowsStep({ userId, onDone }: { userId: string | null; onDone: () => void }) {
+  const { colors } = useAppTheme();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(userId !== null);

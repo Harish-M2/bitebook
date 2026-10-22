@@ -9,15 +9,18 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
 import { Screen } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { getDish } from '@/lib/db/dishes';
 
 export default function DishDetailScreen() {
+  const { colors } = useAppTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const { dishId } = useLocalSearchParams<{ dishId: string }>();
   const dish = useQuery({
     queryKey: ['dish', dishId],
-    queryFn: () => getDish(dishId!),
+    queryFn: () => getDish(dishId!, user?.id),
     enabled: Boolean(dishId),
   });
 

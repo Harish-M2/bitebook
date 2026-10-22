@@ -11,8 +11,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listFeed } from '@/lib/db/feed';
 import { getUnreadCount } from '@/lib/db/notifications';
 import { queryKeys } from '@/lib/queryClient';
@@ -22,6 +22,7 @@ import type { FeedActivity } from '@/types/models';
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useAppTheme();
   const userId = user?.id ?? null;
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [selectedReviewId, setSelectedReviewId] = useState<string>('');

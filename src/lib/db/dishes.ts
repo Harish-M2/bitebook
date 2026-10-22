@@ -1,4 +1,4 @@
-import { publicImageUrl } from '@/lib/db/storage';
+import { publicImageUrl, signedImageUrls } from '@/lib/db/storage';
 import { supabase } from '@/lib/supabase';
 
 /** Shape of the embedded `dish_photos` rows every dish query selects. */
@@ -91,7 +91,7 @@ export interface DishDetail {
   restaurant: { id: string; name: string; imageUrl: string | null };
 }
 
-export async function getDish(dishId: string): Promise<DishDetail> {
+export async function getDish(dishId: string, userId?: string): Promise<DishDetail> {
   const { data, error } = await supabase
     .from('dishes')
     .select(`
@@ -110,13 +110,43 @@ export async function getDish(dishId: string): Promise<DishDetail> {
   if (error) throw error;
   if (!data.restaurant) throw new Error('Dish restaurant not found.');
 
+  let personalImageUrl: string | null = null;
+  if (userId) {
+    const { data: reviews, error: reviewsError } = await supabase
+      .from('reviews')
+      .select(`
+        photos:review_photos(storage_path, position),
+        visit_media:restaurant_review_media!restaurant_review_media_dish_review_fk(storage_path, position, media_type)
+      `)
+      .eq('dish_id', dishId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (reviewsError) {
+      console.warn('[Bitebook] Could not load personal dish photos:', reviewsError);
+    } else {
+      const paths = (reviews ?? []).flatMap((review) => [
+        ...[...(review.visit_media ?? [])]
+          .filter((media) => media.media_type === 'image')
+          .sort((first, second) => (first.position ?? 0) - (second.position ?? 0))
+          .map((media) => media.storage_path),
+        ...[...(review.photos ?? [])]
+          .sort((first, second) => (first.position ?? 0) - (second.position ?? 0))
+          .map((photo) => photo.storage_path),
+      ]);
+      const signed = await signedImageUrls('review-photos', paths);
+      personalImageUrl = paths.map((path) => signed.get(path)).find(Boolean) ?? null;
+    }
+  }
+
   return {
     id: data.id,
     name: data.name,
     description: data.description,
     rating: data.aggregate_rating,
     ratingCount: data.rating_count ?? 0,
-    imageUrl: dishCoverUrl(data.dish_photos, data.image_url),
+    imageUrl: personalImageUrl ?? dishCoverUrl(data.dish_photos, data.image_url),
     restaurant: {
       id: data.restaurant.id,
       name: data.restaurant.name,

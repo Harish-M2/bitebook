@@ -1,8 +1,8 @@
-import { View, FlatList, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { FlatList, Pressable, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { UserGalleryItem } from '@/lib/db/gallery';
 
 interface GalleryGridProps {
@@ -19,6 +19,7 @@ const GAP = 8;
  */
 export function GalleryGrid({ items, isLoading }: GalleryGridProps) {
   const router = useRouter();
+  const { colors } = useAppTheme();
 
   const handlePress = (item: UserGalleryItem) => {
     router.push(`/gallery-detail?reviewId=${item.reviewId}`);

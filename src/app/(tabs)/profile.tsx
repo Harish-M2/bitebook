@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Divider, Screen, Spacer } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
 import { useAuth } from '@/hooks/useAuth';
+import type { ThemePreference } from '@/hooks/useTheme';
 import { useAppTheme } from '@/hooks/useTheme';
 import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
 import { prepareAvatarPhoto, readPhotoBytes, uploadAvatarPhoto } from '@/lib/db/photos';
@@ -30,14 +31,21 @@ const EMPTY_STATS: DiaryStats = {
   averageRating: 0,
 };
 
+const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
+
 /** Profile tab — identity, lifetime stats, and cuisine breakdown. */
 export default function ProfileScreen() {
   const { profile, user, signOut, refreshProfile } = useAuth();
-  const { colors: palette } = useAppTheme();
+  const { colors: palette, preference, setPreference } = useAppTheme();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const [appearanceError, setAppearanceError] = useState<string | null>(null);
   const userId = user?.id ?? null;
 
   const stats = useQuery({
@@ -217,6 +225,34 @@ export default function ProfileScreen() {
             loading={uploadingAvatar}
             onPress={handleAvatarUpload}
           />
+        </View>
+
+        <View className="gap-xs px-lg pt-lg">
+          <Heading level={3}>Appearance</Heading>
+          <View accessibilityRole="radiogroup" className="flex-row rounded-lg border border-border bg-surface p-xxs">
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = preference === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() => {
+                    setAppearanceError(null);
+                    void setPreference(option.value).catch(() => {
+                      setAppearanceError('Appearance changed, but the preference could not be saved.');
+                    });
+                  }}
+                  className="flex-1 items-center rounded-md px-xs py-sm"
+                  style={{ backgroundColor: selected ? palette.accent : 'transparent' }}>
+                  <MetadataText style={{ color: selected ? palette.background : palette.textSecondary }}>
+                    {option.label}
+                  </MetadataText>
+                </Pressable>
+              );
+            })}
+          </View>
+          {appearanceError ? <MetadataText color="danger">{appearanceError}</MetadataText> : null}
         </View>
 
         <Spacer size="md" />

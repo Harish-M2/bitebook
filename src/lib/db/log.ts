@@ -70,12 +70,13 @@ export interface VisitDetailsInput {
   serviceRating?: number;
   atmosphereRating?: number;
   valueRating?: number;
-  spendAmount?: number;
+  spendBand?: number;
   partySize?: number;
   seatingType?: SeatingType;
 }
 
 export interface LogRestaurantReviewInput {
+  clientRequestId: string;
   restaurantId: string;
   overallRating: number;
   restaurantComment: string;
@@ -101,7 +102,8 @@ export async function logRestaurantReview(
   input: LogRestaurantReviewInput,
 ): Promise<LogRestaurantReviewResult> {
   const { data, error } = await supabase
-    .rpc('log_restaurant_review', {
+    .rpc('log_restaurant_review_idempotent', {
+      p_client_request_id: input.clientRequestId,
       p_restaurant_id: input.restaurantId,
       p_overall_rating: input.overallRating,
       p_restaurant_comment: input.restaurantComment.trim() || null,
@@ -123,6 +125,16 @@ export async function logRestaurantReview(
 
   const restaurantReviewId = data[0].restaurant_review_id;
 
+  const existingPositions = new Set<number>();
+  if (input.media.length > 0) {
+    const { data: savedMedia, error: savedMediaError } = await supabase
+      .from('restaurant_review_media')
+      .select('position')
+      .eq('restaurant_review_id', restaurantReviewId);
+    if (savedMediaError) throw savedMediaError;
+    for (const saved of savedMedia ?? []) existingPositions.add(saved.position);
+  }
+
   // Saved separately so the log RPC and its security model stay untouched. A failure here
   // must not fail the log: the visit exists and retrying would create a duplicate.
   let detailsFailed = false;
@@ -135,17 +147,37 @@ export async function logRestaurantReview(
         service_rating: d.serviceRating ?? null,
         atmosphere_rating: d.atmosphereRating ?? null,
         value_rating: d.valueRating ?? null,
-        spend_amount: d.spendAmount ?? null,
+        spend_amount: null,
+        spend_band: d.spendBand ?? null,
         party_size: d.partySize ?? null,
         seating_type: d.seatingType ?? null,
       })
       .eq('id', restaurantReviewId);
-    if (detailsError) {
+    if (detailsError && (detailsError.code === '42703' || detailsError.code === 'PGRST204'
+        || /spend_band.*does not exist/i.test(detailsError.message))) {
+      const { error: legacyDetailsError } = await supabase
+        .from('restaurant_reviews')
+        .update({
+          food_rating: d.foodRating ?? null,
+          service_rating: d.serviceRating ?? null,
+          atmosphere_rating: d.atmosphereRating ?? null,
+          value_rating: d.valueRating ?? null,
+          spend_amount: null,
+          party_size: d.partySize ?? null,
+          seating_type: d.seatingType ?? null,
+        })
+        .eq('id', restaurantReviewId);
+      if (legacyDetailsError) {
+        console.warn('[Bitebook] Visit details could not be saved:', legacyDetailsError);
+      }
+      detailsFailed = true;
+    } else if (detailsError) {
       console.warn('[Bitebook] Visit details could not be saved:', detailsError);
       detailsFailed = true;
     }
   }
   const uploadedPaths: string[] = [];
+  const publicDishPhotos: { dishId: string; storagePath: string; bytes: ArrayBuffer }[] = [];
   const mediaRows: {
     restaurant_review_id: string;
     storage_path: string;
@@ -157,6 +189,7 @@ export async function logRestaurantReview(
   let mediaFailedCount = 0;
 
   for (const [position, media] of input.media.entries()) {
+    if (existingPositions.has(position)) continue;
     const extension = media.fileName.split('.').pop()?.toLowerCase() ||
       (media.type === 'image' ? 'jpg' : 'mp4');
     const storagePath = `${userId}/${restaurantReviewId}/${position}-${Date.now()}.${extension}`;
@@ -167,6 +200,12 @@ export async function logRestaurantReview(
         .from('review-photos')
         .upload(storagePath, bytes, { contentType: media.contentType, upsert: false });
       if (uploadError) throw uploadError;
+
+      if (media.type === 'image' && input.visibility === 'public'
+          && media.dishIndex !== null && media.dishIndex !== undefined) {
+        const dishId = data[media.dishIndex]?.dish_id;
+        if (dishId) publicDishPhotos.push({ dishId, storagePath, bytes });
+      }
 
       uploadedPaths.push(storagePath);
       mediaRows.push({
@@ -192,9 +231,35 @@ export async function logRestaurantReview(
       .from('restaurant_review_media')
       .insert(mediaRows);
 
+    let persistedPaths = new Set(mediaRows.map((media) => media.storage_path));
     if (insertError) {
-      await supabase.storage.from('review-photos').remove(uploadedPaths);
-      mediaFailedCount += mediaRows.length;
+      const { data: savedMedia, error: verifyError } = await supabase
+        .from('restaurant_review_media')
+        .select('storage_path')
+        .eq('restaurant_review_id', restaurantReviewId)
+        .in('storage_path', uploadedPaths);
+
+      if (verifyError) {
+        console.warn('[Bitebook] Could not verify visit media after insert error:', verifyError);
+        persistedPaths = new Set();
+        mediaFailedCount += mediaRows.length;
+      } else {
+        persistedPaths = new Set((savedMedia ?? []).map((media) => media.storage_path));
+        const unreferencedPaths = uploadedPaths.filter((path) => !persistedPaths.has(path));
+        if (unreferencedPaths.length > 0) {
+          await supabase.storage.from('review-photos').remove(unreferencedPaths);
+        }
+        mediaFailedCount += mediaRows.filter((media) => !persistedPaths.has(media.storage_path)).length;
+      }
+    }
+
+    for (const photo of publicDishPhotos) {
+      if (!persistedPaths.has(photo.storagePath)) continue;
+      try {
+        await uploadDishPhoto(userId, photo.dishId, photo.bytes);
+      } catch (photoError) {
+        console.warn('[Bitebook] Public dish photo contribution failed:', photoError);
+      }
     }
   }
 

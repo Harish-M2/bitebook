@@ -6,7 +6,7 @@ import { Pressable, View } from 'react-native';
 import { Avatar } from '@/components/ui/Avatar';
 import { Rating } from '@/components/ui/Rating';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
 import { toggleLikeReview } from '@/lib/db/reviews';
 import { saveRestaurant, unsaveRestaurant } from '@/lib/db/saved';
@@ -22,6 +22,7 @@ type FeedItemProps = {
 
 /** Single home-feed card: actor row, hero photo, dish/restaurant + rating, actions. */
 export function FeedItem({ activity, className, onCommentPress, onActorPress, onSubjectPress }: FeedItemProps) {
+  const { colors } = useAppTheme();
   const isDish = activity.kind === 'logged_dish';
   const isVisit = activity.kind === 'restaurant_visit';
   const actionLabel = isVisit

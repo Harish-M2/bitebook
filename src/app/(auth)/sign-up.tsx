@@ -13,13 +13,14 @@ import {
     Spacer,
     TextField,
 } from '@/components/ui';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 
 /** Matches Supabase's own minimum; the real rule is enforced by the auth service. */
 const MIN_PASSWORD_LENGTH = 6;
 
 export default function SignUp() {
+  const { colors } = useAppTheme();
   const { signUpWithPassword } = useAuth();
 
   const [email, setEmail] = useState('');

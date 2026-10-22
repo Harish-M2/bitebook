@@ -1,9 +1,10 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import { UserPlus, UserMinus } from 'lucide-react-native';
-import { followUser, unfollowUser, isFollowing } from '@/lib/db/social';
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
+import { followUser, isFollowing, unfollowUser } from '@/lib/db/social';
+import { UserMinus, UserPlus } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 interface FollowButtonProps {
   userId: string;
@@ -16,6 +17,8 @@ export const FollowButton = ({
   onFollowChange,
   disabled = false,
 }: FollowButtonProps) => {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [isFollowingState, setIsFollowingState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +97,8 @@ export const FollowButton = ({
   );
 };
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -122,4 +126,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-});
+  });
+}

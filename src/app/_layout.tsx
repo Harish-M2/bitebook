@@ -6,14 +6,17 @@ import {
     useFonts,
 } from '@expo-google-fonts/inter';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { colors } from '@/constants/colors';
+import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ThemeProvider, useAppTheme } from '@/hooks/useTheme';
 import { queryClient } from '@/lib/queryClient';
@@ -23,12 +26,19 @@ SplashScreen.preventAutoHideAsync();
 
 /**
  * Root layout — loads fonts, wraps the app in safe-area/auth providers, and hosts
- * the navigator. Bitebook is dark-only for the MVP (see spec section 6), so
- * the status bar is always forced to "light" regardless of system theme.
+ * the navigator and follows the selected application appearance.
  */
 function ThemeStatusBar() {
-  const { isDark } = useAppTheme();
-  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+  const { isDark, colors: palette } = useAppTheme();
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(palette.background);
+  }, [palette.background]);
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      {Platform.OS === 'android' ? <NavigationBar style={isDark ? 'dark' : 'light'} /> : null}
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -46,12 +56,14 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ThemeProvider>
-            {/* Mounted before the fonts gate so the session lookup starts immediately. */}
-            <AuthProvider>
-              <ThemeStatusBar />
-              <SplashScreenController fontsReady={fontsReady} />
-              {fontsReady ? <RootNavigator /> : null}
-            </AuthProvider>
+            <ToastProvider>
+              {/* Mounted before the fonts gate so the session lookup starts immediately. */}
+              <AuthProvider>
+                <ThemeStatusBar />
+                <SplashScreenController fontsReady={fontsReady} />
+                {fontsReady ? <RootNavigator /> : null}
+              </AuthProvider>
+            </ToastProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </QueryClientProvider>
@@ -65,12 +77,13 @@ export default function RootLayout() {
  */
 function SplashScreenController({ fontsReady }: { fontsReady: boolean }) {
   const { isLoading } = useAuth();
+  const { isReady: themeReady } = useAppTheme();
 
   useEffect(() => {
-    if (fontsReady && !isLoading) {
+    if (fontsReady && !isLoading && themeReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsReady, isLoading]);
+  }, [fontsReady, isLoading, themeReady]);
 
   return null;
 }
@@ -82,6 +95,7 @@ function SplashScreenController({ fontsReady }: { fontsReady: boolean }) {
  */
 function RootNavigator() {
   const { session, needsOnboarding } = useAuth();
+  const { colors } = useAppTheme();
   const isSignedIn = Boolean(session);
 
   return (

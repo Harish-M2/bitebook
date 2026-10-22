@@ -4,12 +4,13 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Caption } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { getVisit, markVisited, unmarkVisited } from '@/lib/db/visited';
 
 /** Toggles a restaurant in the user's private visited list (independent of reviews). */
 export function VisitedButton({ restaurantId }: { restaurantId: string }) {
+  const { colors } = useAppTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const key = ['visit', user?.id ?? null, restaurantId];

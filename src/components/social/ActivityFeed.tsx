@@ -1,23 +1,24 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  TouchableOpacity,
-  RefreshControl,
-} from 'react-native';
-import { ChevronRight, Star } from 'lucide-react-native';
-import {
-  getActivityFeed,
-  Activity,
-  formatActivityDescription,
+    Activity,
+    formatActivityDescription,
+    getActivityFeed,
 } from '@/lib/db/activity';
-import { colors } from '@/constants/colors';
 import { useRouter } from 'expo-router';
+import { ChevronRight, Star } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface ActivityFeedProps {
   limit?: number;
@@ -25,6 +26,8 @@ interface ActivityFeedProps {
 }
 
 export const ActivityFeed = ({ limit = 50, onActivityPress }: ActivityFeedProps) => {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -130,6 +133,8 @@ export const ActivityFeed = ({ limit = 50, onActivityPress }: ActivityFeedProps)
         <ActivityCard
           activity={item}
           onPress={() => handleActivityPress(item)}
+          colors={colors}
+          styles={styles}
         />
       )}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -140,9 +145,11 @@ export const ActivityFeed = ({ limit = 50, onActivityPress }: ActivityFeedProps)
 interface ActivityCardProps {
   activity: Activity;
   onPress: () => void;
+  colors: Palette;
+  styles: ReturnType<typeof createStyles>;
 }
 
-const ActivityCard = ({ activity, onPress }: ActivityCardProps) => {
+const ActivityCard = ({ activity, onPress, colors, styles }: ActivityCardProps) => {
   const description = formatActivityDescription(activity);
   const avatar = activity.user?.avatar_url;
 
@@ -219,7 +226,8 @@ const formatDate = (dateString: string): string => {
   return `${Math.floor(diffDays / 30)}mo ago`;
 };
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -319,4 +327,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: 4,
   },
-});
+  });
+}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Location from 'expo-location';
 import { MapPin } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, View } from 'react-native';
 
 import { PlaceResultRow } from '@/components/food/PlaceResultRow';
@@ -9,8 +10,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { Caption, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useAppTheme } from '@/hooks/useTheme';
 import { importPlace, searchPlaces, type PlaceSearchResult } from '@/lib/db/places';
 import { searchRestaurants } from '@/lib/db/restaurants';
 import { queryKeys } from '@/lib/queryClient';
@@ -33,7 +34,9 @@ const MIN_QUERY_LENGTH = 2;
  * provider call to arrive at the same row.
  */
 export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepProps) {
+  const { colors } = useAppTheme();
   const [query, setQuery] = useState(initialQuery);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const debouncedQuery = useDebouncedValue(query.trim());
   const waiting = query.trim() !== debouncedQuery;
   const isSearching = query.trim().length >= MIN_QUERY_LENGTH && !waiting;
@@ -45,10 +48,30 @@ export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepPr
     enabled: isSearching,
   });
 
+  useEffect(() => {
+    let isCancelled = false;
+    void Location.getForegroundPermissionsAsync()
+      .then(async ({ granted }) => {
+        if (!granted) return;
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (!isCancelled) {
+          setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        }
+      })
+      .catch(() => {
+        // Location is only a search bias; lookup remains useful without it.
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const shouldSearchProvider = isSearching && (known.isError || (known.isSuccess && (known.data?.length ?? 0) < 2));
+
   const places = useQuery({
-    queryKey: queryKeys.placeSearch(debouncedQuery),
-    queryFn: ({ signal }) => searchPlaces(debouncedQuery, {}, signal),
-    enabled: isSearching && known.isSuccess && known.data.length === 0,
+    queryKey: [...queryKeys.placeSearch(debouncedQuery), location?.latitude ?? null, location?.longitude ?? null],
+    queryFn: ({ signal }) => searchPlaces(debouncedQuery, { ...location, limit: 20 }, signal),
+    enabled: shouldSearchProvider,
     staleTime: 5 * 60_000,
   });
 
@@ -70,9 +93,13 @@ export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepPr
 
   // A place already imported under the same name would otherwise appear twice — once as a
   // catalogue row and once as something to add again.
-  const newPlaces = (places.data ?? []).filter(
-    (place) => !knownIds.has(place.name.trim().toLowerCase()),
-  );
+  const newPlaces = shouldSearchProvider
+    ? (places.data ?? []).filter((place) => !knownIds.has(place.name.trim().toLowerCase()))
+    : [];
+  const retrySearch = () => {
+    void known.refetch();
+    if (shouldSearchProvider) void places.refetch();
+  };
 
   return (
     <View className="flex-1 gap-md pt-md">
@@ -107,32 +134,40 @@ export function RestaurantStep({ onSelect, initialQuery = '' }: RestaurantStepPr
             />
           )}
           ListFooterComponent={
-            known.isError ? <ErrorState title="Restaurant search failed" description={known.error.message} onRetry={() => void known.refetch()} />
-              : places.isError && knownResults.length === 0 ? <ErrorState title="Place search failed" description={places.error.message} onRetry={() => void places.refetch()} />
-                : known.isFetching || (knownResults.length === 0 && places.isFetching) ? <ActivityIndicator color={colors.accent} />
-                  : newPlaces.length > 0 ? (
+            known.isFetching || (shouldSearchProvider && places.isFetching) ? <ActivityIndicator color={colors.accent} /> : (
               <View className="gap-sm">
-                <View className="px-lg">
-                  <Caption color="textSecondary">Add from search</Caption>
-                </View>
-                {newPlaces.map((place) => (
-                  <PlaceResultRow
-                    key={place.externalPlaceId}
-                    place={place}
-                    className="px-lg pb-md"
-                    isImporting={
-                      addPlace.isPending &&
-                      addPlace.variables?.externalPlaceId === place.externalPlaceId
-                    }
-                    onPress={() => addPlace.mutate(place)}
-                  />
-                ))}
+                {known.isError ? <Caption className="px-lg">Bitebook results are unavailable; showing external matches.</Caption> : null}
+                {shouldSearchProvider && places.isError ? (
+                  <ErrorState title="Place search failed" description={places.error.message} onRetry={retrySearch} />
+                ) : newPlaces.length > 0 ? (
+                  <>
+                    <View className="px-lg">
+                      <Caption color="textSecondary">Add from search</Caption>
+                    </View>
+                    {newPlaces.map((place) => (
+                      <PlaceResultRow
+                        key={place.externalPlaceId}
+                        place={place}
+                        className="px-lg pb-md"
+                        isImporting={
+                          addPlace.isPending &&
+                          addPlace.variables?.externalPlaceId === place.externalPlaceId
+                        }
+                        onPress={() => addPlace.mutate(place)}
+                      />
+                    ))}
+                  </>
+                ) : null}
               </View>
-            ) : null
+            )
           }
           ListEmptyComponent={
-            known.isPending || known.isError || places.isFetching || places.isError || newPlaces.length > 0 ? null : (
-              <EmptyState
+            known.isPending || (shouldSearchProvider && places.isFetching)
+              || (shouldSearchProvider && places.isError) || newPlaces.length > 0 ? null
+              : known.isError ? (
+                <ErrorState title="Bitebook search failed" description={known.error.message} onRetry={retrySearch} />
+              ) : (
+                <EmptyState
                 icon={<MapPin size={40} color={colors.textMuted} />}
                 title="No restaurants found"
                 description="Try a different spelling, or include the town or city."

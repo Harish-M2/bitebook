@@ -30,10 +30,12 @@ product/UX/engineering spec is `docs/Bitebook_Build_Instructions.md`; the master
 reference is `docs/Bitebook_UI_Concept.png`. **These two files remain the source of truth
 for product/design decisions and must not be modified without explicit user instruction.**
 
-Current product direction: MVP-first, backend-second. Phase 1 built the full dark UI
-shell with mock data; Phase 2 built the real Supabase backend (schema, RLS, auth,
 storage) without touching the Phase 1 UI. Phase 3 (not started) will wire real data into
 the UI and integrate a restaurant data provider.
+Historical product direction was MVP-first, backend-second. The app now uses live
+Supabase data through TanStack Query and the existing provider integrations. The latest
+verified pre-launch status is recorded in §29; that section supersedes older phase and
+dark-only notes below where they conflict.
 
 ---
 
@@ -44,21 +46,23 @@ guessed.
 
 | Technology | Version (as pinned/installed) |
 |---|---|
-| Expo SDK | `~57.0.15` |
-| React Native | `0.86.2` |
+| Expo SDK | `~57.0.28` |
+| React Native | `0.86.3` |
 | React | `19.2.3` |
 | React DOM | `19.2.3` |
-| expo-router | `~57.0.15` |
+| expo-router | `~57.0.26` |
 | TypeScript | `~6.0.3` |
 | NativeWind | `4.2.6` |
 | Tailwind CSS | `^3.4.19` |
 | @supabase/supabase-js | `^2.112.3` |
+| expo-crypto | `~57.0.4` |
+| expo-navigation-bar | `~57.0.3` |
 | react-native-reanimated | `4.5.1` |
 | react-native-worklets | `0.10.1` |
 | ESLint | `^9.0.0` (`eslint-config-expo ~57.0.1`) |
 | Playwright (dev dependency, used for screenshot regression checks) | `^1.62.1` |
-| Node.js (verified on this machine) | `v26.7.0` |
-| npm (verified on this machine) | `11.19.0` |
+| Node.js (verified on this machine) | `v26.12.1` |
+| npm (verified on this machine) | `11.20.0` |
 | Supabase CLI | invoked via `npx supabase` (no fixed local install — confirmed working, run `npx supabase --version` to check on the Mac) |
 | PostgreSQL (remote project) | `17.6.1.155` (confirmed via `supabase/.temp/postgres-version` after linking — see §10) |
 | PostGIS | enabled via `create extension postgis` in `0001_extensions.sql`; exact installed version on the remote project is **UNKNOWN / NEEDS VERIFICATION** (not printed by any command run so far) |
@@ -124,9 +128,9 @@ bitebook/
 │   └── copilot-instructions.md           Permanent Copilot working rules (see below)
 ├── AGENTS.md / CLAUDE.md                  Point to AGENTS.md: "read Expo v57 docs before
 │                                           writing code" — still applicable
-├── app.json                               Expo app config (dark-only, typedRoutes, etc.)
+├── app.json                               Expo app config (automatic system appearance, typedRoutes, etc.)
 ├── eas.json                                EAS Build profiles (development/preview/production)
-├── tailwind.config.js                      Design tokens (colors, radii, spacing) — dark-only
+├── tailwind.config.js                      Semantic runtime color tokens, radii, spacing
 ├── tsconfig.json                           strict TS, `@/*` path alias → `src/*`
 ├── .env.example                            Documents required env var NAMES only
 └── package.json
@@ -148,19 +152,18 @@ folder (they are outside the `bitebook/` git working tree structure referenced b
 ## 4. Application Architecture
 
 - **Startup**: `src/app/_layout.tsx` is the Expo Router root layout. It loads Inter fonts,
-  wraps the app in `GestureHandlerRootView` → `SafeAreaProvider` → `AuthProvider`, forces
-  `StatusBar style="light"` (app is dark-only per spec), and renders a `Stack` with no
-  header, background colour from `colors.background`.
+  wraps the app in `GestureHandlerRootView` → `SafeAreaProvider` → `ThemeProvider` →
+  `ToastProvider` → `AuthProvider`, applies the selected status/system navigation bar
+  appearance, and renders a headerless `Stack` using the active semantic background token.
 - **Navigation**: Expo Router, file-based. A `(tabs)` group holds the 5 main screens
   (home, discover, log, diary, profile). Root `index.tsx` exists — its redirect logic
   should be checked/confirmed (**NEEDS VERIFICATION**: read `src/app/index.tsx` to confirm
   whether it currently redirects to `/home` unconditionally or has any auth-gating logic).
 - **Authentication**: `AuthProvider` (`src/hooks/useAuth.tsx`) wraps the whole app; see §5.
-- **State management**: no global state library (Redux/Zustand/etc.) — React context
-  (`AuthProvider`) plus local component state. Data-fetching is done via small functions in
-  `src/lib/db/*.ts` calling the shared `supabase` client directly (no React Query/SWR
-  currently wired in — **NEEDS VERIFICATION** if this remains true on the Mac; check
-  `package.json` for any data-fetching library before assuming otherwise).
+- **State management**: no global state library (Redux/Zustand/etc.) — React contexts
+  (`AuthProvider`, `ThemeProvider`) plus local component state. TanStack Query is used for
+  server state; data-access helpers live in `src/lib/db/*.ts` and use the shared Supabase
+  client.
 - **Database access**: `src/lib/supabase.ts` exports a single typed `supabase` client
   (`createClient<Database>(...)`). Table-specific helper functions live under
   `src/lib/db/` (currently only `profiles.ts`). Convention: keep route files thin, put
@@ -427,9 +430,10 @@ Original baseline migrations `0001`–`0024` (later migrations are covered in th
 | `0023_seed_cuisines.sql` | Cuisine taxonomy seed data (real migration, not `seed.sql`) |
 | `0024_grants.sql` | Explicit table privileges: DML to `authenticated`, nothing to `anon` |
 
-**Production migration history was reconciled on 2026-10-01.** The final
-`npx supabase migration list --linked` shows every local migration `0001`–`0045` applied
-remotely, with no skipped filenames.
+**Production migration history was reconciled on 2026-10-01.** The latest linked read
+performed on 2026-10-22 shows migrations `0001`–`0055` applied remotely, with `0056` and
+`0057` present locally but not applied. See §29 for the scope and verification limits of
+those pending migrations.
 
 - `0035`–`0038` were checked against the production catalog, then recorded as applied.
 - `0039_notifications.sql` was corrected to add only the missing owner-scoped
@@ -463,8 +467,10 @@ to production via `db push`.
 ## 11. Current TypeScript Database Types
 
 - **Location**: `src/types/database.ts`.
-- **Current state**: this file contains the generated Supabase schema types, updated for
-  migration `0045`'s grouped-review tables, columns, relationships, and RPC.
+- **Current state**: this file contains Supabase schema types for the linked schema through
+  `0055`, plus hand-updated types for local, unapplied migrations `0056` and `0057`. Regenerate
+  only after those migrations are approved/applied, then compare the result before replacing
+  the hand updates.
 - **A real database exists and is linked** (see §8/§10). Running:
   ```
   npx supabase gen types typescript --linked
@@ -681,14 +687,13 @@ and the historical report `.md` files at the project root):
 
 Do not accidentally reverse these:
 
-- Bitebook is **dark-mode only** for the MVP — no light theme toggle (`app.json`
-  `userInterfaceStyle: "dark"`, forced `StatusBar style="light"`, `tailwind.config.js`
-  `darkMode: 'class'`).
-- **No paid restaurant API** is integrated in Phase 2 (explicit, repeated user
-  instruction). Restaurant records in Phase 2 use only `manual` / `user_submitted` /
-  `seed` sources. The multi-provider architecture (`restaurant_sources`) exists
-  structurally so a real provider can be added later without a schema change — do not
-  remove or simplify this table structure.
+- Appearance supports **System**, **Dark**, and **Light**. `ThemeProvider` persists the
+  selection under AsyncStorage key `bitebook.appearance`; NativeWind semantic variables and
+  context-backed palette consumers follow the active theme. See §29 for current behavior.
+- The existing Google Places integration remains behind the `places-search` and
+  `places-import` Edge Functions; this improvement phase introduced no new provider or
+  paid API. Restaurant creation remains server-side, and `restaurant_sources` must not be
+  removed or simplified.
 - **Restaurants are not client-writable.** This was a deliberate security fix — do not
   re-add a client INSERT/UPDATE/DELETE policy on `restaurants` without a documented
   architectural decision to do so.
@@ -949,9 +954,9 @@ No secrets were found in any tracked file during this handover's inspection.
 - Run `npx expo-doctor` first for any "app won't start" issue — it checks for common
   config/dependency mismatches.
 - If Metro bundler hangs or shows stale code, clear cache: `npx expo start --clear`.
-- Since the app is dark-only, if you see light-mode rendering unexpectedly, check
-  `tailwind.config.js` `darkMode: 'class'` is intact and NativeWind's Babel plugin is
-  still configured in `babel.config.js`.
+- If theme colors do not update, verify `ThemeProvider` is in the root layout, the profile
+  preference is restored before the splash hides, and Tailwind's semantic `--bb-*` variables
+  remain connected to `src/constants/colors.ts`.
 
 **Supabase CLI issues**
 - `npx supabase login` opens a browser flow — ensure you're logged into the correct
@@ -1377,3 +1382,64 @@ each. Real authenticated function/provider operations were not tested. No migrat
 RLS policy changes, seed scripts, or changes to the remote-only fix-rls function ran.
 Existing 41 dependency advisories remain; local pgTAP and Deno execution were unavailable.
 See docs/Bitebook_Core_UX_Review.md for the complete release details and prior snapshots.
+
+## 29. Pre-Launch Improvements (2026-10-22)
+
+Work is isolated on `fix/final-prelaunch-improvements`, based on `main`. The earlier
+`feature/bitebook-auth-redesign` commit `b5b7c8e` remains separate and was not merged into
+this branch. No commit, push, deploy, or remote migration apply has been performed for
+this improvement phase. The pre-existing untracked `debug.log` was preserved.
+
+Appearance now supports `system`, `dark`, and `light`. `ThemeProvider` stores the user's
+choice in AsyncStorage under `bitebook.appearance`, follows system appearance when `system`
+is selected, and waits for preference restoration before hiding the splash. Semantic
+`--bb-*` NativeWind variables and context-backed shared components cover profile/settings,
+authentication, navigation, discovery, restaurant/dish detail, diary, visit logging, forms,
+ratings, menus, notifications, loading and error surfaces. Status bars, Android navigation
+buttons, and light/dark splash variants follow the selected appearance. Light accent,
+rating, danger, muted, placeholder and disabled colors were contrast-adjusted.
+
+The photo lifecycle distinguishes private `review-photos` from public `dish-photos`. Diary
+and gallery reads include image-only media linked to the exact dish review and batch-sign
+private paths; dish detail prefers the signed current user's photo before the shared dish
+cover. Public, dish-tagged grouped visit images contribute to `dish_photos` only after the
+private visit media row saves. Owner-only replace/delete controls on restaurant review detail
+save replacements before removing old media and invalidate diary, feed, gallery, dish and
+visit caches. Restaurant cover fields are untouched. A separate idempotent RPC with a
+request UUID and payload fingerprint protects grouped review retries; the original RPC
+remains available to older clients.
+
+Diary and visit-edit dates use a shared themed calendar and retain local `YYYY-MM-DD`
+storage. Display formatting uses the date-only-safe formatter. Spend is an optional 1–4
+pound-sign band; historical `spend_amount` values are not rewritten and remain a display
+fallback. Party size remains optional, numeric and single-column on narrow screens. Log
+feedback uses the themed in-app toast, and the request draft is retained after failed or
+partial media uploads.
+
+Restaurant log search remains local-first and calls the existing provider only when fewer
+than two local matches exist. Local matches rank exact name, prefix, then substring;
+provider results use an already-granted location bias when available and Google IP bias
+otherwise. Search does not request location permission, and the former London fallback was
+removed.
+
+Local migrations `0056_restaurant_review_spend_band.sql` and
+`0057_idempotent_restaurant_review_log.sql` are pending. A read-only linked migration list
+confirmed production remains at `0055`; neither migration was applied. Reads and grouped
+visit-detail writes tolerate the pre-0056 schema and report when a selected spend band
+cannot yet be persisted. Database types were hand-updated for the pending schema. pgTAP
+declares 94 checks but could not run because the local database at `127.0.0.1:54322` is
+unavailable; `npx supabase start` confirmed neither Docker nor Podman is installed/on
+`PATH`. No live database or Storage runtime verification was performed. Node tests cover
+save-before-delete replacement ordering, but
+the fixture browser could not resolve the review-detail query for owner controls and no
+native device was available; interactive persisted-media replacement/deletion therefore
+remains unverified end to end.
+
+Verification completed: `npx tsc --noEmit`, `npx expo lint`, Expo web export, 47 Node tests,
+39 isolated Playwright checks, Profile light/dark persistence, system appearance changes,
+and 320/390/1440px browser layouts. Browser checks used fixtures and performed no live
+database writes. No native simulator/device session was available. `npx expo-doctor` was
+not run; the SDK install check reports five existing patch-version mismatches (`expo`,
+`expo-constants`, `expo-linking`, `expo-location`, `expo-router`), and its proposed updates
+were declined. Installation reported 36 npm audit advisories (10 moderate, 25 high, 1
+critical); no audit remediation was attempted in this phase.

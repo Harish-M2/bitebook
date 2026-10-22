@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(87);
+select plan(94);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -1047,11 +1047,80 @@ set local role authenticated;
 set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 select lives_ok(
+  $$select * from public.log_restaurant_review_idempotent(
+      '00000000-0000-4000-8000-000000000123'::uuid,
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      4.5, 'Idempotent visit test', 5::smallint, 'public', current_date,
+      jsonb_build_array(jsonb_build_object(
+        'dish_id', (select id from public.dishes where name = 'Test Dish'),
+        'rating', 4.5
+      ))
+    )$$,
+  'the idempotent logging RPC accepts a client request key'
+);
+
+select lives_ok(
+  $$select * from public.log_restaurant_review_idempotent(
+      '00000000-0000-4000-8000-000000000123'::uuid,
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      4.5, 'Idempotent visit test', 5::smallint, 'public', current_date,
+      jsonb_build_array(jsonb_build_object(
+        'dish_id', (select id from public.dishes where name = 'Test Dish'),
+        'rating', 4.5
+      ))
+    )$$,
+  'retrying the same request key returns the existing log without error'
+);
+
+select throws_ok(
+  $$select * from public.log_restaurant_review_idempotent(
+      '00000000-0000-4000-8000-000000000123'::uuid,
+      (select id from public.restaurants where slug = 'test-restaurant'),
+      3.5, 'Changed payload', 5::smallint, 'public', current_date,
+      jsonb_build_array(jsonb_build_object(
+        'dish_id', (select id from public.dishes where name = 'Test Dish'),
+        'rating', 4.5
+      ))
+    )$$,
+  '22023', null,
+  'a request key cannot be reused for a changed visit payload'
+);
+
+select is(
+  (select count(*)::int from public.restaurant_reviews
+    where client_request_id = '00000000-0000-4000-8000-000000000123'),
+  1,
+  'a repeated request key creates only one restaurant review'
+);
+
+select is(
+  (select count(*)::int from public.reviews r
+    join public.restaurant_reviews rr on rr.id = r.restaurant_review_id
+    where rr.client_request_id = '00000000-0000-4000-8000-000000000123'),
+  1,
+  'a repeated request key creates only one dish review and diary entry'
+);
+
+select lives_ok(
   $$update public.restaurant_reviews
       set food_rating = 4.5, service_rating = 3, atmosphere_rating = 4, value_rating = 5,
-          spend_amount = 42.50, party_size = 2, seating_type = 'indoor'
+          spend_amount = 42.50, spend_band = 4, party_size = 2, seating_type = 'indoor'
     where restaurant_comment = 'Grouped visit test'$$,
   'the owner can add supporting ratings and visit context to a visit'
+);
+
+select is(
+  (select spend_band from public.restaurant_reviews
+    where restaurant_comment = 'Grouped visit test'),
+  4::smallint,
+  'a visit stores its selected price band independently of the restaurant price level'
+);
+
+select throws_ok(
+  $$update public.restaurant_reviews set spend_band = 5
+    where restaurant_comment = 'Grouped visit test'$$,
+  '23514', null,
+  'spend bands outside the supported one-to-four scale are rejected'
 );
 
 select throws_ok(

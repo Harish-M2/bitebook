@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 
 /**
  * Unauthenticated route group. welcome/sign-in/sign-up are reachable only while signed out;
@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
  */
 export default function AuthLayout() {
   const { session } = useAuth();
+  const { colors } = useAppTheme();
   const isSignedIn = Boolean(session);
 
   return (

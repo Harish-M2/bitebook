@@ -8,17 +8,17 @@
  * the mobile application"), which is the reason this runs in an Edge Function at all.
  */
 
+import {
+    cuisineSlugsFromGoogleTypes,
+    cuisineSlugsFromText,
+    sanitiseCuisineSlugs,
+} from './cuisines.ts';
 import type {
-  NormalisedPlace,
-  PlaceSearchParams,
-  PlacesProvider,
+    NormalisedPlace,
+    PlaceSearchParams,
+    PlacesProvider,
 } from './types.ts';
 import { PlacesRequestError } from './types.ts';
-import {
-  cuisineSlugsFromGoogleTypes,
-  cuisineSlugsFromText,
-  sanitiseCuisineSlugs,
-} from './cuisines.ts';
 
 const HOST = 'https://places.googleapis.com/v1';
 
@@ -165,21 +165,18 @@ export class GooglePlacesProvider implements PlacesProvider {
       textQuery: params.query,
       // Restaurants only. Without this, searching "pizza" returns supermarket aisles.
       includedType: 'restaurant',
-      maxResultCount: Math.min(params.limit ?? 10, 20),
+      pageSize: Math.min(params.limit ?? 10, 20),
     };
 
-    // Always send location bias — Google returns nothing without it.
-    // Default to London (51.5074, -0.1278) if not provided.
-    const latitude = params.latitude ?? 51.5074;
-    const longitude = params.longitude ?? -0.1278;
-    
-    body.locationBias = {
-      circle: {
-        center: { latitude, longitude },
-        // Google rejects a radius over 50km outright, so clamp rather than pass through.
-        radius: Math.min(params.radius ?? 5000, 50000),
-      },
-    };
+    if (params.latitude !== undefined && params.longitude !== undefined) {
+      body.locationBias = {
+        circle: {
+          center: { latitude: params.latitude, longitude: params.longitude },
+          // Google rejects a radius over 50km outright, so clamp rather than pass through.
+          radius: Math.min(params.radius ?? 5000, 50000),
+        },
+      };
+    }
 
     const json = (await this.#request(
       '/places:searchText',

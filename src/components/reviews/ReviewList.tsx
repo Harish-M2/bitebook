@@ -1,17 +1,18 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { getRestaurantRatingStats, getRestaurantReviews, Review } from '@/lib/db/reviews';
 import { ChevronDown, ChevronUp, Star } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 interface ReviewListProps {
@@ -20,6 +21,8 @@ interface ReviewListProps {
 }
 
 export const ReviewList = ({ restaurantId, onRefresh }: ReviewListProps) => {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<{
@@ -115,6 +118,8 @@ export const ReviewList = ({ restaurantId, onRefresh }: ReviewListProps) => {
                   expandedReviewId === item.id ? null : item.id
                 )
               }
+              colors={colors}
+              styles={styles}
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -128,12 +133,16 @@ interface ReviewCardProps {
   review: Review;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  colors: Palette;
+  styles: ReturnType<typeof createStyles>;
 }
 
 const ReviewCard = ({
   review,
   isExpanded,
   onToggleExpand,
+  colors,
+  styles,
 }: ReviewCardProps) => {
   const hasPhotos = review.photos && review.photos.length > 0;
   const user = (review as any).user;
@@ -235,7 +244,8 @@ const formatDate = (dateString: string): string => {
   return `${Math.floor(diffDays / 365)} years ago`;
 };
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -368,4 +378,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: 4,
   },
-});
+  });
+}

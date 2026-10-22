@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { FollowButton } from '@/components/social/FollowButton';
 import { Avatar } from '@/components/ui/Avatar';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 
 export type PersonRowProfile = {
   id: string;
@@ -32,6 +32,7 @@ export function PersonRow({
   mutualNames?: string[];
   cuisines?: string[];
 }) {
+  const { colors } = useAppTheme();
   const name = profile.display_name || profile.username || 'Bitebook user';
   const statParts = [
     profile.dishes_logged_count ? `${profile.dishes_logged_count} dishes` : null,

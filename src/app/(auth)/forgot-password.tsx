@@ -12,13 +12,13 @@ import {
     Spacer,
     TextField,
 } from '@/components/ui';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
 
 export default function ForgotPassword() {
   const { resetPassword } = useAuth();
   const { colors: palette } = useAppTheme();
+  const colors = palette;
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);

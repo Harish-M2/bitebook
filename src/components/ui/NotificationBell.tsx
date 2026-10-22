@@ -1,25 +1,26 @@
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Text,
-  Modal,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-  RefreshControl,
-} from 'react-native';
-import { Bell, X, Check } from 'lucide-react-native';
-import { useFocusEffect } from 'expo-router';
-import { colors } from '@/constants/colors';
-import {
-  getAllNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  getUnreadCount,
-} from '@/lib/db/notifications';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { Notification } from '@/lib/db/notifications';
+import {
+    getAllNotifications,
+    getUnreadCount,
+    markAllNotificationsAsRead,
+    markNotificationAsRead,
+} from '@/lib/db/notifications';
+import { useFocusEffect } from 'expo-router';
+import { Bell, Check, X } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import {
+    ActivityIndicator,
+    FlatList,
+    Modal,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface NotificationBellProps {
   size?: number;
@@ -30,6 +31,8 @@ interface NotificationBellProps {
  * Notification bell icon that shows unread count and opens notification list
  */
 export function NotificationBell({ size = 24, showBadge = true }: NotificationBellProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [showModal, setShowModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -234,7 +237,8 @@ function formatNotificationTime(isoString: string): string {
   return date.toLocaleDateString();
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   bellButton: {
     padding: 8,
     position: 'relative',
@@ -358,4 +362,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 24,
   },
-});
+  });
+}

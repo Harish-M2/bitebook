@@ -1,5 +1,6 @@
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { getSavedRestaurants, unsaveRestaurant } from '@/lib/db/saved';
 import type { Restaurant } from '@/types/models';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +33,8 @@ export function SavedList({
   onRestaurantPress,
   showCuisineFilter = true,
 }: SavedListProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const router = useRouter();
   const { user } = useAuth();
   const client = useQueryClient();
@@ -257,7 +260,8 @@ export function SavedList({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -400,4 +404,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textSecondary,
   },
-});
+  });
+}

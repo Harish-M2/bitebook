@@ -55,6 +55,7 @@ export type RestaurantVisit = {
   atmosphereRating: number | null;
   valueRating: number | null;
   spendAmount: number | null;
+  spendBand: number | null;
   partySize: number | null;
   seatingType: string | null;
   actor: UserSummary;

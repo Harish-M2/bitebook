@@ -10,11 +10,12 @@ import { PhotoGalleryModal } from '@/components/ui/PhotoGalleryModal';
 import { Rating } from '@/components/ui/Rating';
 import { Screen } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { getUserGalleryItem } from '@/lib/db/gallery';
 import { formatRelativeTime } from '@/lib/format';
 
 export default function GalleryDetailScreen() {
+  const { colors } = useAppTheme();
   const { reviewId } = useLocalSearchParams<{ reviewId: string }>();
   const [galleryVisible, setGalleryVisible] = useState(false);
 

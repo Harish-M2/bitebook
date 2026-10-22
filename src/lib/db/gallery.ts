@@ -1,6 +1,6 @@
-import { supabase } from '@/lib/supabase';
 import { DISH_PHOTO_SELECT } from '@/lib/db/dishes';
 import { signedImageUrls } from '@/lib/db/storage';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Gallery item represents a single review with photos from a user's dishes.
@@ -24,7 +24,8 @@ const GALLERY_SELECT = `
   created_at,
   dish:dishes(id, name, image_url, ${DISH_PHOTO_SELECT}),
   restaurant:restaurants(id, name),
-  photos:review_photos(storage_path, position, created_at)
+  photos:review_photos(storage_path, position, created_at),
+  visit_media:restaurant_review_media!restaurant_review_media_dish_review_fk(storage_path, position, created_at, media_type)
 `;
 
 /**
@@ -45,28 +46,29 @@ export async function getUserGallery(userId: string): Promise<UserGalleryItem[]>
 
   const items = (data ?? [])
     .filter((row) => {
-      // Only include reviews that have at least one review photo
-      return (row.photos ?? []).length > 0 && row.dish;
+      return ((row.photos ?? []).length > 0
+        || (row.visit_media ?? []).some((media) => media.media_type === 'image')) && row.dish;
     });
 
   // Batch sign all photo URLs at once
   const allPaths: string[] = [];
-  const pathToItem = new Map<string, (typeof items)[0]>();
   for (const item of items) {
     for (const photo of item.photos ?? []) {
       allPaths.push(photo.storage_path);
-      pathToItem.set(photo.storage_path, item);
+    }
+    for (const media of item.visit_media ?? []) {
+      if (media.media_type === 'image') allPaths.push(media.storage_path);
     }
   }
 
   const signedUrls = await signedImageUrls('review-photos', allPaths);
 
   return items.map((row) => {
-    const reviewPhotos = row.photos ?? [];
-    // Sort photos by position then creation time
-    const sortedPhotos = [...reviewPhotos].sort(
-      (a, b) =>
-        (a.position ?? 0) - (b.position ?? 0) || a.created_at.localeCompare(b.created_at),
+    const sortedPhotos = [
+      ...(row.photos ?? []),
+      ...(row.visit_media ?? []).filter((media) => media.media_type === 'image'),
+    ].sort((a, b) =>
+      (a.position ?? 0) - (b.position ?? 0) || a.created_at.localeCompare(b.created_at),
     );
 
     const photoUrls = sortedPhotos
@@ -106,10 +108,11 @@ export async function getUserGalleryItem(reviewId: string): Promise<UserGalleryI
     return null;
   }
 
-  const reviewPhotos = data.photos ?? [];
-  const sortedPhotos = [...reviewPhotos].sort(
-    (a, b) =>
-      (a.position ?? 0) - (b.position ?? 0) || a.created_at.localeCompare(b.created_at),
+  const sortedPhotos = [
+    ...(data.photos ?? []),
+    ...(data.visit_media ?? []).filter((media) => media.media_type === 'image'),
+  ].sort((a, b) =>
+    (a.position ?? 0) - (b.position ?? 0) || a.created_at.localeCompare(b.created_at),
   );
 
   const storagePaths = sortedPhotos.map((photo) => photo.storage_path);

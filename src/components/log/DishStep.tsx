@@ -8,7 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { BodyText, Caption, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listDishesForRestaurant, sameDishSelection, type RestaurantDish } from '@/lib/db/dishes';
 
 export type DishCategory = 'starter' | 'main' | 'dessert' | 'side' | 'drink';
@@ -52,6 +52,7 @@ const DIETARY_TAGS: { value: DishDietaryTag; label: string }[] = [
  * showing the existing names is what prevents that, not the constraint.
  */
 export function DishStep({ restaurantId, selected, onToggle }: DishStepProps) {
+  const { colors } = useAppTheme();
   const [query, setQuery] = useState('');
   const [newDishCategory, setNewDishCategory] = useState<DishCategory | null>(null);
   const [newDishDietaryTags, setNewDishDietaryTags] = useState<DishDietaryTag[]>([]);

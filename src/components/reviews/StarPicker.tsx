@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useAppTheme } from '@/hooks/useTheme';
 import { Star } from 'lucide-react-native';
-import { colors } from '@/constants/colors';
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface StarPickerProps {
   rating: number;
@@ -14,6 +14,7 @@ export const StarPicker = ({
   onRatingChange,
   disabled = false,
 }: StarPickerProps) => {
+  const { colors } = useAppTheme();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const displayRating = hoverRating !== null ? hoverRating : rating;
 
@@ -38,7 +39,7 @@ export const StarPicker = ({
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={styles.label}>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
         {displayRating > 0
           ? `${displayRating} Star${displayRating !== 1 ? 's' : ''}`
           : 'Tap to rate'}
@@ -62,7 +63,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: colors.textSecondary,
     fontWeight: '500',
   },
 });

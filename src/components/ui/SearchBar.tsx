@@ -1,8 +1,8 @@
 import { Search } from 'lucide-react-native';
 import { TextInput, View, type TextInputProps } from 'react-native';
 
+import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
-import { colors } from '@/constants/colors';
 
 type SearchBarProps = Omit<TextInputProps, 'style'> & {
   className?: string;
@@ -10,6 +10,7 @@ type SearchBarProps = Omit<TextInputProps, 'style'> & {
 
 /** Search input matching the concept's "Search for dishes, restaurants, cuisines..." field. */
 export function SearchBar({ className, placeholder = 'Search...', ...rest }: SearchBarProps) {
+  const { colors } = useAppTheme();
   return (
     <View
       className={cn(

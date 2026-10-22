@@ -1,11 +1,11 @@
-import { ActivityIndicator, Pressable, View } from 'react-native';
 import { MapPin, Plus } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { cn } from '@/lib/cn';
-import { colors } from '@/constants/colors';
-import { formatPriceLevel } from '@/lib/format';
 import { BodyText, Caption } from '@/components/ui/Typography';
+import { useAppTheme } from '@/hooks/useTheme';
+import { cn } from '@/lib/cn';
 import type { PlaceSearchResult } from '@/lib/db/places';
+import { formatPriceLevel } from '@/lib/format';
 
 type PlaceResultRowProps = {
   place: PlaceSearchResult;
@@ -23,6 +23,7 @@ type PlaceResultRowProps = {
  * a badly reviewed restaurant rather than an unknown one.
  */
 export function PlaceResultRow({ place, onPress, isImporting, className }: PlaceResultRowProps) {
+  const { colors } = useAppTheme();
   return (
     <Pressable
       onPress={onPress}

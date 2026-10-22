@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 import { Button } from '@/components/ui/Button';
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { logActivity } from '@/lib/db/activity';
 import {
     deleteReview,
@@ -37,6 +38,8 @@ export const ReviewForm = ({
   onSubmitSuccess,
   onCancel,
 }: ReviewFormProps) => {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -342,7 +345,8 @@ export const ReviewForm = ({
   );
 };
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
@@ -435,4 +439,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-});
+  });
+}

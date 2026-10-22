@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Animated, View, type DimensionValue } from 'react-native';
 
-import { colors } from '@/constants/colors';
 import { radius } from '@/constants/spacing';
+import { useAppTheme } from '@/hooks/useTheme';
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -13,6 +13,7 @@ type SkeletonProps = {
 
 /** Pulsing placeholder block shown while content is loading. */
 export function Skeleton({ width = '100%', height = 16, borderRadius: cornerRadius = radius.sm, className }: SkeletonProps) {
+  const { colors } = useAppTheme();
   const [opacity] = useState(() => new Animated.Value(0.4));
 
   useEffect(() => {

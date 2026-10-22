@@ -10,14 +10,16 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listReviewedRestaurantIds, listVisited } from '@/lib/db/visited';
+import { formatDiaryDate } from '@/lib/format';
 
 type StateFilter = 'all' | 'visited_only' | 'reviewed';
 
 /** Private list of restaurants the user has marked as visited. */
 export default function VisitedScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { user } = useAuth();
   const visited = useQuery({
@@ -98,7 +100,7 @@ export default function VisitedScreen() {
               <Caption color="textSecondary">
                 {[
                   item.restaurant?.city,
-                  new Date(item.visited_at).toLocaleDateString(),
+                  formatDiaryDate(item.visited_at),
                   reviewedIds.has(item.restaurant_id) ? 'Reviewed' : 'Visited only',
                 ]
                   .filter(Boolean)

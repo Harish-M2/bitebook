@@ -30,7 +30,7 @@ async function enrichVisitParents(parents: VisitParent[]): Promise<RestaurantVis
   const userIds = [...new Set(parents.map((parent) => parent.user_id))];
   const visitIds = parents.map((parent) => parent.id);
 
-  const [restaurantsResult, profilesResult, reviewsResult, mediaResult] = await Promise.all([
+  const [restaurantsResult, profilesResult, reviewsResult, mediaResult, spendBandsResult] = await Promise.all([
     supabase
       .from('restaurants')
       .select('id, name, city, price_level, image_url')
@@ -49,15 +49,25 @@ async function enrichVisitParents(parents: VisitParent[]): Promise<RestaurantVis
       .select('id, restaurant_review_id, dish_review_id, media_type, position, storage_path')
       .in('restaurant_review_id', visitIds)
       .order('position', { ascending: true }),
+    supabase
+      .from('restaurant_reviews')
+      .select('id, spend_band')
+      .in('id', visitIds),
   ]);
 
   if (restaurantsResult.error) throw restaurantsResult.error;
   if (profilesResult.error) throw profilesResult.error;
   if (reviewsResult.error) throw reviewsResult.error;
   if (mediaResult.error) throw mediaResult.error;
+  if (spendBandsResult.error
+      && !['42703', 'PGRST204'].includes(spendBandsResult.error.code ?? '')
+      && !/spend_band.*does not exist/i.test(spendBandsResult.error.message)) {
+    throw spendBandsResult.error;
+  }
 
   const restaurants = new Map((restaurantsResult.data ?? []).map((row) => [row.id, row]));
   const profiles = new Map((profilesResult.data ?? []).map((row) => [row.id, row]));
+  const spendBandByVisit = new Map((spendBandsResult.data ?? []).map((row) => [row.id, row.spend_band]));
   const reviewsByVisit = new Map<string, typeof reviewsResult.data>();
   for (const review of reviewsResult.data ?? []) {
     if (!review.restaurant_review_id) continue;
@@ -115,6 +125,7 @@ async function enrichVisitParents(parents: VisitParent[]): Promise<RestaurantVis
       atmosphereRating: parent.atmosphere_rating,
       valueRating: parent.value_rating,
       spendAmount: parent.spend_amount,
+      spendBand: spendBandByVisit.get(parent.id) ?? null,
       partySize: parent.party_size,
       seatingType: parent.seating_type,
       actor: {
@@ -183,6 +194,82 @@ export async function getRestaurantVisitSummary(
 
   const [visit] = await enrichVisitParents([data]);
   return visit ?? null;
+}
+
+export async function deleteRestaurantReviewMedia(mediaId: string): Promise<void> {
+  const { data: media, error: loadError } = await supabase
+    .from('restaurant_review_media')
+    .select('id, storage_path')
+    .eq('id', mediaId)
+    .maybeSingle();
+  if (loadError) throw loadError;
+  if (!media) throw new Error('This media item is no longer available.');
+
+  const { data: deleted, error: deleteError } = await supabase
+    .from('restaurant_review_media')
+    .delete()
+    .eq('id', mediaId)
+    .select('id')
+    .maybeSingle();
+  if (deleteError) throw deleteError;
+  if (!deleted) throw new Error('You do not have permission to delete this media item.');
+
+  const { error: storageError } = await supabase.storage
+    .from('review-photos')
+    .remove([media.storage_path]);
+  if (storageError) console.warn('[Bitebook] Could not remove deleted visit media from storage:', storageError);
+}
+
+export async function replaceRestaurantReviewImage(
+  userId: string,
+  mediaId: string,
+  bytes: ArrayBuffer,
+): Promise<void> {
+  const { data: media, error: loadError } = await supabase
+    .from('restaurant_review_media')
+    .select('id, restaurant_review_id, dish_review_id, position, storage_path, media_type')
+    .eq('id', mediaId)
+    .maybeSingle();
+  if (loadError) throw loadError;
+  if (!media) throw new Error('This media item is no longer available.');
+  if (media.media_type !== 'image') throw new Error('Only visit photos can be replaced.');
+
+  const nextPath = `${userId}/${media.restaurant_review_id}/${media.position}-${Date.now()}.jpg`;
+  const { error: uploadError } = await supabase.storage
+    .from('review-photos')
+    .upload(nextPath, bytes, { contentType: 'image/jpeg', upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { error: insertError } = await supabase.from('restaurant_review_media').insert({
+    restaurant_review_id: media.restaurant_review_id,
+    dish_review_id: media.dish_review_id,
+    storage_path: nextPath,
+    media_type: 'image',
+    content_type: 'image/jpeg',
+    position: media.position,
+  });
+  if (insertError) {
+    await supabase.storage.from('review-photos').remove([nextPath]);
+    throw insertError;
+  }
+
+  const { data: deleted, error: deleteError } = await supabase
+    .from('restaurant_review_media')
+    .delete()
+    .eq('id', mediaId)
+    .select('id')
+    .maybeSingle();
+  if (deleteError || !deleted) {
+    await supabase.from('restaurant_review_media').delete().eq('storage_path', nextPath);
+    await supabase.storage.from('review-photos').remove([nextPath]);
+    if (deleteError) throw deleteError;
+    throw new Error('You do not have permission to replace this photo.');
+  }
+
+  const { error: storageError } = await supabase.storage
+    .from('review-photos')
+    .remove([media.storage_path]);
+  if (storageError) console.warn('[Bitebook] Could not remove replaced visit media from storage:', storageError);
 }
 
 export type RecentlyReviewedRestaurant = {

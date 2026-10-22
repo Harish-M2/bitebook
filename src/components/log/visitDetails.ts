@@ -6,7 +6,7 @@ export type VisitDetailsDraft = {
   serviceRating: number;
   atmosphereRating: number;
   valueRating: number;
-  spend: string;
+  spendBand: number | null;
   partySize: string;
   seatingType: SeatingType | null;
 };
@@ -16,7 +16,7 @@ export const EMPTY_VISIT_DETAILS: VisitDetailsDraft = {
   serviceRating: 0,
   atmosphereRating: 0,
   valueRating: 0,
-  spend: '',
+  spendBand: null,
   partySize: '',
   seatingType: null,
 };
@@ -28,9 +28,10 @@ export const SEATING_OPTIONS: { value: SeatingType; label: string }[] = [
   { value: 'takeaway', label: 'Takeaway' },
 ];
 
-export function isValidSpend(value: string): boolean {
-  if (value.trim() === '') return true;
-  return /^\d{1,6}(\.\d{1,2})?$/.test(value.trim());
+export const SPEND_BANDS = [1, 2, 3, 4] as const;
+
+export function isValidSpendBand(value: number | null): boolean {
+  return value === null || SPEND_BANDS.includes(value as (typeof SPEND_BANDS)[number]);
 }
 
 export function isValidPartySize(value: string): boolean {
@@ -45,7 +46,7 @@ export function toVisitDetailsInput(d: VisitDetailsDraft): VisitDetailsInput {
     serviceRating: d.serviceRating >= 0.5 ? d.serviceRating : undefined,
     atmosphereRating: d.atmosphereRating >= 0.5 ? d.atmosphereRating : undefined,
     valueRating: d.valueRating >= 0.5 ? d.valueRating : undefined,
-    spendAmount: d.spend.trim() && isValidSpend(d.spend) ? Number(d.spend) : undefined,
+    spendBand: d.spendBand !== null && isValidSpendBand(d.spendBand) ? d.spendBand : undefined,
     partySize: d.partySize.trim() && isValidPartySize(d.partySize) ? Number(d.partySize) : undefined,
     seatingType: d.seatingType ?? undefined,
   };

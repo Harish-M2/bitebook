@@ -1,7 +1,8 @@
 import { ExternalLink } from '@/components/external-link';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { MenuItem } from '@/lib/db/menus';
 import { formatMenuPrice } from '@/lib/format';
 import { Image } from 'expo-image';
@@ -25,6 +26,8 @@ interface MenuModalProps {
  * Includes close button and loading/empty states.
  */
 export function MenuModal({ visible, title, items, isLoading, onClose, error, onRetry }: MenuModalProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
   const handleSelectItem = useCallback((item: MenuItem) => {
@@ -41,6 +44,8 @@ export function MenuModal({ visible, title, items, isLoading, onClose, error, on
         item={selectedItem}
         restaurantName={title}
         onClose={handleCloseDetail}
+        styles={styles}
+        colors={colors}
       />
     );
   }
@@ -87,6 +92,7 @@ export function MenuModal({ visible, title, items, isLoading, onClose, error, on
                 key={item.id}
                 item={item}
                 onPress={() => handleSelectItem(item)}
+                styles={styles}
               />
             ))}
             <View style={styles.contentPadding} />
@@ -100,12 +106,13 @@ export function MenuModal({ visible, title, items, isLoading, onClose, error, on
 interface MenuItemRowProps {
   item: MenuItem;
   onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
 }
 
 /**
  * Single menu item in the list view - compact layout with image, name, and price.
  */
-function MenuItemRow({ item, onPress }: MenuItemRowProps) {
+function MenuItemRow({ item, onPress, styles }: MenuItemRowProps) {
   const price = formatMenuPrice(item.price, item.currency);
   return (
     <Pressable style={styles.itemRow} onPress={onPress}>
@@ -138,13 +145,15 @@ interface MenuItemDetailModalProps {
   item: MenuItem;
   restaurantName: string;
   onClose: () => void;
+  styles: ReturnType<typeof createStyles>;
+  colors: Palette;
 }
 
 /**
  * Full-screen detail view for a single menu item.
  * Shows large image, full description, price, and nutrition info.
  */
-function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailModalProps) {
+function MenuItemDetailModal({ item, restaurantName, onClose, styles, colors }: MenuItemDetailModalProps) {
   const price = formatMenuPrice(item.price, item.currency);
   return (
     <Modal visible={true} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -193,13 +202,14 @@ function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailMo
                 <BodyText style={styles.detailSectionTitle}>Nutrition</BodyText>
                 <View style={styles.nutritionGrid}>
                   {item.nutrition.calories && (
-                    <NutritionItem label="Calories" value={Math.round(item.nutrition.calories)} />
+                    <NutritionItem label="Calories" value={Math.round(item.nutrition.calories)} styles={styles} />
                   )}
                   {item.nutrition.protein && (
                     <NutritionItem
                       label="Protein"
                       value={Math.round(item.nutrition.protein)}
                       unit="g"
+                      styles={styles}
                     />
                   )}
                   {item.nutrition.carbs && (
@@ -207,6 +217,7 @@ function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailMo
                       label="Carbs"
                       value={Math.round(item.nutrition.carbs)}
                       unit="g"
+                      styles={styles}
                     />
                   )}
                   {item.nutrition.fat && (
@@ -214,6 +225,7 @@ function MenuItemDetailModal({ item, restaurantName, onClose }: MenuItemDetailMo
                       label="Fat"
                       value={Math.round(item.nutrition.fat)}
                       unit="g"
+                      styles={styles}
                     />
                   )}
                 </View>
@@ -230,9 +242,10 @@ interface NutritionItemProps {
   label: string;
   value: number;
   unit?: string;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function NutritionItem({ label, value, unit = '' }: NutritionItemProps) {
+function NutritionItem({ label, value, unit = '', styles }: NutritionItemProps) {
   return (
     <View style={styles.nutritionItem}>
       <Caption style={styles.nutritionLabel}>{label}</Caption>
@@ -244,7 +257,8 @@ function NutritionItem({ label, value, unit = '' }: NutritionItemProps) {
   );
 }
 
-const styles = {
+function createStyles(colors: Palette) {
+  return {
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -411,4 +425,5 @@ const styles = {
     fontSize: 16,
     fontWeight: '600' as const,
   },
-};
+  };
+}

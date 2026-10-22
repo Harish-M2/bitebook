@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
 import { publicImageUrl } from '@/lib/db/storage';
 import { MetadataText } from './Typography';
@@ -42,6 +42,7 @@ function getInitials(name: string): string {
 
 /** Circular user avatar with an initials fallback when no photo is available. */
 export function Avatar({ uri, name, size = 'md', className }: AvatarProps) {
+  const { colors } = useAppTheme();
   const imageUri = uri && /^https?:\/\//i.test(uri) ? uri : publicImageUrl('avatars', uri ?? null);
 
   if (!imageUri) {

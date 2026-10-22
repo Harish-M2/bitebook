@@ -14,7 +14,12 @@ const DIARY_SELECT = `
   eaten_at,
   dish:dishes(id, name, image_url, aggregate_rating, rating_count, ${DISH_PHOTO_SELECT}),
   restaurant:restaurants(id, name),
-  review:reviews(rating, restaurant_review_id, photos:review_photos(storage_path, position))
+  review:reviews(
+    rating,
+    restaurant_review_id,
+    photos:review_photos(storage_path, position),
+    visit_media:restaurant_review_media!restaurant_review_media_dish_review_fk(storage_path, position, media_type)
+  )
 `;
 
 export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
@@ -35,11 +40,15 @@ export async function listDiaryEntries(userId: string): Promise<DiaryEntry[]> {
   // for the whole page rather than one request per entry.
   const photoPathByEntry = new Map<string, string>();
   for (const row of rows) {
-    const photos = [...(row.review?.photos ?? [])].sort(
+    const visitPhotos = [...(row.review?.visit_media ?? [])]
+      .filter((media) => media.media_type === 'image')
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const reviewPhotos = [...(row.review?.photos ?? [])].sort(
       (a, b) => (a.position ?? 0) - (b.position ?? 0)
     );
-    if (photos[0]?.storage_path) {
-      photoPathByEntry.set(row.id, photos[0].storage_path);
+    const photoPath = visitPhotos[0]?.storage_path ?? reviewPhotos[0]?.storage_path;
+    if (photoPath) {
+      photoPathByEntry.set(row.id, photoPath);
     }
   }
   const signed = await signedImageUrls('review-photos', [...photoPathByEntry.values()]);

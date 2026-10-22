@@ -1,8 +1,8 @@
-import { ActivityIndicator, View } from 'react-native';
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 
 /**
  * Entry point — resolves where a launching user belongs. The splash screen is still up
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
  */
 export default function Index() {
   const { session, isLoading, profile, needsOnboarding } = useAuth();
+  const { colors } = useAppTheme();
 
   if (isLoading) {
     return null;

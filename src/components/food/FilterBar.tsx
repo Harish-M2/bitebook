@@ -1,4 +1,5 @@
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { RestaurantFilters } from '@/lib/db/filters';
 import { getPriceLevels, SORT_OPTIONS } from '@/lib/db/filters';
 import type { Restaurant } from '@/types/models';
@@ -48,6 +49,8 @@ export function FilterBar({
   onCuisineChange,
   compact = false,
 }: FilterBarProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [showFilters, setShowFilters] = useState(false);
   const priceOptions = getPriceLevels(restaurants);
 
@@ -337,7 +340,8 @@ export function FilterBar({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -476,4 +480,5 @@ const styles = StyleSheet.create({
     color: colors.background,
     textAlign: 'center',
   },
-});
+  });
+}

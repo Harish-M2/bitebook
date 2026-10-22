@@ -984,11 +984,14 @@ export type Database = {
       restaurant_reviews: {
         Row: {
           atmosphere_rating: number | null
+          client_request_id: string | null
+          client_request_fingerprint: string | null
           food_rating: number | null
           party_size: number | null
           seating_type: string | null
           service_rating: number | null
           spend_amount: number | null
+          spend_band: number | null
           value_rating: number | null
           created_at: string
           id: string
@@ -1003,11 +1006,14 @@ export type Database = {
         }
         Insert: {
           atmosphere_rating?: number | null
+          client_request_id?: string | null
+          client_request_fingerprint?: string | null
           food_rating?: number | null
           party_size?: number | null
           seating_type?: string | null
           service_rating?: number | null
           spend_amount?: number | null
+          spend_band?: number | null
           value_rating?: number | null
           created_at?: string
           id?: string
@@ -1022,11 +1028,14 @@ export type Database = {
         }
         Update: {
           atmosphere_rating?: number | null
+          client_request_id?: string | null
+          client_request_fingerprint?: string | null
           food_rating?: number | null
           party_size?: number | null
           seating_type?: string | null
           service_rating?: number | null
           spend_amount?: number | null
+          spend_band?: number | null
           value_rating?: number | null
           created_at?: string
           id?: string
@@ -1592,6 +1601,24 @@ export type Database = {
       }
       log_restaurant_review: {
         Args: {
+          p_dishes: Json
+          p_overall_rating: number
+          p_recommendation_tier: number
+          p_restaurant_comment: string | null
+          p_restaurant_id: string
+          p_visited_at: string
+          p_visibility: Database["public"]["Enums"]["review_visibility"]
+        }
+        Returns: {
+          diary_entry_id: string
+          dish_id: string
+          restaurant_review_id: string
+          review_id: string
+        }[]
+      }
+      log_restaurant_review_idempotent: {
+        Args: {
+          p_client_request_id: string
           p_dishes: Json
           p_overall_rating: number
           p_recommendation_tier: number

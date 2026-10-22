@@ -1,26 +1,31 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
-  // Bitebook is a dark-only app (app.json sets userInterfaceStyle: "dark"). NativeWind's
-  // default "media" dark mode can't be forced on web and throws there; "class" mode allows
-  // the forced-dark theme to work identically across native and web.
+  // Class mode gives system and explicitly selected themes the same tokens on native and web.
   darkMode: 'class',
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
       colors: {
-        background: '#0B0D0E',
-        surface: '#12171A',
-        'surface-elevated': '#1A2125',
-        'surface-muted': '#20282C',
-        border: '#2F383D',
-        'text-primary': '#F4F1EC',
-        'text-secondary': '#BAB7B1',
-        'text-muted': '#7D8488',
-        accent: '#D7B98A',
-        'accent-dark': '#A6814D',
-        rating: '#E5B566',
-        danger: '#E86F5D',
+        background: 'rgb(var(--bb-background) / <alpha-value>)',
+        surface: 'rgb(var(--bb-surface) / <alpha-value>)',
+        'surface-elevated': 'rgb(var(--bb-surface-elevated) / <alpha-value>)',
+        'surface-muted': 'rgb(var(--bb-surface-muted) / <alpha-value>)',
+        border: 'rgb(var(--bb-border) / <alpha-value>)',
+        'text-primary': 'rgb(var(--bb-text-primary) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--bb-text-secondary) / <alpha-value>)',
+        'text-muted': 'rgb(var(--bb-text-muted) / <alpha-value>)',
+        accent: 'rgb(var(--bb-accent) / <alpha-value>)',
+        'accent-dark': 'rgb(var(--bb-accent-dark) / <alpha-value>)',
+        'accent-soft': 'rgb(var(--bb-accent-soft) / <alpha-value>)',
+        rating: 'rgb(var(--bb-rating) / <alpha-value>)',
+        danger: 'rgb(var(--bb-danger) / <alpha-value>)',
+        success: 'rgb(var(--bb-success) / <alpha-value>)',
+        warning: 'rgb(var(--bb-warning) / <alpha-value>)',
+        focus: 'rgb(var(--bb-focus) / <alpha-value>)',
+        placeholder: 'rgb(var(--bb-placeholder) / <alpha-value>)',
+        'disabled-background': 'rgb(var(--bb-disabled-background) / <alpha-value>)',
+        'disabled-text': 'rgb(var(--bb-disabled-text) / <alpha-value>)',
       },
       borderRadius: {
         sm: '8px',

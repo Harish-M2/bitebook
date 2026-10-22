@@ -125,7 +125,14 @@ export async function searchRestaurants(query: string, signal?: AbortSignal): Pr
     throw error;
   }
 
-  return (data ?? []).map(toRestaurant);
+  const normalizedQuery = trimmed.toLowerCase();
+  return (data ?? []).map(toRestaurant).sort((first, second) => {
+    const relevance = (restaurant: Restaurant) => {
+      const name = restaurant.name.trim().toLowerCase();
+      return name === normalizedQuery ? 0 : name.startsWith(normalizedQuery) ? 1 : 2;
+    };
+    return relevance(first) - relevance(second) || first.name.localeCompare(second.name);
+  });
 }
 
 export async function searchRestaurantsByCuisine(query: string, signal: AbortSignal): Promise<Restaurant[]> {

@@ -20,6 +20,12 @@ const darkPalette = {
   accentSoft: '#F2E4C9',
   rating: '#E5B566',
   danger: '#E86F5D',
+  success: '#4CB782',
+  warning: '#E4B450',
+  focus: '#D7B98A',
+  placeholder: '#7D8488',
+  disabledBackground: '#20282C',
+  disabledText: '#7D8488',
   white: '#FFFFFF',
 } as const;
 
@@ -31,16 +37,20 @@ const lightPalette = {
   border: '#D9CBB7',
   textPrimary: '#171A1D',
   textSecondary: '#545E66',
-  textMuted: '#7A7F82',
-  accent: '#A66E3A',
+  textMuted: '#626B67',
+  accent: '#8C5B28',
   accentDark: '#7A4E24',
   accentSoft: '#F2E3C6',
-  rating: '#D69A4D',
-  danger: '#C85A4F',
+  rating: '#8C5B28',
+  danger: '#A73F35',
+  success: '#287A50',
+  warning: '#8B5E12',
+  focus: '#8C5B28',
+  placeholder: '#626B67',
+  disabledBackground: '#EEE5D9',
+  disabledText: '#626B67',
   white: '#FFFFFF',
 } as const;
-
-export const colors = darkPalette;
 
 export const theme = {
   dark: darkPalette,
@@ -48,4 +58,23 @@ export const theme = {
 } as const;
 
 export type ThemeName = keyof typeof theme;
-export type ColorToken = keyof typeof colors;
+export type Palette = { [Key in keyof typeof darkPalette]: string };
+export type ColorToken = keyof Palette;
+
+function hexChannels(value: string): string {
+  const hex = value.slice(1);
+  const full = hex.length === 3 ? [...hex].map((part) => part + part).join('') : hex;
+  const red = Number.parseInt(full.slice(0, 2), 16);
+  const green = Number.parseInt(full.slice(2, 4), 16);
+  const blue = Number.parseInt(full.slice(4, 6), 16);
+  return `${red} ${green} ${blue}`;
+}
+
+export function getThemeVariables(themeName: ThemeName): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(theme[themeName]).map(([name, value]) => [
+      `--bb-${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`,
+      hexChannels(value),
+    ]),
+  );
+}

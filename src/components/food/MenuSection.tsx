@@ -1,5 +1,6 @@
 import { BodyText, Caption } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { MenuItem } from '@/lib/db/menus';
 import { Image } from 'expo-image';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
@@ -15,6 +16,8 @@ interface MenuSectionProps {
  * Shows item name, price, description, and image if available.
  */
 export function MenuSection({ items, isLoading, onItemPress }: MenuSectionProps) {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -39,7 +42,7 @@ export function MenuSection({ items, isLoading, onItemPress }: MenuSectionProps)
       <FlatList
         data={items}
         renderItem={({ item }) => (
-          <MenuItemCard item={item} onPress={() => onItemPress?.(item)} />
+          <MenuItemCard item={item} onPress={() => onItemPress?.(item)} styles={styles} />
         )}
         keyExtractor={(item) => item.id}
         scrollEnabled={false}
@@ -52,12 +55,13 @@ export function MenuSection({ items, isLoading, onItemPress }: MenuSectionProps)
 interface MenuItemCardProps {
   item: MenuItem;
   onPress?: () => void;
+  styles: ReturnType<typeof createStyles>;
 }
 
 /**
  * Individual menu item card showing name, description, price, and image.
  */
-function MenuItemCard({ item, onPress }: MenuItemCardProps) {
+function MenuItemCard({ item, onPress, styles }: MenuItemCardProps) {
   return (
     <Pressable style={styles.itemContainer} onPress={onPress}>
       {item.imageUrl && (
@@ -90,7 +94,8 @@ function MenuItemCard({ item, onPress }: MenuItemCardProps) {
   );
 }
 
-const styles = {
+function createStyles(colors: Palette) {
+  return {
   container: {
     paddingVertical: 16,
     paddingHorizontal: 16,
@@ -162,4 +167,5 @@ const styles = {
     fontSize: 12,
     color: colors.textSecondary,
   },
-};
+  };
+}

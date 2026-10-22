@@ -144,6 +144,46 @@ test('Dish cover uses ordered photo records and normalizes the fallback path', (
   assert.equal(photos.dishCoverUrl([{ storage_path: 'later.jpg', position: 2, created_at: '2026-10-01' }, { storage_path: 'first.jpg', position: 0, created_at: '2026-10-01' }], null), 'https://storage.example/dish-photos/first.jpg');
   assert.equal(photos.dishCoverUrl([], 'dish-id/fallback.jpg'), 'https://storage.example/dish-photos/dish-id/fallback.jpg');
 });
+test('Dish detail prefers the owner’s signed private review photo over the shared dish cover', async () => {
+  const signedPaths = [];
+  const publicPaths = [];
+  const db = databaseMock((table) => table === 'dishes' ? ({ data: {
+    id: 'dish', name: 'Pasta', description: null, aggregate_rating: 4.5, rating_count: 1, image_url: null,
+    dish_photos: [{ storage_path: 'global-cover.jpg', position: 0, created_at: '2026-10-01' }],
+    restaurant: { id: 'restaurant', name: 'Restaurant', image_url: null },
+  }, error: null }) : ({ data: [{
+    photos: [], visit_media: [{ storage_path: 'private-visit.jpg', position: 1, media_type: 'image' }, { storage_path: 'private-visit.mp4', position: 0, media_type: 'video' }],
+  }], error: null }));
+  db.storage = { from: (bucket) => ({
+    getPublicUrl: (path) => { publicPaths.push([bucket, path]); return { data: { publicUrl: `https://storage.example/${bucket}/${path}` } }; },
+    createSignedUrls: async (paths) => { signedPaths.push([bucket, ...paths]); return { data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${path}` })), error: null }; },
+  }) };
+  const dishes = loadSource('src/lib/db/dishes.ts', { '@/lib/supabase': { supabase: db } });
+  const result = await dishes.getDish('dish', 'owner');
+  assert.equal(result.imageUrl, 'https://signed.example/private-visit.jpg');
+  assert.deepEqual(signedPaths, [['review-photos', 'private-visit.jpg']]);
+  assert.deepEqual(publicPaths, []);
+});
+test('Diary prefers a dish-tagged private visit image over review and public cover images', async () => {
+  const signedPaths = [];
+  const db = databaseMock((table) => table === 'diary_entries' ? ({ data: [{
+    id: 'entry', eaten_at: '2026-10-14',
+    dish: { id: 'dish', name: 'Pasta', image_url: null, aggregate_rating: 4.5, rating_count: 1,
+      dish_photos: [{ storage_path: 'global-cover.jpg', position: 0, created_at: '2026-10-01' }] },
+    restaurant: { id: 'restaurant', name: 'Restaurant' },
+    review: { rating: 4.5, restaurant_review_id: 'visit',
+      photos: [{ storage_path: 'private-review.jpg', position: 0 }],
+      visit_media: [{ storage_path: 'private-visit.jpg', position: 0, media_type: 'image' }, { storage_path: 'visit-video.mp4', position: 0, media_type: 'video' }] },
+  }], error: null }) : ({ data: null, error: null }));
+  db.storage = { from: (bucket) => ({
+    getPublicUrl: (path) => ({ data: { publicUrl: `https://storage.example/${bucket}/${path}` } }),
+    createSignedUrls: async (paths) => { signedPaths.push([bucket, ...paths]); return { data: paths.map((path) => ({ path, signedUrl: `https://signed.example/${path}` })), error: null }; },
+  }) };
+  const diary = loadSource('src/lib/db/diary.ts', { '@/lib/supabase': { supabase: db } });
+  const [entry] = await diary.listDiaryEntries('owner');
+  assert.equal(entry.dish.imageUrl, 'https://signed.example/private-visit.jpg');
+  assert.deepEqual(signedPaths, [['review-photos', 'private-visit.jpg']]);
+});
 test('Restaurant catalogue resolves an ordered photo-table cover when image_url is missing', async () => {
   const db = databaseMock(() => ({ data: [{ id: 'restaurant', name: 'Restaurant', city: null, price_level: null, image_url: null,
     restaurant_cuisines: [], restaurant_photos: [{ storage_path: 'later.jpg', position: 2 }, { storage_path: 'first.jpg', position: 0 }] }], error: null }));
@@ -151,6 +191,15 @@ test('Restaurant catalogue resolves an ordered photo-table cover when image_url 
   const [result] = await restaurants.listRestaurants();
   assert.equal(result.imageUrl, 'https://storage.example/restaurant-photos/first.jpg');
   assert.equal(result.priceLevel, '');
+});
+test('Local restaurant search ranks exact names before prefixes and substring matches', async () => {
+  const db = databaseMock(() => ({ data: [
+    { id: 'substring', name: 'The Pasta Room', city: null, price_level: null, image_url: null, restaurant_cuisines: [], restaurant_photos: [], dishes: [] },
+    { id: 'prefix', name: 'Pasta House', city: null, price_level: null, image_url: null, restaurant_cuisines: [], restaurant_photos: [], dishes: [] },
+    { id: 'exact', name: 'Pasta', city: null, price_level: null, image_url: null, restaurant_cuisines: [], restaurant_photos: [], dishes: [] },
+  ], error: null }));
+  const restaurants = loadSource('src/lib/db/restaurants.ts', { '@/lib/supabase': { supabase: db }, '@/lib/db/places': {} });
+  assert.deepEqual((await restaurants.searchRestaurants('pasta')).map((row) => row.id), ['exact', 'prefix', 'substring']);
 });
 test('Popular dish reads use a real cuisine join and exclude unrated aggregates', async () => {
   const db = databaseMock(() => ({ data: [], error: null }));
@@ -274,11 +323,169 @@ test('Dish logging calls the transaction RPC with the existing restaurant and di
 test('Grouped reviews reuse the existing restaurant without creating duplicate records', async () => {
   const db = databaseMock(() => ({ data: [{ restaurant_review_id: 'visit', review_id: 'review', diary_entry_id: 'entry' }], error: null }));
   const log = loadSource('src/lib/db/log.ts', { '@/lib/supabase': { supabase: db }, '@/lib/db/photos': {} });
-  const result = await log.logRestaurantReview('owner', { restaurantId: 'restaurant', overallRating: 4, restaurantComment: '', recommendationTier: 4, visibility: 'public', dishes: [{ dishId: 'dish', dishName: 'Existing dish', rating: 4, comment: '' }], media: [] });
+  const result = await log.logRestaurantReview('owner', { clientRequestId: 'request-id', restaurantId: 'restaurant', overallRating: 4, restaurantComment: '', recommendationTier: 4, visibility: 'public', dishes: [{ dishId: 'dish', dishName: 'Existing dish', rating: 4, comment: '' }], media: [] });
   assert.equal(result.restaurantReviewId, 'visit');
-  assert.equal(db.calls[0][1], 'log_restaurant_review');
+  assert.equal(db.calls[0][1], 'log_restaurant_review_idempotent');
+  assert.equal(db.calls[0][2].p_client_request_id, 'request-id');
   assert.equal(db.calls[0][2].p_restaurant_id, 'restaurant');
   assert.ok(!db.calls.some(([table]) => table === 'restaurants'));
+});
+test('Visit summaries still load when the optional spend-band migration is pending', async () => {
+  const parent = { id: 'visit', user_id: 'owner', restaurant_id: 'restaurant', overall_rating: 4,
+    recommendation_tier: 4, restaurant_comment: null, visited_at: '2026-10-14', created_at: '2026-10-14T12:00:00Z',
+    food_rating: null, service_rating: null, atmosphere_rating: null, value_rating: null,
+    spend_amount: null, party_size: null, seating_type: null };
+  const db = databaseMock((table, actions) => {
+    if (table === 'restaurant_reviews' && actions.some(([method, columns]) => method === 'select' && columns === 'id, spend_band')) {
+      return { data: null, error: { code: '42703', message: 'column restaurant_reviews.spend_band does not exist' } };
+    }
+    if (table === 'restaurant_reviews') return { data: [parent], error: null };
+    if (table === 'restaurants') return { data: [{ id: 'restaurant', name: 'Restaurant', city: null, price_level: null, image_url: null }], error: null };
+    if (table === 'profiles') return { data: [{ id: 'owner', username: 'owner', display_name: 'Owner', avatar_url: null }], error: null };
+    return { data: [], error: null };
+  });
+  const reviews = loadSource('src/lib/db/restaurant-reviews.ts', { '@/lib/supabase': { supabase: db } });
+  const [visit] = await reviews.listRestaurantVisitSummaries(['owner']);
+  assert.equal(visit.id, 'visit');
+  assert.equal(visit.spendAmount, null);
+  assert.equal(visit.spendBand, null);
+});
+test('Grouped logging saves legacy visit details and reports a missing spend-band migration', async () => {
+  const detailUpdates = [];
+  const db = databaseMock((table, actions) => {
+    if (table === 'log_restaurant_review_idempotent') {
+      return { data: [{ restaurant_review_id: 'visit', dish_id: 'dish', review_id: 'review', diary_entry_id: 'entry' }], error: null };
+    }
+    if (table === 'restaurant_reviews') {
+      const update = actions.find(([method]) => method === 'update')?.[1];
+      if (update) {
+        detailUpdates.push(update);
+        return update.spend_band === undefined
+          ? { data: null, error: null }
+          : { data: null, error: { code: '42703', message: 'column spend_band does not exist' } };
+      }
+    }
+    return { data: null, error: null };
+  });
+  const log = loadSource('src/lib/db/log.ts', { '@/lib/supabase': { supabase: db }, '@/lib/db/photos': {} });
+  const result = await log.logRestaurantReview('owner', {
+    clientRequestId: 'request-id', restaurantId: 'restaurant', overallRating: 4,
+    restaurantComment: '', recommendationTier: 4, visibility: 'public',
+    dishes: [{ dishId: 'dish', dishName: 'Pasta', rating: 4, comment: '' }], media: [],
+    details: { foodRating: 4, spendBand: 3 },
+  });
+  assert.equal(result.detailsFailed, true);
+  assert.equal(detailUpdates.length, 2);
+  assert.equal(detailUpdates[1].food_rating, 4);
+  assert.equal(detailUpdates[1].spend_band, undefined);
+});
+test('Grouped visit media contributes only public dish-tagged images and skips saved positions on retry', async () => {
+  const createVisitPhotoTest = (visibility, existingPositions = []) => {
+    const storageUploads = [];
+    const publicDishPhotos = [];
+    const db = databaseMock((table) => table === 'log_restaurant_review_idempotent'
+      ? ({ data: [{ restaurant_review_id: 'visit', dish_id: 'dish', review_id: 'review', diary_entry_id: 'entry' }], error: null })
+      : table === 'restaurant_review_media'
+        ? ({ data: existingPositions.map((position) => ({ position })), error: null })
+        : ({ data: null, error: null }));
+    db.storage = { from: (bucket) => ({
+      upload: async (path) => { storageUploads.push([bucket, path]); return { error: null }; },
+      remove: async () => ({ error: null }),
+    }) };
+    const log = loadSource('src/lib/db/log.ts', {
+      '@/lib/supabase': { supabase: db },
+      '@/lib/db/photos': {
+        readPhotoBytes: async () => new ArrayBuffer(1),
+        uploadDishPhoto: async (_userId, dishId) => { publicDishPhotos.push(dishId); return 'dish-photo'; },
+        uploadReviewPhoto: async () => 'review-photo',
+      },
+    });
+    return { db, log, publicDishPhotos, storageUploads, input: {
+      clientRequestId: 'request-id', restaurantId: 'restaurant', overallRating: 4,
+      restaurantComment: '', recommendationTier: 4, visibility,
+      dishes: [{ dishId: 'dish', dishName: 'Pasta', rating: 4, comment: '' }],
+      media: [{ uri: 'file:///photo.jpg', type: 'image', contentType: 'image/jpeg', fileName: 'photo.jpg', dishIndex: 0 }],
+    } };
+  };
+
+  const publicVisit = createVisitPhotoTest('public');
+  const publicResult = await publicVisit.log.logRestaurantReview('owner', publicVisit.input);
+  assert.equal(publicResult.mediaFailedCount, 0);
+  assert.deepEqual(publicVisit.publicDishPhotos, ['dish']);
+  assert.equal(publicVisit.storageUploads.filter(([bucket]) => bucket === 'review-photos').length, 1);
+
+  const privateVisit = createVisitPhotoTest('private');
+  await privateVisit.log.logRestaurantReview('owner', privateVisit.input);
+  assert.deepEqual(privateVisit.publicDishPhotos, []);
+
+  const retry = createVisitPhotoTest('public', [0]);
+  const retryResult = await retry.log.logRestaurantReview('owner', retry.input);
+  assert.equal(retryResult.mediaFailedCount, 0);
+  assert.deepEqual(retry.storageUploads, []);
+  assert.deepEqual(retry.publicDishPhotos, []);
+});
+test('A lost media-insert response keeps objects referenced by committed rows', async () => {
+  const storageUploads = [];
+  const storageRemovals = [];
+  const publicDishPhotos = [];
+  const db = databaseMock((table, actions) => {
+    if (table === 'log_restaurant_review_idempotent') {
+      return { data: [{ restaurant_review_id: 'visit', dish_id: 'dish', review_id: 'review', diary_entry_id: 'entry' }], error: null };
+    }
+    if (table === 'restaurant_review_media' && actions.some(([method]) => method === 'insert')) {
+      return { data: null, error: { message: 'fixture transport failure after commit' } };
+    }
+    if (table === 'restaurant_review_media' && actions.some(([method]) => method === 'in')) {
+      return { data: [{ storage_path: storageUploads[0][1] }], error: null };
+    }
+    return { data: [], error: null };
+  });
+  db.storage = { from: (bucket) => ({
+    upload: async (path) => { storageUploads.push([bucket, path]); return { error: null }; },
+    remove: async (paths) => { storageRemovals.push([bucket, ...paths]); return { error: null }; },
+  }) };
+  const log = loadSource('src/lib/db/log.ts', {
+    '@/lib/supabase': { supabase: db },
+    '@/lib/db/photos': {
+      readPhotoBytes: async () => new ArrayBuffer(1),
+      uploadDishPhoto: async (_userId, dishId) => { publicDishPhotos.push(dishId); return 'dish-photo'; },
+      uploadReviewPhoto: async () => 'review-photo',
+    },
+  });
+  const result = await log.logRestaurantReview('owner', {
+    clientRequestId: 'request-id', restaurantId: 'restaurant', overallRating: 4,
+    restaurantComment: '', recommendationTier: 4, visibility: 'public',
+    dishes: [{ dishId: 'dish', dishName: 'Pasta', rating: 4, comment: '' }],
+    media: [{ uri: 'file:///photo.jpg', type: 'image', contentType: 'image/jpeg', fileName: 'photo.jpg', dishIndex: 0 }],
+  });
+  assert.equal(result.mediaFailedCount, 0);
+  assert.deepEqual(storageRemovals, []);
+  assert.deepEqual(publicDishPhotos, ['dish']);
+});
+test('Replacing saved visit media persists the new private object and row before deleting the old one', async () => {
+  const operations = [];
+  const db = databaseMock((table, actions) => {
+    if (table !== 'restaurant_review_media') return { data: null, error: null };
+    if (actions.some(([method]) => method === 'delete')) return { data: { id: 'old-media' }, error: null };
+    if (actions.some(([method]) => method === 'select')) return { data: {
+      id: 'old-media', restaurant_review_id: 'visit', dish_review_id: 'dish-review',
+      position: 2, storage_path: 'owner/visit/2-old.jpg', media_type: 'image',
+    }, error: null };
+    return { data: null, error: null };
+  });
+  db.storage = { from: (bucket) => ({
+    upload: async (path) => { operations.push(['upload', bucket, path]); return { error: null }; },
+    remove: async (paths) => { operations.push(['remove', bucket, ...paths]); return { error: null }; },
+  }) };
+  const reviews = loadSource('src/lib/db/restaurant-reviews.ts', { '@/lib/supabase': { supabase: db } });
+  await reviews.replaceRestaurantReviewImage('owner', 'old-media', new ArrayBuffer(1));
+  const insertIndex = db.calls.findIndex(([table, method]) => table === 'restaurant_review_media' && method === 'insert');
+  const deleteIndex = db.calls.findIndex(([table, method]) => table === 'restaurant_review_media' && method === 'delete');
+  assert.ok(operations.some(([method, bucket]) => method === 'upload' && bucket === 'review-photos'));
+  assert.ok(insertIndex >= 0 && deleteIndex > insertIndex);
+  assert.equal(db.calls[insertIndex][2].dish_review_id, 'dish-review');
+  assert.equal(db.calls[insertIndex][2].position, 2);
+  assert.ok(operations.some(([method, bucket, path]) => method === 'remove' && bucket === 'review-photos' && path === 'owner/visit/2-old.jpg'));
 });
 test('Rating reads paginate public reviews instead of truncating the count', async () => {
   const db = databaseMock((_table, actions) => ({ data: actions.find(([method]) => method === 'range')[1] === 0
@@ -295,4 +502,17 @@ test('Dish selections normalize new names but keep different existing dish IDs d
   assert.equal(photos.sameDishSelection({ id: null, name: ' Soup ' }, { id: null, name: 'soup' }), true);
   assert.equal(photos.sameDishSelection({ id: 'dish', name: 'Soup' }, { id: 'dish', name: 'Updated Soup' }), true);
   assert.equal(photos.sameDishSelection({ id: 'first', name: 'Soup' }, { id: 'second', name: 'Soup' }), false);
+});
+test('Diary calendar dates and optional spend bands preserve their data contracts', () => {
+  const visitDetails = loadSource('src/components/log/visitDetails.ts');
+  assert.equal(format.formatDiaryDate('2026-10-14', new Date(2026, 9, 15, 12)), 'Yesterday');
+  assert.equal(visitDetails.isValidSpendBand(null), true);
+  assert.equal(visitDetails.isValidSpendBand(4), true);
+  assert.equal(visitDetails.isValidSpendBand(5), false);
+  const empty = visitDetails.toVisitDetailsInput({ ...visitDetails.EMPTY_VISIT_DETAILS });
+  assert.equal(empty.spendBand, undefined);
+  assert.equal(empty.partySize, undefined);
+  const selected = visitDetails.toVisitDetailsInput({ ...visitDetails.EMPTY_VISIT_DETAILS, spendBand: 3, partySize: '2' });
+  assert.equal(selected.spendBand, 3);
+  assert.equal(selected.partySize, 2);
 });

@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { MapPin } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ImagePlus, MapPin, Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -11,12 +13,15 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
 import { Screen } from '@/components/ui/Screen';
 import { Surface } from '@/components/ui/Surface';
+import { useToast } from '@/components/ui/Toast';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
+import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/hooks/useTheme';
-import { getRestaurantVisitSummary } from '@/lib/db/restaurant-reviews';
-import { formatPriceLevel } from '@/lib/format';
+import { preparePhoto, readPhotoBytes } from '@/lib/db/photos';
+import { deleteRestaurantReviewMedia, getRestaurantVisitSummary, replaceRestaurantReviewImage } from '@/lib/db/restaurant-reviews';
+import { formatDiaryDate, formatPriceLevel } from '@/lib/format';
+import { queryKeys } from '@/lib/queryClient';
 
 function VisitVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri);
@@ -31,9 +36,13 @@ function VisitVideo({ uri }: { uri: string }) {
 }
 
 export default function RestaurantReviewDetailScreen() {
+  const queryClient = useQueryClient();
   const router = useRouter();
   const { restaurantReviewId } = useLocalSearchParams<{ restaurantReviewId: string }>();
   const { colors: palette } = useAppTheme();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [processingMediaId, setProcessingMediaId] = useState<string | null>(null);
 
   const visit = useQuery({
     queryKey: ['restaurant-review', restaurantReviewId],
@@ -81,6 +90,66 @@ export default function RestaurantReviewDetailScreen() {
   const recommendation = RESTAURANT_RECOMMENDATIONS.find(
     (option) => option.tier === data.recommendationTier,
   );
+  const isOwner = user?.id === data.userId;
+
+  async function invalidateVisitMedia() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['restaurant-review', restaurantReviewId] }),
+      queryClient.invalidateQueries({ queryKey: ['restaurant-visits'] }),
+      queryClient.invalidateQueries({ queryKey: ['restaurant-visits-by-restaurant', data.restaurant.id] }),
+      queryClient.invalidateQueries({ queryKey: ['dish'] }),
+      queryClient.invalidateQueries({ queryKey: ['gallery-item'] }),
+      user ? queryClient.invalidateQueries({ queryKey: queryKeys.diary(user.id) }) : Promise.resolve(),
+      user ? queryClient.invalidateQueries({ queryKey: queryKeys.feed(user.id) }) : Promise.resolve(),
+    ]);
+  }
+
+  async function removeMedia(mediaId: string) {
+    if (processingMediaId) return;
+    setProcessingMediaId(mediaId);
+    try {
+      await deleteRestaurantReviewMedia(mediaId);
+      await invalidateVisitMedia();
+      showToast({ title: 'Photo deleted', message: 'The visit photo was removed.', tone: 'success' });
+    } catch (error) {
+      showToast({ title: 'Could not delete photo', message: error instanceof Error ? error.message : 'Please try again.', tone: 'error' });
+    } finally {
+      setProcessingMediaId(null);
+    }
+  }
+
+  async function replaceMedia(mediaId: string) {
+    if (!user || processingMediaId) return;
+    setProcessingMediaId(mediaId);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) throw new Error('Photo access is needed to replace this image. You can also keep the existing photo.');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+      if (result.canceled) return;
+
+      const prepared = await preparePhoto(result.assets[0].uri);
+      const bytes = await readPhotoBytes(prepared.uri);
+      await replaceRestaurantReviewImage(user.id, mediaId, bytes);
+      await invalidateVisitMedia();
+      showToast({ title: 'Photo replaced', message: 'The updated photo is saved to this visit.', tone: 'success' });
+    } catch (error) {
+      showToast({ title: 'Could not replace photo', message: error instanceof Error ? error.message : 'Please try again.', tone: 'error' });
+    } finally {
+      setProcessingMediaId(null);
+    }
+  }
+
+  function confirmDeleteMedia(mediaId: string) {
+    Alert.alert('Delete visit photo?', 'This removes the photo from this visit.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void removeMedia(mediaId) },
+    ]);
+  }
 
   return (
     <Screen navigation>
@@ -90,7 +159,7 @@ export default function RestaurantReviewDetailScreen() {
             <Heading level={1}>{data.restaurant.name}</Heading>
             {location ? (
               <View className="flex-row items-center gap-xxs">
-                <MapPin size={14} color={colors.textMuted} />
+                <MapPin size={14} color={palette.textMuted} />
                 <Caption>{location}</Caption>
               </View>
             ) : null}
@@ -107,9 +176,9 @@ export default function RestaurantReviewDetailScreen() {
 
           {data.media.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-sm">
-              {data.media.map((media) => media.url ? (
-                <View key={media.id} className="overflow-hidden rounded-xl">
-                  {media.type === 'video' ? (
+              {data.media.map((media) => (
+                <View key={media.id} className="relative overflow-hidden rounded-xl">
+                  {media.url ? media.type === 'video' ? (
                     <VisitVideo uri={media.url} />
                   ) : (
                     <Image
@@ -118,9 +187,37 @@ export default function RestaurantReviewDetailScreen() {
                       accessibilityLabel={`${data.restaurant.name} visit photo`}
                       style={{ width: 240, height: 240, borderRadius: 12 }}
                     />
+                  ) : (
+                    <View className="h-60 w-60 items-center justify-center bg-surface-elevated">
+                      <Caption>Photo unavailable</Caption>
+                    </View>
                   )}
+                  {isOwner ? (
+                    <View className="absolute right-xs top-xs flex-row gap-xs">
+                      {media.type === 'image' ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Replace visit photo"
+                          disabled={processingMediaId !== null}
+                          onPress={() => void replaceMedia(media.id)}
+                          className="h-11 w-11 items-center justify-center rounded-pill bg-black/75">
+                          <ImagePlus size={18} color="#FFFFFF" />
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Delete visit media"
+                        disabled={processingMediaId !== null}
+                        onPress={() => confirmDeleteMedia(media.id)}
+                        className="h-11 w-11 items-center justify-center rounded-pill bg-black/75">
+                        {processingMediaId === media.id
+                          ? <ActivityIndicator color="#FFFFFF" />
+                          : <Trash2 size={18} color="#FFFFFF" />}
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null)}
+              ))}
             </ScrollView>
           ) : null}
 
@@ -131,7 +228,7 @@ export default function RestaurantReviewDetailScreen() {
                 <BodyText medium>{data.actor.displayName}</BodyText>
                 {data.actor.username ? <Caption>@{data.actor.username}</Caption> : null}
               </View>
-              <MetadataText>{data.visitedAt}</MetadataText>
+              <MetadataText>{formatDiaryDate(data.visitedAt)}</MetadataText>
             </View>
             <Rating value={data.overallRating} size="md" />
             <Caption color="textSecondary">
@@ -155,13 +252,15 @@ export default function RestaurantReviewDetailScreen() {
             {[
               data.seatingType ? data.seatingType[0].toUpperCase() + data.seatingType.slice(1) : null,
               data.partySize ? `Party of ${data.partySize}` : null,
-              data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
+              data.spendBand !== null ? `Spend ${'£'.repeat(data.spendBand)}`
+                : data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
             ].filter(Boolean).length > 0 ? (
               <Caption color="textSecondary">
                 {[
                   data.seatingType ? data.seatingType[0].toUpperCase() + data.seatingType.slice(1) : null,
                   data.partySize ? `Party of ${data.partySize}` : null,
-                  data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
+                  data.spendBand !== null ? `Spend ${'£'.repeat(data.spendBand)}`
+                    : data.spendAmount !== null ? `Spend ${data.spendAmount}` : null,
                 ].filter(Boolean).join(' · ')}
               </Caption>
             ) : null}

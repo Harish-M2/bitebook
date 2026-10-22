@@ -14,7 +14,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Rating } from '@/components/ui/Rating';
 import { Screen } from '@/components/ui/Screen';
 import { BodyText, Caption, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listDishesForRestaurant } from '@/lib/db/dishes';
 import { toRestaurantVisitFeedActivity } from '@/lib/db/feed';
 import { listRestaurantVisitsForRestaurant } from '@/lib/db/restaurant-reviews';
@@ -23,6 +23,7 @@ import { publicImageUrl } from '@/lib/db/storage';
 import { formatPriceLevel } from '@/lib/format';
 
 export default function RestaurantDetailScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { restaurantId } = useLocalSearchParams<{ restaurantId: string }>();
 

@@ -4,7 +4,7 @@ import type { GestureResponderEvent } from 'react-native';
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 
 type LogTabButtonProps = {
   children?: React.ReactNode;
@@ -13,6 +13,7 @@ type LogTabButtonProps = {
 
 /** Prominent raised circular button that replaces the default centre tab button. */
 function LogTabButton({ onPress }: LogTabButtonProps) {
+  const { colors } = useAppTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -48,6 +49,7 @@ function LogTabButton({ onPress }: LogTabButtonProps) {
  * button (see Bitebook_Build_Instructions.md, section 6/9 navigation spec).
  */
 export default function TabsLayout() {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' && width <= 768 ? 24 : 0);

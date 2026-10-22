@@ -7,8 +7,9 @@ import type { DishReviewDraft } from '@/components/log/RatingStep';
 import { Rating } from '@/components/ui/Rating';
 import { Surface } from '@/components/ui/Surface';
 import { BodyText, Caption, Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
+import { useAppTheme } from '@/hooks/useTheme';
+import { formatDiaryDate } from '@/lib/format';
 import type { ReviewVisibility } from '@/types/database';
 
 import { SEATING_OPTIONS, type VisitDetailsDraft } from './visitDetails';
@@ -66,6 +67,7 @@ export function ConfirmStep({
   onEdit,
   privateVisit = false,
 }: ConfirmStepProps) {
+  const { colors } = useAppTheme();
   const VisibilityIcon = VISIBILITY_ICON[visibility];
   const detailLines = [
     details.foodRating >= 0.5 ? `Food ${details.foodRating}` : null,
@@ -74,7 +76,7 @@ export function ConfirmStep({
     details.valueRating >= 0.5 ? `Value ${details.valueRating}` : null,
     details.seatingType ? SEATING_OPTIONS.find((o) => o.value === details.seatingType)?.label : null,
     details.partySize.trim() ? `Party of ${details.partySize.trim()}` : null,
-    details.spend.trim() ? `Spend ${details.spend.trim()}` : null,
+    details.spendBand !== null ? `Spend ${'£'.repeat(details.spendBand)}` : null,
   ].filter(Boolean) as string[];
   const recommendation = RESTAURANT_RECOMMENDATIONS.find((option) => option.tier === recommendationTier);
 
@@ -84,7 +86,7 @@ export function ConfirmStep({
         <View className="mb-sm flex-row items-center justify-between">
           <MetadataText color="accent">Visit preview</MetadataText>
           <View className="rounded-full border border-border bg-surface-muted px-sm py-xxs">
-            <MetadataText>{visitedAt}</MetadataText>
+            <MetadataText>{formatDiaryDate(visitedAt)}</MetadataText>
           </View>
         </View>
 

@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { Screen } from '@/components/ui/Screen';
-import { colors } from '@/constants/colors';
+import type { Palette } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import {
     getNotificationPreferences,
     updateNotificationPreferences,
@@ -22,6 +23,8 @@ import {
  * Allows users to customize which notifications they receive
  */
 export default function NotificationSettingsScreen() {
+  const { colors } = useAppTheme();
+  const styles = createStyles(colors);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +94,8 @@ export default function NotificationSettingsScreen() {
           value={preferences.friend_reviews}
           onToggle={(value) => handleToggle('friend_reviews', value)}
           disabled={isSaving}
+          colors={colors}
+          styles={styles}
         />
 
         <SettingRow
@@ -99,6 +104,8 @@ export default function NotificationSettingsScreen() {
           value={preferences.friend_follows}
           onToggle={(value) => handleToggle('friend_follows', value)}
           disabled={isSaving}
+          colors={colors}
+          styles={styles}
         />
       </View>
 
@@ -112,6 +119,8 @@ export default function NotificationSettingsScreen() {
           value={preferences.restaurant_updates}
           onToggle={(value) => handleToggle('restaurant_updates', value)}
           disabled={isSaving}
+          colors={colors}
+          styles={styles}
         />
 
         <SettingRow
@@ -120,6 +129,8 @@ export default function NotificationSettingsScreen() {
           value={preferences.app_announcements}
           onToggle={(value) => handleToggle('app_announcements', value)}
           disabled={isSaving}
+          colors={colors}
+          styles={styles}
         />
       </View>
 
@@ -140,9 +151,11 @@ interface SettingRowProps {
   value: boolean;
   onToggle: (value: boolean) => void;
   disabled?: boolean;
+  colors: Palette;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function SettingRow({ label, description, value, onToggle, disabled }: SettingRowProps) {
+function SettingRow({ label, description, value, onToggle, disabled, colors, styles }: SettingRowProps) {
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingLabel}>
@@ -160,7 +173,8 @@ function SettingRow({ label, description, value, onToggle, disabled }: SettingRo
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: Palette) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -221,4 +235,5 @@ const styles = StyleSheet.create({
     color: colors.danger,
     textAlign: 'center',
   },
-});
+  });
+}

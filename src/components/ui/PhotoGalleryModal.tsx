@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, View, ScrollView, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Dimensions, Modal, Pressable, ScrollView, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
 import { Caption } from '@/components/ui/Typography';
+import { useAppTheme } from '@/hooks/useTheme';
 
 interface Photo {
   url: string;
@@ -29,6 +29,7 @@ export function PhotoGalleryModal({
   onClose,
   title,
 }: PhotoGalleryModalProps) {
+  const { colors } = useAppTheme();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const scrollViewRef = useRef<ScrollView>(null);
   const lastVisibleRef = useRef(visible);

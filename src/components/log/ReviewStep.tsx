@@ -2,13 +2,14 @@ import { Globe, Lock, Users } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Chip } from '@/components/ui/Chip';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { RatingInput } from '@/components/ui/RatingInput';
 import { TextField } from '@/components/ui/TextField';
 import { Caption, MetadataText } from '@/components/ui/Typography';
 import { RESTAURANT_RECOMMENDATIONS } from '@/constants/recommendations';
 import { useAppTheme } from '@/hooks/useTheme';
 import type { ReviewVisibility } from '@/types/database';
-import { isValidPartySize, isValidSpend, SEATING_OPTIONS, type VisitDetailsDraft } from './visitDetails';
+import { isValidPartySize, SEATING_OPTIONS, SPEND_BANDS, type VisitDetailsDraft } from './visitDetails';
 
 type ReviewStepProps = {
   text: string;
@@ -101,13 +102,10 @@ export function ReviewStep({
         ))}
       </View>
 
-      <TextField
+      <DatePickerField
         label="Visit date"
         value={visitedAt}
-        onChangeText={onChangeVisitedAt}
-        placeholder="YYYY-MM-DD"
-        keyboardType="numbers-and-punctuation"
-        maxLength={10}
+        onChange={onChangeVisitedAt}
         hint="Use the date you visited"
       />
 
@@ -117,7 +115,6 @@ export function ReviewStep({
         value={text}
         onChangeText={onChangeText}
         multiline
-        autoFocus
         maxLength={MAX_LENGTH}
         textAlignVertical="top"
         hint={`${text.length}/${MAX_LENGTH}`}
@@ -140,26 +137,29 @@ export function ReviewStep({
         </View>
       </View>
 
-      <View className="flex-row gap-sm">
-        <TextField
-          className="flex-1"
-          label="Spend (optional)"
-          value={details.spend}
-          onChangeText={(spend) => patch({ spend })}
-          keyboardType="decimal-pad"
-          maxLength={9}
-          error={isValidSpend(details.spend) ? null : 'Enter an amount like 42.50'}
-        />
-        <TextField
-          className="flex-1"
-          label="Party size (optional)"
-          value={details.partySize}
-          onChangeText={(partySize) => patch({ partySize })}
-          keyboardType="number-pad"
-          maxLength={3}
-          error={isValidPartySize(details.partySize) ? null : 'Enter 1 to 100'}
-        />
+      <View className="gap-xs">
+        <Caption color="textSecondary">Spend band (optional)</Caption>
+        <View className="flex-row flex-wrap gap-xs">
+          {SPEND_BANDS.map((band) => (
+            <Chip
+              key={band}
+              label={'£'.repeat(band)}
+              accessibilityLabel={`Price band ${band}`}
+              selected={details.spendBand === band}
+              onPress={() => patch({ spendBand: details.spendBand === band ? null : band })}
+            />
+          ))}
+        </View>
       </View>
+
+      <TextField
+        label="Party size (optional)"
+        value={details.partySize}
+        onChangeText={(partySize) => patch({ partySize })}
+        keyboardType="number-pad"
+        maxLength={3}
+        error={isValidPartySize(details.partySize) ? null : 'Enter 1 to 100'}
+      />
 
       <View className="gap-xxs">
         <Caption color="textSecondary">Who can see this visit</Caption>

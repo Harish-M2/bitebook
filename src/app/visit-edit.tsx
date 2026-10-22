@@ -5,12 +5,13 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Screen } from '@/components/ui/Screen';
 import { TextField } from '@/components/ui/TextField';
 import { Caption, Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listDishesForRestaurant } from '@/lib/db/dishes';
 import {
     addVisitDish,
@@ -29,6 +30,7 @@ function isValidDate(value: string): boolean {
 
 /** Private notes, date and remembered dishes for a visited restaurant. Never public. */
 export default function VisitEditScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -120,13 +122,10 @@ export default function VisitEditScreen() {
           <Heading level={2}>{visit.data.restaurant?.name ?? 'Visit'}</Heading>
           <MetadataText>Only you can see this. It is not a review.</MetadataText>
 
-          <TextField
+          <DatePickerField
             label="Date visited"
             value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            maxLength={10}
-            error={isValidDate(date) ? null : 'Use the format YYYY-MM-DD'}
+            onChange={setDate}
           />
           <TextField
             label="Private notes (optional)"

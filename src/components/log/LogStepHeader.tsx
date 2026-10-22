@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Heading, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 
 type LogStepHeaderProps = {
   title: string;
@@ -27,6 +27,7 @@ export function LogStepHeader({
   onBack,
   action,
 }: LogStepHeaderProps) {
+  const { colors } = useAppTheme();
   return (
     <View className="px-lg pt-xs">
       <View style={{ width: '100%', maxWidth: 760, alignSelf: 'center', gap: 8 }}>

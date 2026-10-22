@@ -11,10 +11,11 @@ import {
     Spacer,
     TextField,
 } from '@/components/ui';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPassword() {
+  const { colors } = useAppTheme();
   const { code } = useLocalSearchParams<{ code?: string }>();
 
   const [password, setPassword] = useState('');

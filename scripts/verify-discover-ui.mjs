@@ -41,7 +41,7 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 await context.addInitScript(({ storageKey, session }) => {
   localStorage.setItem(storageKey, JSON.stringify(session));
-  localStorage.setItem('bitebook.theme', 'light');
+  if (!localStorage.getItem('bitebook.appearance')) localStorage.setItem('bitebook.appearance', 'dark');
 }, { storageKey, session });
 let saved = true;
 let visited = false;
@@ -56,6 +56,11 @@ await context.route((url) => url.hostname === supabaseUrl.hostname, async (route
   const request = route.request();
   const url = new URL(request.url());
   if (url.pathname.startsWith('/auth/')) return route.fulfill({ json: user });
+  if (url.pathname.endsWith('/places-search')) return route.fulfill({ json: { source: 'fixture', results: [
+    { externalPlaceId: 'fixture-duplicate', name: restaurant.name, address: restaurant.city, city: restaurant.city, latitude: null, longitude: null, priceLevel: 2 },
+    { externalPlaceId: 'fixture-new-one', name: 'Fixture New Restaurant', address: 'London', city: 'London', latitude: null, longitude: null, priceLevel: 2 },
+    { externalPlaceId: 'fixture-new-two', name: 'Fixture Second Restaurant', address: 'London', city: 'London', latitude: null, longitude: null, priceLevel: 2 },
+  ] } });
   if (!url.pathname.startsWith('/rest/v1/')) return route.fulfill({ json: [] });
   const table = url.pathname.split('/').pop();
   const select = url.searchParams.get('select') ?? '';
@@ -87,7 +92,12 @@ await context.route((url) => url.hostname === supabaseUrl.hostname, async (route
     rows = empty ? [] : [restaurant, secondRestaurant, otherRestaurant];
     const name = url.searchParams.get('name');
     if (name) rows = rows.filter((row) => row.name.toLowerCase().includes(name.replace(/^ilike\./, '').replace(/[%*]/g, '').toLowerCase()));
-    if (url.searchParams.has('id')) rows = rows.filter((row) => `eq.${row.id}` === url.searchParams.get('id'));
+    const idFilter = url.searchParams.get('id');
+    if (idFilter?.startsWith('eq.')) rows = rows.filter((row) => row.id === idFilter.slice(3));
+    if (idFilter?.startsWith('in.')) {
+      const ids = idFilter.slice(4).replace(/^\(|\)$/g, '').split(',');
+      rows = rows.filter((row) => ids.includes(row.id));
+    }
     if (url.searchParams.has('restaurant_cuisines.cuisine.slug')) rows = rows.filter((row) => row.restaurant_cuisines.length);
   }
   if (table === 'dishes') {
@@ -99,17 +109,18 @@ await context.route((url) => url.hostname === supabaseUrl.hostname, async (route
     if (method === 'POST') rows = [dishRows.at(-1)];
   }
   if (table === 'restaurant_reviews') rows = empty ? [] : ratings;
+  if (table === 'restaurant_review_media') rows = [];
+  if (table === 'restaurant_reviews' && select.includes('user_id')) rows = [];
   if (table === 'menu_items') {
     if (failMenu) return route.fulfill({ status: 500, json: { message: 'Fixture menu failure' } });
     rows = [{ id: 'fixture-menu', name: 'Fixture Menu Pasta', price: 12.5, currency: 'GBP', image_url: null, nutrition: null }];
   }
-  if (table === 'log_restaurant_review') rows = [{ restaurant_review_id: 'fixture-logged-visit', review_id: 'fixture-review', diary_entry_id: 'entry' }];
+  if (table === 'log_restaurant_review_idempotent') rows = [{ restaurant_review_id: 'fixture-logged-visit', dish_id: dishId, review_id: 'fixture-review', diary_entry_id: 'entry' }];
   if (table === 'saved_dishes') rows = saved ? [{ id: 'bookmark', restaurant_id: restaurantId, status: 'want_to_eat', restaurant }] : [];
   if (table === 'restaurant_visits') rows = visited ? [{ id: 'visit', user_id: userId, restaurant_id: restaurantId, visited_at: '2026-10-14', notes: 'Existing visit notes', restaurant,
     restaurant_visit_dishes: dishRows.filter((row) => visitDishIds.has(row.id)).map((row) => ({ dish: { id: row.id, name: row.name } })) }] : [];
   if (table === 'restaurant_visit_dishes') rows = [...visitDishIds].map((id) => ({ dish_id: id }));
   if (table === 'diary_entries') rows = empty ? [] : [{ id: 'entry', eaten_at: '2026-10-14', dish, restaurant, review: { rating: 4.5, restaurant_review_id: null, photos: [] } }];
-  if (table === 'restaurant_reviews' && select.includes('user_id')) rows = [];
   const singular = (request.headers().accept ?? '').includes('vnd.pgrst.object');
   const headers = { 'content-range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` };
   return route.fulfill({ headers, json: singular ? rows[0] ?? null : rows });
@@ -133,7 +144,7 @@ try {
     }
     return false;
   }));
-  passed('Discover uses eligible recommendations and remains dark despite a stored light preference');
+  passed('Discover uses eligible recommendations and restores the stored dark preference');
   await visible(page.getByLabel(`Photo unavailable for ${dish.name}`));
   await page.waitForFunction(() => Array.from(document.images).some((image) => image.src.includes('/__fixture/photo.png') && image.complete && image.naturalWidth > 0));
   passed('Real image component renders a loaded asset and a branded missing-photo fallback');
@@ -226,9 +237,28 @@ try {
     for (const label of ['Home', 'Discover', 'Diary', 'Profile']) await visible(page.getByText(label, { exact: true }).last());
   }
   passed('All five tabs render with bottom navigation, including Profile and Log');
+  await page.goto(`${baseUrl}/profile`);
+  await visible(page.getByText('Appearance', { exact: true }));
+  await page.getByRole('radio', { name: 'Light', exact: true }).click();
+  await page.waitForFunction(() => localStorage.getItem('bitebook.appearance') === 'light');
+  const lightThemeState = {
+    className: await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.className),
+    selected: await page.getByRole('radio', { name: 'Light', exact: true }).getAttribute('aria-checked'),
+    background: await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.style.getPropertyValue('--bb-background')),
+  };
+  assert.match(lightThemeState.className, /light/, JSON.stringify(lightThemeState));
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.match(await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.className), /light/);
+  await page.getByRole('radio', { name: 'Dark', exact: true }).click();
+  assert.match(await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.className), /dark/);
+  passed('Profile appearance changes immediately and the selected theme persists across reload');
   await page.getByRole('button', { name: 'Log a dish', exact: true }).click();
   await visible(page.getByText('Where did you eat?', { exact: true }));
   await page.getByPlaceholder('Search restaurants...').fill('Ember');
+  await visible(page.getByRole('button', { name: 'Add Fixture New Restaurant', exact: true }));
+  await visible(page.getByRole('button', { name: 'Add Fixture Second Restaurant', exact: true }));
+  assert.equal(await page.getByRole('button', { name: `Add ${restaurant.name}`, exact: true }).count(), 0);
+  passed('Log search combines multiple provider results with local matches and removes duplicates without prompting for location');
   await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).click();
   await visible(page.getByText('What did you have?', { exact: true }));
   await page.getByText(dish.name, { exact: true }).last().click();
@@ -252,7 +282,7 @@ try {
   await page.getByRole('button', { name: 'Log it', exact: true }).click();
   await page.waitForURL('**/diary');
   await visible(page.getByText('Your diary', { exact: true }));
-  const submission = writes.find((write) => write.table === 'log_restaurant_review');
+  const submission = writes.find((write) => write.table === 'log_restaurant_review_idempotent');
   assert.equal(submission.body.p_restaurant_id, restaurantId);
   assert.equal(submission.body.p_dishes[0].dish_id, dishId);
   assert.equal(submission.body.p_dishes[0].rating, 4);
@@ -271,23 +301,25 @@ try {
   passed('Case and whitespace variants remain selected rather than creating duplicate draft dishes');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await visible(page.getByText('Your visit', { exact: true }));
-  await page.getByPlaceholder('YYYY-MM-DD').fill('2026-99-99');
-  assert.equal(await page.getByRole('button', { name: 'Continue', exact: true }).isEnabled(), false);
-  await page.getByPlaceholder('YYYY-MM-DD').fill('2026-10-14');
-  const reviewsBeforePrivateVisit = writes.filter((write) => write.table === 'log_restaurant_review').length;
+  await page.getByRole('button', { name: /Visit date:/ }).click();
+  const selectedDate = new Date();
+  selectedDate.setDate(selectedDate.getDate() - 8);
+  const dateLabel = selectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  await page.getByRole('button', { name: dateLabel, exact: true }).click();
+  const reviewsBeforePrivateVisit = writes.filter((write) => write.table === 'log_restaurant_review_idempotent').length;
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await visible(page.getByText('Ready to log', { exact: true }));
   await page.getByRole('button', { name: 'Save visit', exact: true }).click();
   await page.waitForURL('**/diary');
   await visible(page.getByRole('button', { name: `View private visit to ${restaurant.name}`, exact: true }));
   assert.equal(visitDishIds.size, 2);
-  assert.equal(writes.filter((write) => write.table === 'log_restaurant_review').length, reviewsBeforePrivateVisit);
+  assert.equal(writes.filter((write) => write.table === 'log_restaurant_review_idempotent').length, reviewsBeforePrivateVisit);
   assert.ok(writes.some((write) => write.table === 'dishes' && write.body.name === 'Fixture New Soup'));
   await page.getByRole('button', { name: 'Visits', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: `View diary entry for ${dish.name}`, exact: true }).count(), 0);
   await page.getByRole('button', { name: 'Dishes', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: `View private visit to ${restaurant.name}`, exact: true }).count(), 0);
-  passed('Private logging accepts multiple new unrated dishes, rejects invalid dates, and appears in Diary without a review');
+  passed('Private logging accepts multiple new unrated dishes, selects a calendar date, and appears without a review');
   await page.getByRole('button', { name: 'Log a dish', exact: true }).click();
   await page.getByPlaceholder('Search restaurants...').fill('Ember');
   await page.getByRole('button', { name: `View ${restaurant.name}`, exact: true }).click();

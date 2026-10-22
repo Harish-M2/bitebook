@@ -8,7 +8,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Caption, MetadataText } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import type { RestaurantReviewMediaInput } from '@/lib/db/log';
 import { preparePhoto } from '@/lib/db/photos';
 
@@ -65,6 +65,7 @@ function VideoPreview({ uri }: { uri: string }) {
 
 /** Step 4 — attach a small, ordered set of private visit photos and videos. */
 export function PhotoStep({ media, onChange, dishNames = [] }: PhotoStepProps) {
+  const { colors } = useAppTheme();
   const [isPreparing, setIsPreparing] = useState(false);
   const remaining = MAX_MEDIA_ITEMS - media.length;
 

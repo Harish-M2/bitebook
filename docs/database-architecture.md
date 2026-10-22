@@ -25,7 +25,7 @@ Related documents:
 | `dish_photos` | Dish photo references. |
 | `dish_cuisines` | Dish ↔ cuisine tags. |
 | `reviews` | User reviews of a dish, optionally linked to a grouped restaurant visit. |
-| `restaurant_reviews` | A restaurant visit's overall rating, recommendation, comment, date, and visibility. |
+| `restaurant_reviews` | A restaurant visit's overall rating, recommendation, comment, date, visibility, optional spend band, and visit details. |
 | `restaurant_review_media` | Ordered image/video references attached to a grouped visit. |
 | `review_photos` | Review photo references (Storage paths, private bucket). |
 | `diary_entries` | A user's personal food log; always private to the owner. |
@@ -61,6 +61,14 @@ relationships:
   continues to link to exactly one private `diary_entries` row.
 - `restaurant_review_media` belongs to a parent visit and may optionally reference one of
   its dish reviews. Its table and Storage reads inherit the parent review's visibility.
+- `restaurant_reviews.spend_band` is an optional visit-specific price tier from 1 (£) to
+  4 (££££). Historical `spend_amount` values remain intact and are not reinterpreted.
+- Migration `0056_restaurant_review_spend_band.sql` adds this nullable field with a
+  database check constraint; no existing rows are rewritten.
+- Migration `0057_idempotent_restaurant_review_log.sql` adds an optional client request key
+  and request fingerprint plus a separate invoker RPC. Replays with the same payload return
+  the existing rows; changed payloads under a reused key are rejected. The existing
+  `log_restaurant_review` signature remains available to older clients.
 - `log_restaurant_review(...)` writes the parent, all dish reviews, and diary entries in a
   single `SECURITY INVOKER` transaction. Media objects are uploaded afterward because
   Storage cannot participate in a database transaction.

@@ -13,8 +13,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Divider, Screen } from '@/components/ui/Screen';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { BodyText, Heading } from '@/components/ui/Typography';
-import { colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppTheme } from '@/hooks/useTheme';
 import { listDiaryEntries } from '@/lib/db/diary';
 import { getDiaryStats } from '@/lib/db/stats';
 import { listVisited, type VisitedRestaurant } from '@/lib/db/visited';
@@ -33,6 +33,7 @@ type DiaryRow = { kind: 'dish'; entry: DiaryEntry } | { kind: 'visit'; visit: Vi
 export default function DiaryScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useAppTheme();
   const userId = user?.id ?? null;
   const [view, setView] = useState<'All' | 'Dishes' | 'Visits'>('All');
 

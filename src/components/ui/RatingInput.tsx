@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { Star } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
-import { colors } from '@/constants/colors';
+import { useAppTheme } from '@/hooks/useTheme';
 import { cn } from '@/lib/cn';
 
 type RatingInputProps = {
@@ -25,6 +25,7 @@ const RATING_ROW_WIDTH = 252;
  * control cannot produce is also a value that cannot be stored.
  */
 export function RatingInput({ value, onChange, className }: RatingInputProps) {
+  const { colors } = useAppTheme();
   function select(next: number) {
     // Selecting the same value again is a no-op, so don't buzz for it.
     if (next !== value) {
