@@ -1485,3 +1485,26 @@ The isolated browser suite has 43 checks, including rendered light/dark icon tin
 Home surface separation, themed logos, and failed photos. Mobile/desktop screenshots
 were reviewed at 320/390/1440px. TypeScript and lint pass; Expo Doctor remains unavailable
 without downloading its package. No database or security changes were needed.
+
+## 33. Home and Reviewed-Visit Release (2026-10-22)
+
+Home changes include the current user alongside followed authors, including for
+users following nobody. The author list is deduplicated and newest-first order is kept.
+These changes passed 50 data tests and 44 isolated browser checks before the visit work.
+
+Migration `0058_reviews_mark_restaurants_visited.sql` backfills reviewed restaurants
+into private Visited history and adds deferred, trigger-only synchronization for future
+dish and restaurant reviews. Existing visit details are not overwritten; each user and
+restaurant has one visit, and reviewed dishes attach without duplicates. Review saves
+also invalidate Visited caches. The owner authorized deploying all changes to production;
+`0058` was applied on 2026-10-22 before publishing the app changes to `main`.
+
+The SQL suite now declares 110 assertions, including 16 new review-to-visit checks.
+The full pgTAP suite remains unexecuted: local Postgres at `127.0.0.1:54322` refused the
+connection; the assertion count was statically verified. TypeScript, lint, and 50 data
+tests pass. Live read-only checks found zero missing reviewed visits or dish links, both
+triggers enabled, RLS retained, and no client execution permission on the trigger helper.
+An authenticated, rollback-only production smoke transaction verified standalone and
+grouped review logging, meal dates, preserved notes, deduplication, and cross-user visit
+privacy. It left zero smoke users behind. These live checks do not constitute a full
+pgTAP-suite pass. Publishing `main` triggers the existing Vercel production integration.

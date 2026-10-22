@@ -72,6 +72,16 @@ relationships:
 - `log_restaurant_review(...)` writes the parent, all dish reviews, and diary entries in a
   single `SECURITY INVOKER` transaction. Media objects are uploaded afterward because
   Storage cannot participate in a database transaction.
+- Migration `0058_reviews_mark_restaurants_visited.sql`, applied to production on
+  2026-10-22, makes each dish or
+  restaurant review also mark its restaurant privately visited. Deferred constraint
+  triggers run after diary creation so standalone reviews use the meal date. The
+  trigger-only definer helper pins `search_path = public` and cannot be executed by
+  clients. Existing visit dates and notes are preserved, reviewed dishes are linked
+  idempotently, and historical reviews are backfilled. Review deletion does not remove
+  visited history. No RLS policy or counter-maintenance rule changes.
+  Production catalog and backfill checks passed, as did authenticated standalone and
+  grouped logging tests in a rolled-back transaction; no smoke fixtures remain.
 
 ## 3. RLS Model
 

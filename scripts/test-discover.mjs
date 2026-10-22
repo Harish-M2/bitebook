@@ -57,6 +57,41 @@ const restaurant = (id, extras = {}) => ({ id, name: id, cuisine: 'Italian', pri
 const emptyContext = () => ({ friendRestaurantIds: new Set(), favouriteCuisines: new Set() });
 const filters = loadSource('src/lib/db/filters.ts');
 
+for (const [description, following, expectedAuthors] of [
+  ['following nobody', [], ['owner']],
+  ['following another user', ['friend'], ['owner', 'friend']],
+  ['duplicate or self follow rows', ['owner', 'friend', 'friend'], ['owner', 'friend']],
+]) {
+  test(`Home includes the user's own reviews when ${description}`, async () => {
+    const actor = { id: 'owner', username: 'owner', displayName: 'Owner', avatarUrl: null };
+    const db = databaseMock((table) => ({ data: table === 'follows'
+      ? following.map((following_id) => ({ following_id }))
+      : expectedAuthors.map((authorId) => ({
+        id: authorId === 'owner' ? 'own-review' : 'friend-review',
+        user_id: authorId, restaurant_id: 'restaurant', rating: 4, dish: null,
+        created_at: authorId === 'owner' ? '2026-10-22T12:00:00Z' : '2026-10-21T12:00:00Z',
+        author: { id: authorId, username: authorId, display_name: authorId, avatar_url: null },
+        restaurant: { id: 'restaurant', name: 'Restaurant', city: 'London', price_level: 2, image_url: null },
+        photos: [],
+      })), error: null }));
+    let visitAuthors;
+    const feed = loadSource('src/lib/db/feed.ts', {
+      '@/lib/supabase': { supabase: db },
+      '@/lib/db/storage': { ...storage, signedImageUrls: async () => new Map() },
+      '@/lib/db/restaurant-reviews': { listRestaurantVisitSummaries: async (authors) => {
+        visitAuthors = authors;
+        return [{ id: 'own-visit', actor, restaurant: { id: 'restaurant', name: 'Restaurant', priceLevel: 2, imageUrl: null },
+          dishes: [], overallRating: 4.5, photoUrl: null, createdAt: '2026-10-22T13:00:00Z' }];
+      } },
+    });
+    const result = await feed.listFeed('owner');
+    assert.deepEqual(db.calls.find(([table, method]) => table === 'reviews' && method === 'in'), ['reviews', 'in', 'user_id', expectedAuthors]);
+    assert.deepEqual(visitAuthors, expectedAuthors);
+    assert.deepEqual(result.map((activity) => activity.id), ['own-visit', 'own-review', ...(following.includes('friend') ? ['friend-review'] : [])]);
+    assert.ok(db.calls.some(([table, method, column, value]) => table === 'reviews' && method === 'is' && column === 'restaurant_review_id' && value === null));
+  });
+}
+
 test('Distance filters convert miles to kilometres and do not treat unknown distance as nearby', () => {
   assert.equal(filters.distanceKilometres('1 mi'), 1.609344);
   assert.equal(filters.distanceKilometres('Unknown'), null);

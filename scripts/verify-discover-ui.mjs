@@ -50,6 +50,7 @@ let empty = false;
 let searchDelay = null;
 let failMenu = false;
 let failFeedPhoto = false;
+let followNobody = false;
 const writes = [];
 await context.route('**/__fixture/photo.png', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: bitmap }));
 await context.route('**/__fixture/broken.png', (route) => route.fulfill({ status: 404, body: '' }));
@@ -82,13 +83,14 @@ await context.route((url) => url.hostname === supabaseUrl.hostname, async (route
   }
   if (failRestaurants && table === 'restaurants') return route.fulfill({ status: 500, json: { message: 'Fixture restaurant failure' } });
   let rows = [];
-  if (table === 'follows' && select === 'following_id') rows = [{ following_id: 'fixture-followee' }];
+  if (table === 'follows' && select === 'following_id') rows = followNobody ? [] : [{ following_id: 'fixture-followee' }];
   if (table === 'reviews' && select.includes('photos:review_photos')) rows = [{
     id: 'fixture-feed-review', user_id: 'fixture-followee', restaurant_id: restaurantId,
     rating: 4.5, review_text: 'A meal worth remembering', created_at: new Date().toISOString(),
-    like_count: 2, comment_count: 1, author: { ...profile, display_name: 'Fixture Friend' },
+    like_count: 2, comment_count: 1, author: followNobody ? profile : { ...profile, display_name: 'Fixture Friend' },
     dish, restaurant: { ...restaurant, image_url: failFeedPhoto ? `${baseUrl}/__fixture/broken.png` : photo }, photos: [],
   }];
+  if (table === 'reviews' && select.includes('photos:review_photos') && followNobody && !url.searchParams.get('user_id')?.includes(userId)) rows = [];
   if (table === 'profiles') rows = url.searchParams.has('username') || url.searchParams.has('display_name')
     ? [{ ...profile, id: 'fixture-person', display_name: 'Fixture Friend', username: 'fixture_friend' }] : [profile];
   if (table === 'cuisines') {
@@ -299,6 +301,11 @@ try {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   passed('Profile appearance changes immediately and the selected theme persists across reload');
+  followNobody = true;
+  await page.reload();
+  await visible(feedCard.getByRole('button', { name: "View Fixture Taster's profile", exact: true }));
+  passed('Home displays the signed-in user’s own review even when they follow nobody');
+  followNobody = false;
   await page.getByRole('button', { name: 'Log a dish', exact: true }).click();
   await visible(page.getByText('Where did you eat?', { exact: true }));
   await page.getByPlaceholder('Search restaurants...').fill('Ember');

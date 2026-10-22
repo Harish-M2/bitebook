@@ -19,7 +19,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(94);
+select plan(110);
 
 -- Fixture users (created directly in auth.users, mirroring supabase/seed.sql's approach).
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
@@ -1223,6 +1223,206 @@ select throws_ok(
     :'core_visit_id', :'core_visit_dish_id'),
   '42501', null,
   'another user cannot attach dishes to a private visit even with conflict handling'
+);
+reset role;
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited immediate;
+
+select is(
+  (select count(*)::int from pg_trigger where tgname in
+    ('reviews_mark_restaurant_visited', 'restaurant_reviews_mark_restaurant_visited')
+    and tgdeferrable and tginitdeferred and not tgisinternal),
+  2,
+  'review-to-visit triggers run after the complete review transaction'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.mark_review_restaurant_visited()', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.mark_review_restaurant_visited()', 'EXECUTE')
+  and not has_function_privilege('service_role', 'public.mark_review_restaurant_visited()', 'EXECUTE'),
+  'clients cannot directly execute the review-to-visit trigger helper'
+);
+
+select ok(
+  (select prosecdef and proconfig @> array['search_path=public']
+    from pg_proc where oid = 'public.mark_review_restaurant_visited()'::regprocedure),
+  'the trigger helper pins its definer search path'
+);
+
+insert into public.restaurants (name, slug, created_by_profile_id)
+values
+  ('Automatic visit', 'auto-review-visit', '11111111-1111-1111-1111-111111111111'),
+  ('Preserved visit', 'preserved-review-visit', '11111111-1111-1111-1111-111111111111'),
+  ('Grouped automatic visit', 'grouped-auto-review-visit', '11111111-1111-1111-1111-111111111111'),
+  ('Discarded review', 'discarded-review-visit', '11111111-1111-1111-1111-111111111111');
+
+insert into public.dishes (restaurant_id, name, created_by_profile_id)
+select id, 'Automatic visit dish', '11111111-1111-1111-1111-111111111111'
+from public.restaurants where slug in
+  ('auto-review-visit', 'preserved-review-visit', 'grouped-auto-review-visit', 'discarded-review-visit');
+
+insert into public.restaurant_visits (user_id, restaurant_id, visited_at, notes)
+select '11111111-1111-1111-1111-111111111111', id, '2026-09-01', 'Keep my visit notes'
+from public.restaurants where slug = 'preserved-review-visit';
+
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited deferred;
+
+select logged.review_id as auto_visit_review_id
+from public.restaurants restaurant
+join public.dishes dish on dish.restaurant_id = restaurant.id
+cross join lateral public.log_dish(restaurant.id, 4, dish.id, null, null, 'private', '2026-10-05') logged
+where restaurant.slug = 'auto-review-visit' \gset
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited immediate;
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'auto-review-visit'),
+  1,
+  'a private dish review marks its restaurant as visited'
+);
+
+select is(
+  (select visit.visited_at from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'auto-review-visit'),
+  '2026-10-05'::date,
+  'a standalone review uses the diary meal date rather than its creation date'
+);
+
+select is(
+  (select count(*)::int from public.restaurant_visit_dishes link
+    join public.restaurant_visits visit on visit.id = link.visit_id
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'auto-review-visit'),
+  1,
+  'the reviewed dish is attached to the automatic visit'
+);
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited deferred;
+
+select logged.* from public.restaurants restaurant
+join public.dishes dish on dish.restaurant_id = restaurant.id
+cross join lateral public.log_dish(restaurant.id, 4.5, dish.id, null, null, 'public', '2026-10-06') logged
+where restaurant.slug in ('auto-review-visit', 'preserved-review-visit');
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited immediate;
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'auto-review-visit'),
+  1,
+  'repeated reviews of the same restaurant do not duplicate its visit'
+);
+
+select is(
+  (select visit.visited_at from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'preserved-review-visit'),
+  '2026-09-01'::date,
+  'reviewing an existing visit preserves its saved date'
+);
+
+select is(
+  (select visit.notes from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'preserved-review-visit'),
+  'Keep my visit notes',
+  'reviewing an existing visit preserves its notes'
+);
+
+select is(
+  (select count(*)::int from public.restaurant_visit_dishes link
+    join public.restaurant_visits visit on visit.id = link.visit_id
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'preserved-review-visit'),
+  1,
+  'an existing visit also receives its reviewed dish'
+);
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited deferred;
+
+insert into public.restaurant_reviews (user_id, restaurant_id, overall_rating, recommendation_tier, visibility, visited_at)
+select '11111111-1111-1111-1111-111111111111', id, 4, 5, 'public', '2026-10-04'
+from public.restaurants where slug = 'grouped-auto-review-visit'
+returning id as auto_parent_review_id \gset
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited immediate;
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'grouped-auto-review-visit'),
+  1,
+  'a restaurant review marks the restaurant visited even without a child review'
+);
+
+select is(
+  (select visit.visited_at from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'grouped-auto-review-visit'),
+  '2026-10-04'::date,
+  'a restaurant review supplies its actual visit date'
+);
+
+insert into public.reviews (user_id, restaurant_id, dish_id, rating, visibility, restaurant_review_id)
+select '11111111-1111-1111-1111-111111111111', restaurant.id, dish.id, 4, 'public', :'auto_parent_review_id'
+from public.restaurants restaurant join public.dishes dish on dish.restaurant_id = restaurant.id
+where restaurant.slug = 'grouped-auto-review-visit';
+
+select is(
+  (select count(*)::int from public.restaurant_visit_dishes link
+    join public.restaurant_visits visit on visit.id = link.visit_id
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'grouped-auto-review-visit'),
+  1,
+  'a child dish review attaches to the restaurant review''s existing visit'
+);
+
+delete from public.reviews where id = :'auto_visit_review_id';
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'auto-review-visit'),
+  1,
+  'removing a review does not erase the visited history'
+);
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited deferred;
+
+insert into public.reviews (user_id, restaurant_id, dish_id, rating, visibility)
+select '11111111-1111-1111-1111-111111111111', restaurant.id, dish.id, 4, 'private'
+from public.restaurants restaurant join public.dishes dish on dish.restaurant_id = restaurant.id
+where restaurant.slug = 'discarded-review-visit'
+returning id as discarded_visit_review_id \gset
+
+delete from public.reviews where id = :'discarded_visit_review_id';
+
+set constraints reviews_mark_restaurant_visited, restaurant_reviews_mark_restaurant_visited immediate;
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug = 'discarded-review-visit'),
+  0,
+  'a review removed before transaction completion does not create a visit'
+);
+
+reset role;
+set local role authenticated;
+set local "request.jwt.claims" to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+select is(
+  (select count(*)::int from public.restaurant_visits visit
+    join public.restaurants restaurant on restaurant.id = visit.restaurant_id
+    where restaurant.slug in ('auto-review-visit', 'preserved-review-visit', 'grouped-auto-review-visit')),
+  0,
+  'automatically created visits remain private even for public reviews'
 );
 reset role;
 

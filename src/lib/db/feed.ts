@@ -62,10 +62,7 @@ export async function listRestaurantVisitFeedActivities(
 }
 
 /**
- * The home feed: reviews written by the people this user follows.
- *
- * Returns an empty array when the user follows nobody — that is the normal state for a new
- * account, not an error, and the screen renders its empty state for it.
+ * The home feed: this user's reviews alongside reviews by people they follow.
  */
 export async function listFeed(userId: string): Promise<FeedActivity[]> {
   const { data: following, error: followsError } = await supabase
@@ -77,20 +74,17 @@ export async function listFeed(userId: string): Promise<FeedActivity[]> {
     throw followsError;
   }
 
-  const followeeIds = (following ?? []).map((row) => row.following_id);
-  if (followeeIds.length === 0) {
-    return [];
-  }
+  const authorIds = [...new Set([userId, ...(following ?? []).map((row) => row.following_id)])];
 
   const [reviewResult, visits] = await Promise.all([
     supabase
       .from('reviews')
       .select(FEED_SELECT)
-      .in('user_id', followeeIds)
+      .in('user_id', authorIds)
       .is('restaurant_review_id', null)
       .order('created_at', { ascending: false })
       .limit(FEED_PAGE_SIZE),
-    listRestaurantVisitSummaries(followeeIds, FEED_PAGE_SIZE),
+    listRestaurantVisitSummaries(authorIds, FEED_PAGE_SIZE),
   ]);
 
   if (reviewResult.error) throw reviewResult.error;

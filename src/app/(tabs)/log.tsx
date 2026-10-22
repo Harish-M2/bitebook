@@ -186,6 +186,9 @@ export default function LogScreen() {
         void queryClient.invalidateQueries({ queryKey: queryKeys.feed(user.id) });
       }
       // The dish's aggregate rating and the restaurant's dish list both changed.
+      void queryClient.invalidateQueries({ queryKey: ['visited-list'] });
+      void queryClient.invalidateQueries({ queryKey: ['visit'] });
+      void queryClient.invalidateQueries({ queryKey: ['visit-dishes'] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.restaurants() });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-dishes'] });
       void queryClient.invalidateQueries({ queryKey: ['restaurant-visits', user?.id] });
