@@ -1474,3 +1474,14 @@ for both enabled and disabled states. The browser regression first reproduced th
 opacity, then passed with the fix. Its 41 checks now cover selecting/clearing dishes,
 rating dishes, and completing both restaurant rating and recommendation requirements;
 enabled Continue renders at opacity `1`, while incomplete steps remain disabled and dim.
+
+## 32. Light-Mode Icon and Home Contrast (2026-10-22)
+
+Branded icons now tint with semantic theme colors rather than retaining pale ivory/gold
+asset colors in light mode. The central Log glyph uses the contrasting background token;
+logos default to the active theme unless explicitly overridden. Home feed items have a
+distinct surface and border, and reuse FoodPhoto for loading and failed-media states.
+The isolated browser suite has 43 checks, including rendered light/dark icon tints,
+Home surface separation, themed logos, and failed photos. Mobile/desktop screenshots
+were reviewed at 320/390/1440px. TypeScript and lint pass; Expo Doctor remains unavailable
+without downloading its package. No database or security changes were needed.

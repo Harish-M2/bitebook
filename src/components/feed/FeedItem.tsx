@@ -1,7 +1,7 @@
-import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { FoodPhoto } from '@/components/food/FoodPhoto';
 import { Avatar } from '@/components/ui/Avatar';
 import { BrandIcon } from '@/components/ui/BrandIcon';
 import { Rating } from '@/components/ui/Rating';
@@ -65,7 +65,7 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress, on
   };
 
   return (
-    <View className={cn('gap-sm', className)}>
+    <View testID={`feed-item-${activity.id}`} className={cn('gap-sm rounded-md border border-border bg-surface p-md', className)}>
       <View className="flex-row items-center gap-xs">
         <Pressable
           onPress={onActorPress}
@@ -92,16 +92,17 @@ export function FeedItem({ activity, className, onCommentPress, onActorPress, on
           accessibilityRole={onSubjectPress ? 'button' : undefined}
           accessibilityLabel={onSubjectPress ? `View ${title ?? 'review'}` : undefined}
           style={{ alignItems: 'center' }}>
-          <Image
-            source={activity.photoUrl}
-            transition={150}
-            accessibilityLabel={title ?? 'Food photo'}
+          <FoodPhoto
+            uri={activity.photoUrl}
+            label={title ?? 'Food photo'}
+            emptyLabel="Photo unavailable"
             style={{
               width: '86%',
               maxWidth: 420,
               aspectRatio: 1.15,
               borderRadius: 18,
-              backgroundColor: colors.surfaceElevated,
+              borderWidth: 1,
+              borderColor: colors.border,
               alignSelf: 'center',
             }}
           />

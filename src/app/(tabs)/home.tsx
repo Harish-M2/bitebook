@@ -102,7 +102,7 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <FeedItem
             activity={item}
-            className="px-lg pb-lg"
+            className="mx-lg mb-lg"
             onSubjectPress={() => {
               if (item.visit) {
                 router.push({
@@ -123,7 +123,6 @@ export default function HomeScreen() {
             }}
           />
         )}
-        ItemSeparatorComponent={() => <View className="mx-lg mb-lg h-[1px] bg-border" />}
         ListEmptyComponent={
           feed.isPending ? (
             <FeedSkeleton />

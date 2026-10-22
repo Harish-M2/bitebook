@@ -36,7 +36,7 @@ function LogTabButton({ onPress }: LogTabButtonProps) {
           shadowOffset: { width: 0, height: 4 },
           elevation: 6,
         }}>
-        <BrandIcon name="add" size={26} variant="green" />
+        <BrandIcon name="add" size={26} variant="green" color="background" />
       </View>
     </Pressable>
   );

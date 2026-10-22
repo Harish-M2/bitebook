@@ -49,6 +49,7 @@ let failRestaurants = false;
 let empty = false;
 let searchDelay = null;
 let failMenu = false;
+let failFeedPhoto = false;
 const writes = [];
 await context.route('**/__fixture/photo.png', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: bitmap }));
 await context.route('**/__fixture/broken.png', (route) => route.fulfill({ status: 404, body: '' }));
@@ -81,6 +82,13 @@ await context.route((url) => url.hostname === supabaseUrl.hostname, async (route
   }
   if (failRestaurants && table === 'restaurants') return route.fulfill({ status: 500, json: { message: 'Fixture restaurant failure' } });
   let rows = [];
+  if (table === 'follows' && select === 'following_id') rows = [{ following_id: 'fixture-followee' }];
+  if (table === 'reviews' && select.includes('photos:review_photos')) rows = [{
+    id: 'fixture-feed-review', user_id: 'fixture-followee', restaurant_id: restaurantId,
+    rating: 4.5, review_text: 'A meal worth remembering', created_at: new Date().toISOString(),
+    like_count: 2, comment_count: 1, author: { ...profile, display_name: 'Fixture Friend' },
+    dish, restaurant: { ...restaurant, image_url: failFeedPhoto ? `${baseUrl}/__fixture/broken.png` : photo }, photos: [],
+  }];
   if (table === 'profiles') rows = url.searchParams.has('username') || url.searchParams.has('display_name')
     ? [{ ...profile, id: 'fixture-person', display_name: 'Fixture Friend', username: 'fixture_friend' }] : [profile];
   if (table === 'cuisines') {
@@ -249,8 +257,47 @@ try {
   assert.match(lightThemeState.className, /light/, JSON.stringify(lightThemeState));
   await page.reload({ waitUntil: 'networkidle' });
   assert.match(await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.className), /light/);
+  await page.goto(`${baseUrl}/home`);
+  const feedCard = page.getByTestId('feed-item-fixture-feed-review');
+  await visible(feedCard);
+  await visible(page.getByTestId('brand-logo-horizontal-light'));
+  const feedSurface = await feedCard.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, border: style.borderColor, width: style.borderTopWidth };
+  });
+  assert.equal(feedSurface.background, 'rgb(255, 255, 255)');
+  assert.equal(feedSurface.width, '1px');
+  assert.notEqual(feedSurface.border, feedSurface.background);
+  assert.equal(await page.getByTestId('brand-icon-discover-ivory').locator('feFlood').getAttribute('flood-color'), '#0E2F26');
+  assert.equal(await page.getByTestId('brand-icon-home-gold').locator('feFlood').getAttribute('flood-color'), '#8C5B28');
+  assert.equal(await page.getByTestId('brand-icon-add-green').locator('feFlood').getAttribute('flood-color'), '#F8F5ED');
+  assert.equal(await feedCard.getByTestId('brand-icon-comment-ivory').locator('feFlood').getAttribute('flood-color'), '#0E2F26');
+  passed('Light navigation, active tabs, Log glyph and feed actions render contrasting theme colors');
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.screenshot({ path: join(screenshots, `home-light-${width}.png`), fullPage: true });
+  }
+  failFeedPhoto = true;
+  await page.reload();
+  await visible(feedCard.getByLabel(`Photo unavailable for ${dish.name}`));
+  await page.screenshot({ path: join(screenshots, 'home-light-photo-fallback.png'), fullPage: true });
+  passed('Light Home separates feed content, uses the contrasting logo, and retains a visible failed-photo fallback');
+  failFeedPhoto = false;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/profile`);
   await page.getByRole('radio', { name: 'Dark', exact: true }).click();
   assert.match(await page.locator('#root div[style*="--bb-background"]').evaluate((element) => element.className), /dark/);
+  assert.equal(await page.getByTestId('brand-icon-home-ivory').locator('feFlood').getAttribute('flood-color'), '#F8F5ED');
+  assert.equal(await page.getByTestId('brand-icon-add-green').locator('feFlood').getAttribute('flood-color'), '#0B0D0E');
+  await page.goto(`${baseUrl}/home`);
+  await visible(feedCard);
+  await visible(page.getByTestId('brand-logo-horizontal-dark'));
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.screenshot({ path: join(screenshots, `home-dark-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   passed('Profile appearance changes immediately and the selected theme persists across reload');
   await page.getByRole('button', { name: 'Log a dish', exact: true }).click();
   await visible(page.getByText('Where did you eat?', { exact: true }));

@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 
 import { brandAssets } from '@/constants/branding';
+import { useAppTheme } from '@/hooks/useTheme';
 
 type BrandLogoProps = {
   variant?: 'horizontal' | 'stacked' | 'symbol' | 'wordmark';
@@ -9,8 +10,10 @@ type BrandLogoProps = {
   decorative?: boolean;
 };
 
-export function BrandLogo({ variant = 'horizontal', width = 144, onLight = false,
+export function BrandLogo({ variant = 'horizontal', width = 144, onLight: onLightProp,
   decorative = false }: BrandLogoProps) {
+  const { isDark } = useAppTheme();
+  const onLight = onLightProp ?? !isDark;
   const source = variant === 'symbol'
     ? (onLight ? brandAssets.logoSymbolDark : brandAssets.logoSymbol)
     : variant === 'wordmark' ? (onLight ? brandAssets.wordmarkDark : brandAssets.wordmarkLight)
